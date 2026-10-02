@@ -1679,7 +1679,7 @@ test('specialist hires launch in their own folder and preserve their role on res
   const f=fixture();const previous=process.env.FAKE_AGENT_LOG;process.env.FAKE_AGENT_LOG=f.log;
   t.after(()=>{if(previous===undefined) delete process.env.FAKE_AGENT_LOG;else process.env.FAKE_AGENT_LOG=previous;f.close();});
   const workers=manager(f,f.claude,[]);t.after(()=>workers.shutdown());
-  const hired=workers.spawn('desk-1','test','Edit the footage',false,'agent','claude',undefined,undefined,undefined,undefined,[],undefined,'video-editor');
+  const hired=workers.spawn('desk-1','test','Edit the footage',false,'agent','claude',undefined,undefined,undefined,undefined,[],'video-editor');
   assert.equal(typeof hired,'object');if(typeof hired==='string')return;
   assert.equal(hired.name,'Video Editor');assert.equal(hired.specialist,'video-editor');
   assert.equal(workers.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
