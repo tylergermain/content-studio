@@ -1,6 +1,6 @@
 # Specialist agents
 
-At an empty desk, choose **Hire**, then select **Video Editor**, **Researcher**, **Designer**, or a saved custom specialist. Choose Claude Code, Codex, or Pi (local) independently of the role. An optional task starts the session immediately. General workers keep their existing behavior.
+At an empty desk, choose **Hire**, then select **Video Editor**, **Researcher**, **Designer**, or a saved custom specialist. Choose Claude Code, Codex, or Pi (local) independently of the role. An optional task starts the session immediately. General workers remain available to admins. Human employee accounts can hire only roles allowed by the org chart.
 
 An admin can expand **Manage specialists** to edit the selected role or create a new one with a name, folder ID, and instructions. Saving creates these files under the floor's project:
 

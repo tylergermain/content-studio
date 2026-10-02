@@ -35,11 +35,13 @@ export const meetingHandlers = {
     ctx.withSignIn(c, ctx.claudeFor(request.provider ?? floor.workers.officeDefault.provider), () => ctx.withFreshBase(c, floor, () => ctx.warn(c, floor.meetings.start(request, who, c.accountId))));
   },
   'meeting.stop'(ctx, c) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Meeting controls are admin-only');
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.meetings.stop(who));
   },
   'meeting.clear'(ctx, c) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Meeting controls are admin-only');
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.meetings.clear(who));
