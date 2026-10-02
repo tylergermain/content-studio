@@ -10,6 +10,7 @@ import { builtFloors } from '../../core/floors';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder, waitingLabel } from '../../nextup';
 import { saveSettings, store } from '../../state';
+import { openOrgChart } from '../../ui/org-chart/ui';
 import { openAccounts } from '../../ui/accounts';
 import { openBoard } from '../../ui/boards';
 import { openCharacter } from '../../ui/character';
@@ -90,6 +91,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       { id: 'share', icon: '🖥️', label: () => (voice.sharing ? 'Stop sharing' : 'Share screen'), section: 'Together', on: () => voice.sharing, status: () => voice.sharing, chip: () => 'Sharing', blocked: noMedia, run: () => void talk.toggleShare() },
       { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Together', key: 'F', shown: () => inOffice(), on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
       { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Together', shown: () => store.invites, run: () => openTeam(net) },
+      { id: 'org-chart', icon: '🏢', label: 'Org chart', section: 'Together', shown: () => !!store.floor, run: () => openOrgChart() },
       { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Together', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
       { id: 'office-builder', icon: '📐', label: 'Office builder', section: 'Office', key: 'B', shown: () => store.me.admin && inOffice() && !!store.floor, run: () => openOfficeBuilder(net) },

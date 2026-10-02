@@ -1689,3 +1689,12 @@ test('specialist hires launch in their own folder and preserve their role on res
   assert.equal(restored.get(hired.id)?.specialist,'video-editor');
   assert.equal(restored.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
 });
+
+test('the central hiring policy blocks shells, stations and direct hires before starting a process', t=>{
+ const f=fixture();t.after(()=>f.close());const workers=manager(f,f.claude,[]);t.after(()=>workers.shutdown());
+ workers.hiringPolicy=()=> 'Only approved specialists';
+ assert.equal(workers.spawn('desk-1','employee',undefined,false,'shell'),'Only approved specialists');
+ assert.equal(workers.spawn('desk-1','employee','General task'),'Only approved specialists');
+ assert.equal(workers.station('station-issues','employee','Find issues'),'Only approved specialists');
+ assert.equal(f.read().length,0);assert.equal(workers.list().length,0);
+});

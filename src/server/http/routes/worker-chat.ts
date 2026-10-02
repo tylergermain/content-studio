@@ -1,3 +1,4 @@
+import { employeeWorkerError } from '../../org-chart/access.js';
 import path from 'node:path';
 import { displayChatText } from '../../../shared/worker-chat.js';
 import { open } from 'node:fs/promises';
@@ -42,6 +43,7 @@ export const workerChatRoutes = {
       }
       const floor = floorParam(ctx,url); const id = url.searchParams.get('worker') ?? '';
       if (!floor || !/^[a-zA-Z0-9_-]{1,80}$/.test(id) || !floor.workers.get(id)) return send(res,404,{error:'No such worker'});
+      if(req.method==='POST') { const denied=employeeWorkerError(ctx,floor,session.account?.id,id);if(denied)return send(res,403,{error:denied}); }
       if (p === '/api/worker-chat' && req.method === 'GET') {
         const data = await snapshot(floor,id,ctx.cfg.dataDir,admin);
         return data ? send(res,200,data) : send(res,400,{error:'Chat is available for agent workers'});

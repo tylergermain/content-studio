@@ -39,3 +39,7 @@ The local configuration is excluded by `/agents/*/mcp.local.json` in the floor's
 Pi reads the role instructions and uses its installed tools and extensions. Pi has no built-in MCP client, so a role with additional MCP servers is rejected for Pi until an adapter is implemented. This version does not automatically install adapters.
 
 The Video Editor role supplies editing instructions, not a new video editing engine. It uses installed skills, editing applications, CLI tools and configured MCP services. It preserves original production assets and needs the relevant tools available on the Studio.
+
+## Employee hiring
+
+Human member accounts see only specialists below their assigned org-chart position. Admins manage reporting relationships under **Org chart** in the office menu. See [employee permissions and delegation](org-chart.md). General workers remain available to admins, while employees need an assigned position with specialist roles underneath it.
