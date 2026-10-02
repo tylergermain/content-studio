@@ -10,6 +10,8 @@ import { employeeWorkerError } from '../src/server/org-chart/access.js';
 import { orgChartRoute } from '../src/server/http/routes/org-chart.js';
 import { specialistRoute } from '../src/server/http/routes/specialists.js';
 import { officeWorkers } from '../src/server/hooks/office-workers.js';
+import { queueHandlers } from '../src/server/ws/handlers/queue.js';
+import { meetingHandlers } from '../src/server/ws/handlers/meetings.js';
 import { parseArgs } from '../bin/office-workers.js';
 import type { Account } from '../src/server/accounts.js';
 import type { WorkerInfo } from '../src/shared/protocol.js';
@@ -72,4 +74,13 @@ test('MCP delegation inherits the human employee’s limits and ignores a spoofe
  assert.equal((await post({worker:'target',prompt:'Hire anything for me'},'/tell')).status,403);
  const deniedHome=await (await post({workers:['target']},'/home')).json();assert.match(deniedHome.results[0].error,/own account/);
  assert.equal(parseArgs(['hire','--specialist','researcher','--prompt','Research']).specialist,'researcher');
+});
+
+test('employees cannot trigger unrestricted queue workers through retries or worker-limit changes',()=>{
+ const warnings:string[]=[];let invoked=0;const mutate=()=>{invoked++;};
+ const floor={queue:{add:mutate,remove:mutate,move:mutate,retry:mutate,clear:mutate,setLimit:mutate},meetings:{start:mutate,stop:mutate,clear:mutate}};
+ const ctx={meOf:()=>({admin:false}),floorOf:()=>floor,warn:(_c:unknown,message:string)=>warnings.push(message)};
+ const c={accountId:'employee',peer:{name:'Employee'}};
+ for(const [type,handler] of Object.entries({...queueHandlers,...meetingHandlers}))(handler as Function)(ctx,c,{t:type,taskId:'task',maxWorkers:20,prompt:'Create a general worker'});
+ assert.equal(invoked,0);assert.equal(warnings.length,9);
 });

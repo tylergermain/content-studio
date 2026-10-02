@@ -23,12 +23,12 @@ export async function officeQueue(ctx: Ctx, req: http.IncomingMessage, res: http
     };
   };
   if (req.method === 'GET') return send(res, 200, view());
+  const denied=floor.workers.hiringPolicy?.(floor.workers.ownerOf(agent.id),undefined,'agent');if(denied)return send(res,403,{error:denied});
   if (req.method === 'DELETE') {
     const err = floor.queue.remove(url.searchParams.get('task') ?? '');
     return err ? send(res, 400, { error: err }) : send(res, 200, view());
   }
   if (req.method !== 'POST') return send(res, 405, { error: 'GET, POST or DELETE' });
-  const denied=floor.workers.hiringPolicy?.(floor.workers.ownerOf(agent.id),undefined,'agent');if(denied)return send(res,403,{error:denied});
   let body: { prompt?: unknown; title?: unknown; issue?: unknown };
   try {
     body = JSON.parse(await readBody(req));
