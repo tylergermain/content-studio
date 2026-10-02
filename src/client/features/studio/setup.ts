@@ -4,10 +4,11 @@ import { LIMITS, STUDIO_AGENTS, STUDIO_BOARDS, type BoardFeed, type SlackChannel
 import type { Net } from '../../net';
 import { store } from '../../state';
 import { h, openModal, toast } from '../../ui/dom';
+import { watchSection } from './watch-setup';
 
 // Making a floor its own (admins): what the two wall boards are for and where their posts come from,
-// who stands at each kiosk and what they're told, the prices on its stock ticker, and what the office
-// is signed in to so it can fill a board by itself.
+// who stands at each kiosk and what they're told, the prices on its stock ticker, the YouTube channels
+// its screens follow, and what the office is signed in to so it can fill a board by itself.
 
 const WHERE: Record<StudioBoard, string> = { issues: 'Left board (where Issues hangs)', pulls: 'Right board (where Pull Requests hangs)' };
 const KIOSK: Record<StationKind, string> = { issues: 'Kiosk by the left board', queue: 'Kiosk by the task queue', pulls: 'Kiosk by the right board' };
@@ -120,6 +121,9 @@ export function openStudioSetup(net: Net) {
     ),
   );
 
+  // ---- The channels its screens follow (see watch-setup.ts) ---------------------------------------
+  const watch = watchSection();
+
   const save = h('button.btn.primary', { type: 'button' }, 'Save for this floor');
   const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '✕');
   const el = h(
@@ -141,6 +145,8 @@ export function openStudioSetup(net: Net) {
         h('p.note', {}, 'Live prices, read every minute. Stocks by their symbol, indexes like ^GSPC, crypto like BTC-USD.'),
         h('p.note', {}, 'They slide along the stock ticker bar, and go up as a table on the market board: both come from the office builder’s catalog (Work › Stock ticker, Work › Market board). A floor with neither shows no prices.'),
       ),
+      h('h3', {}, 'Channels to watch'),
+      watch.el,
       h('h3', {}, 'Connections'),
       connections,
     ),
@@ -159,9 +165,12 @@ export function openStudioSetup(net: Net) {
       for (const b of boards) b.drawChannels();
     }),
   ];
+  offs.push(watch.off);
   const modal = openModal(el, { doing: '🪧 setting up the floor', onClose: () => offs.forEach((off) => off()) });
   close.addEventListener('click', () => modal.close());
   save.addEventListener('click', () => {
+    const channels = watch.value();
+    if ('bad' in channels) return toast(`Not a YouTube channel or video link: ${channels.bad[0]}`, 'warn');
     const setup: StudioSetup = { boards: {}, agents: {} };
     for (const b of boards) {
       const v = b.value();
@@ -173,6 +182,7 @@ export function openStudioSetup(net: Net) {
     }
     const list = symbols.value.split(/[\s,]+/).filter(Boolean);
     if (list.length) setup.ticker = { symbols: list };
+    if (channels.channels.length) setup.watch = channels;
     net.send({ t: 'studio.setup', setup });
     modal.close();
   });

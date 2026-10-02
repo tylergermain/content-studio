@@ -1,6 +1,7 @@
 /** The board agents: what each is for, and the ones waiting by their boards before anyone has asked them anything. */
 import { STATION_AGENT, type StationKind } from '../../shared/layout';
 import { store } from '../state';
+import { resolvedProvider } from '../ui/provider';
 import { Worker } from '../world/character';
 import type { DeskView } from '../world/types';
 import type { World } from '../world/world';
@@ -47,6 +48,10 @@ export function idleAgentsIn(w: World): IdleAgent[] {
       model.setTask({ name: stationInfo(kind).offer, summary: stationInfo(kind).does });
     });
     model.setOutfit(w.plan.agents.outfit === 'peasant' ? 'peasant' : null);
+    // It runs on whatever the office hires by default, and wears that on its antenna.
+    const wear = () => model.setProvider(resolvedProvider(undefined, store.project));
+    wear();
+    store.on('project', wear);
     const view = w.desks.get(def.id)!;
     view.vacancy.children[0].add(model.root);
     noOutline(model.root);

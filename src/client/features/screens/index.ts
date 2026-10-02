@@ -2,10 +2,11 @@
  * Video screens (the kinds that play, see KindDef.plays in shared/furniture.ts): each plays the floor's
  * own videos, from its media folder (see server/media.ts), on a loop. A screen that names a file
  * (Piece.media) loops that one; the rest take the folder's videos in turn, each starting on a different
- * one. Looking at one, E opens what's on it in a window, with its sound.
+ * one. A screen set to the channels the floor watches plays their newest videos instead (see watch.ts).
+ * Looking at one, E opens what's on it in a window, with its sound.
  */
 import * as THREE from 'three';
-import { kindDef } from '../../../shared/furniture';
+import { WATCH_MEDIA, kindDef } from '../../../shared/furniture';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
@@ -14,6 +15,7 @@ import { idleCard, troubleCard } from './card';
 import { ScreenPlayer } from './player';
 import { LIST_AT_MOST_EVERY, LIST_EVERY, freeSlot, mediaFolder, mediaListUrl, nextAfter, programme, startOf, type MediaFile, type Programme } from './playlist';
 import { openScreenWindow } from './ui';
+import { WatchScreens } from './watch';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -58,6 +60,8 @@ export function installScreens(ctx: Ctx) {
   const bad = new Map<string, number>();
   let retryAt = 0;
   const cards = new Map<string, THREE.CanvasTexture>();
+  /** The screens that play the channels the floor watches, rather than its folder. */
+  const watch = new WatchScreens(ctx);
 
   const folder = () => mediaFolder(store.currentFloor()?.dir ?? '…');
 
@@ -155,6 +159,7 @@ export function installScreens(ctx: Ctx) {
   function leave() {
     for (const s of screens.values()) s.player.dispose();
     screens.clear();
+    watch.leave();
     for (const c of cards.values()) c.dispose();
     cards.clear();
     bad.clear();
@@ -191,6 +196,13 @@ export function installScreens(ctx: Ctx) {
       }
       // Its face is a new one whenever the piece is built again (painted another color), so it's checked every frame.
       s.player.attach(v.screen);
+      if (v.piece.media === WATCH_MEDIA) {
+        // The channels' videos, on YouTube's own player over the face: its own picture is only the card under that.
+        s.named = WATCH_MEDIA;
+        s.player.idle(watch.keep(id, v.screen));
+        s.player.tick(dt, false);
+        continue;
+      }
       const renamed = s.named !== v.piece.media;
       s.named = v.piece.media;
       if (list && (renamed || s.seen !== look)) {
@@ -205,6 +217,7 @@ export function installScreens(ctx: Ctx) {
       s.player.dispose();
       screens.delete(id);
     }
+    watch.sweep();
     // Looks in the folder when you arrive, when a screen's put up, and every minute after: a file dropped in shows up by itself.
     if (here && screens.size && !looking) {
       const since = now - lookedAt;
@@ -220,11 +233,14 @@ export function installScreens(ctx: Ctx) {
   ctx.interactions.define('screen', {
     reach: 6,
     hint: (it) => {
+      const watching = watch.hint(it.pieceId);
+      if (watching) return watching;
       const file = it.pieceId ? screens.get(it.pieceId)?.player.file : undefined;
       if (!file) return { k: 'idle', parts: [hintTitle('📺 Video screen'), aside('Nothing to play yet')] };
       return { k: file.name, parts: [hintTitle(`📺 ${file.name}`), key('E', file.kind === 'video' ? 'Watch with sound' : 'Look closer')] };
     },
     use: onE((it) => {
+      if (watch.open(it.pieceId)) return;
       const player = it.pieceId ? screens.get(it.pieceId)?.player : undefined;
       const file = player?.file;
       if (!floor || !player || !file) return void toast(`📺 Drop videos in ${folder()}`);

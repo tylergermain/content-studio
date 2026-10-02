@@ -6,3 +6,5 @@
 .jb-disc.spin { animation: jb-spin 2.4s linear infinite; }
 @keyframes jb-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .jb-disc.spin { animation: none; } }
+.jb-name { display: block; width: 100%; margin-top: 8px; }
+.jb-now .jb-full { color: var(--ink); }

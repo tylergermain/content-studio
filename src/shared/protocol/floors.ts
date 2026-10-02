@@ -10,6 +10,7 @@ import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
 import type { StudioState, TickerState } from '../studio.js';
+import type { WatchState } from './watch.js';
 import type { WhiteboardView } from '../whiteboard.js';
 import type { AgentProvider } from './agents.js';
 import type { GhIssue, GhPull, GhState } from './github.js';
@@ -131,6 +132,8 @@ export interface FloorView {
   studio: StudioState;
   /** The prices on this floor's ticker (none, when it has no ticker). */
   ticker: TickerState;
+  /** The newest videos from the YouTube channels this floor watches (none, when it watches none). */
+  watch: WatchState;
 }
 
 export type FloorClientMsg =

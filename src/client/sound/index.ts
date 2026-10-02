@@ -304,6 +304,11 @@ export class OfficeSound {
     this.music.setMusicVolume(volume, muted);
   }
 
+  /** How loud the jukebox's music is where you stand, 0–1, for what plays outside Web Audio (the video on the lounge TV). */
+  musicHeard(): number {
+    return this.music.heard();
+  }
+
   /** 1 on each beat of the tune, falling to 0 before the next, for the jukebox's lights. */
   beat(): number {
     return this.music.beat();

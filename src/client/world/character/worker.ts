@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import type { Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
+import type { AgentProvider, Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
 import { isAsleep, type WorkerPr } from '../../../shared/status';
 import { beard, grime, peasantGarb, type Beard, type PeasantGarb } from '../costumes';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
@@ -7,12 +7,13 @@ import type { WorkerRig } from './rig';
 import { ease, popIn } from './curves';
 import { undress } from './props';
 import { ACT_MIN, DESPAIR_MIN, TWIRL_TIME, WAIT_CYCLE, WAIT_HOPS, blendStance, type Act, type Stance } from './worker-stance';
-import { STATUS_BULB, bubbleFor } from './worker-badges';
+import { bubbleFor } from './worker-badges';
 import { globe, papers } from './worker-props';
 import { DANCE, groove, type Dancing, type Stage } from './worker-dance';
 import { DEAD, STARVED, bones, crossedEyes, slump } from './worker-jail';
 import { packUp, waddle, type Leaving } from './worker-leave';
 import { dressUp, growBeard, wearGarb } from './worker-dress';
+import { Antenna } from './worker-antenna';
 
 /** The little Claude worker that sits at a desk. Forward is +z. */
 export class Worker {
@@ -20,8 +21,8 @@ export class Worker {
   private body = new THREE.Group();
   /** Its moving parts, for what poses them from the other files here (a dance, a cell, a costume). */
   private rig: WorkerRig;
-  private bulb: THREE.MeshToonMaterial;
-  private bulbMesh: THREE.Mesh;
+  /** Its antenna: the stalk, its status light, and on that the emblem of what it runs on (see worker-antenna.ts). */
+  private antenna = new Antenna(this.body);
   private armL: THREE.Object3D;
   private armR: THREE.Object3D;
   private bubble: THREE.Sprite | null = null;
@@ -130,12 +131,6 @@ export class Worker {
       this.body.add(cup);
       this.headset.push(cup);
     }
-    // Antenna with status bulb
-    this.body.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#2b2d42'), 0, 1.07, 0, false));
-    this.bulb = toonUnique(STATUS_BULB.starting);
-    this.bulb.emissive = new THREE.Color(STATUS_BULB.starting).multiplyScalar(0.6);
-    this.bulbMesh = mesh(new THREE.SphereGeometry(0.075, 12, 10), this.bulb, 0, 1.2, 0, false);
-    this.body.add(this.bulbMesh);
 
     const arm = (x: number) => {
       const pivot = new THREE.Group();
@@ -161,13 +156,18 @@ export class Worker {
     for (const prop of [this.papers.group, this.globe.group]) prop.visible = false;
     this.root.add(this.globe.group);
 
-    this.rig = { root: this.root, body: this.body, skin: this.skin, armL: this.armL, armR: this.armR, feet: this.feet, pupils: this.pupils, bulb: this.bulb, bulbMesh: this.bulbMesh, props: [this.papers.group, this.globe.group] };
+    this.rig = { root: this.root, body: this.body, skin: this.skin, armL: this.armL, armR: this.armR, feet: this.feet, pupils: this.pupils, bulb: this.antenna.bulb, bulbMesh: this.antenna.light, props: [this.papers.group, this.globe.group] };
     this.setName(name);
   }
 
   /** Where the globe floats, in its own space: beside its laptop, where the card over its head doesn't hide it. */
   setPropSpot(at: THREE.Vector3) {
     this.spot.copy(at);
+  }
+
+  /** What it runs on, which the emblem on its antenna shows: none (a shared shell, the bartender) wears the plain one. */
+  setProvider(provider: AgentProvider | undefined) {
+    this.antenna.wear(provider);
   }
 
   /** What its latest tool call was, to act out while it's working. */
@@ -252,14 +252,8 @@ export class Worker {
   setStatus(status: WorkerStatus, bounce: boolean) {
     this.status = status;
     this.bouncing = bounce;
-    if (!this.dancing) this.paintBulb();
+    if (!this.dancing) this.antenna.paint(status);
     this.drawBubble();
-  }
-
-  private paintBulb() {
-    const c = STATUS_BULB[this.status] ?? '#adb5bd';
-    this.bulb.color.set(c);
-    this.bulb.emissive.set(c).multiplyScalar(0.7);
   }
 
   /** Jumps for joy, arms up, for a few seconds. */
@@ -319,8 +313,7 @@ export class Worker {
     this.armR.position.set(0.3, 0.55, 0.05);
     this.feet.forEach((f, i) => f.position.set(i ? 0.12 : -0.12, 0.2, 0.05));
     for (const p of this.pupils) p.position.y = 0.7;
-    this.bulb.color.set(STATUS_BULB.exited);
-    this.bulb.emissive.set('#000000');
+    this.antenna.dark();
     if (this.bubble) {
       this.root.remove(this.bubble);
       disposeSprite(this.bubble);
@@ -376,8 +369,7 @@ export class Worker {
       this.twirlT = -1;
       this.dancing = null;
       for (const prop of [this.papers.group, this.globe.group]) prop.visible = false;
-      this.bulb.color.set(STATUS_BULB.exited);
-      this.bulb.emissive.set('#000000');
+      this.antenna.dark();
       if (this.bubble) {
         this.root.remove(this.bubble);
         disposeSprite(this.bubble);
@@ -418,7 +410,6 @@ export class Worker {
   private languish(dt: number, t: number) {
     const { thin, dead } = this.jailed!;
     slump(this.rig, this.jailed!, this.skeleton, this.fell, this.phase, t);
-    this.bulbMesh.scale.setScalar(1);
     this.blink(dt, dead ? 1 : 1 - 0.55 * thin);
     if (this.mutterT > 0) {
       this.mutterT -= dt;
@@ -432,6 +423,8 @@ export class Worker {
   }
 
   update(dt: number, t: number) {
+    // Its emblem stands still once it's locked up or packing, and spins as if at work through a dance.
+    this.antenna.update(dt, t, this.jailed || this.leaving ? 'exited' : this.dancing ? 'working' : this.status);
     if (this.jailed) return this.languish(dt, t);
     if (this.leaving) return this.carry(this.leaving, dt, t);
     if (this.dancing) return this.boogie(this.dancing, dt, t);
@@ -492,7 +485,6 @@ export class Worker {
     this.body.rotation.z = isAsleep(this.status) ? Math.sin(t * 1.5) * 0.08 : s.roll;
     this.props(dt, t);
     this.blink(dt, s.lid);
-    this.bulbMesh.scale.setScalar(this.status === 'needs_input' ? 1 + Math.abs(Math.sin(t * 8)) * 0.5 : 1);
     if (this.bubble) this.bubble.position.y = (this.bubbleIsCard ? 1.74 : 1.95) + (hopping ? this.body.position.y : 0) + Math.sin(t * 3) * 0.03;
     if (this.nameTag) this.nameTag.position.y = 1.55 + (hopping ? this.body.position.y : 0);
     // Walking in to a meeting: the same waddle as on the way out, without the box.
@@ -568,8 +560,7 @@ export class Worker {
     this.body.scale.setScalar(1);
     for (const a of [this.armL, this.armR]) a.rotation.z = 0;
     for (const f of this.feet) f.position.set(f.position.x, 0.2, 0.05);
-    this.bulbMesh.scale.setScalar(1);
-    this.paintBulb();
+    this.antenna.paint(this.status);
   }
 
   /** `lid` narrows the eyes (1 = wide open) between blinks. */

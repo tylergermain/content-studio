@@ -18,9 +18,13 @@ export function seatable(obj: THREE.Object3D, seatId: string, radius: number, in
   obj.userData.interact = it;
 }
 
-export function chair(color: string): THREE.Group {
+/** The colour of every chair in the office: one graphite, whoever's desk it's at. */
+export const CHAIR_COLOR = '#2b2d42';
+
+/** A swivel chair. They're all CHAIR_COLOR: the colour a caller asks for is no longer used. */
+export function chair(_color?: string): THREE.Group {
   const g = new THREE.Group();
-  const mat = toon(color);
+  const mat = toon(CHAIR_COLOR);
   g.add(mesh(roundedBox(0.62, 0.1, 0.58, 0.12), mat, 0, 0.5, 0));
   const back = mesh(roundedBox(0.62, 0.1, 0.6, 0.12), mat, 0, 0.86, 0.27);
   back.rotation.x = Math.PI / 2 - 0.12;

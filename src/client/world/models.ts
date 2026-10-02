@@ -14,6 +14,7 @@ import playUrl from '../models/play.glb?url';
 import plantsUrl from '../models/plants.glb?url';
 import roomsUrl from '../models/rooms.glb?url';
 import studioUrl from '../models/studio.glb?url';
+import toppersUrl from '../models/toppers.glb?url';
 import { toon } from './toon';
 
 // The things in the world modelled in Blender rather than built in code. Each .glb is exported by a
@@ -34,6 +35,7 @@ const MODELS = {
   greenery: { url: greeneryUrl, preload: true },
   rooms: { url: roomsUrl, preload: true },
   studio: { url: studioUrl, preload: true },
+  toppers: { url: toppersUrl, preload: true },
 } satisfies Record<string, { url: string; preload: boolean }>;
 
 export type ModelName = keyof typeof MODELS;

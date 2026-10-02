@@ -149,13 +149,21 @@ export class Voice {
     if (this.talking) this.setMuted(true);
   }
 
-  async startShare(): Promise<string | null> {
+  /**
+   * Shares your screen (the browser asks which). Given a `source`, that's what goes out instead (the
+   * game on the boss's monitor, see features/boss-desk), with nothing to ask: you're sharing by the
+   * time this returns.
+   */
+  async startShare(source?: MediaStream): Promise<string | null> {
     if (this.screen) return null;
-    if (!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia) return 'Screen sharing needs HTTPS (or localhost).';
-    try {
-      this.screen = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
-    } catch (err) {
-      return (err as Error).name === 'NotAllowedError' ? null : `Could not share: ${(err as Error).message}`;
+    if (source) this.screen = source;
+    else {
+      if (!window.isSecureContext || !navigator.mediaDevices?.getDisplayMedia) return 'Screen sharing needs HTTPS (or localhost).';
+      try {
+        this.screen = await navigator.mediaDevices.getDisplayMedia({ video: { frameRate: 15 }, audio: false });
+      } catch (err) {
+        return (err as Error).name === 'NotAllowedError' ? null : `Could not share: ${(err as Error).message}`;
+      }
     }
     const track = this.screen.getVideoTracks()[0];
     track.contentHint = 'detail';

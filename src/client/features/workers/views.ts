@@ -24,7 +24,7 @@ import { $ } from '../../ui/dom';
 import { expandSign, openExpand } from '../../ui/floorplan';
 import { renderWorkers } from '../../ui/workers-panel';
 import { renderLimits } from '../../ui/limits';
-import { modelBadge, providerLabel } from '../../ui/provider';
+import { modelBadge, providerLabel, resolvedProvider } from '../../ui/provider';
 import { renderUsage } from '../../ui/usage';
 import { Worker } from '../../world/character';
 import { Jail } from './jail';
@@ -161,6 +161,8 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
       v.model.setAction(w.action);
       v.model.setPr(workerPr(w, store.pulls.items, store.queue.tasks));
       v.model.setLost(!!w.lost);
+      // The emblem on its antenna is what it runs on: its own provider, or the office's for one hired before they were kept.
+      v.model.setProvider(w.kind === 'agent' ? resolvedProvider(w.provider, store.project) : undefined);
       const engineBadge = w.kind === 'agent' ? modelBadge(w.provider, w.model, w.effort, w.usage?.model) : undefined;
       v.model.setTask(meetingCard(w) ?? (w.task && w.kind === 'agent' ? { ...w.task, name: `${providerLabel(w.provider, store.project)}${engineBadge ? ` · ${engineBadge}` : ''} · ${w.task.name}` } : w.task));
       const deskDef = plan().byId.get(w.deskId);

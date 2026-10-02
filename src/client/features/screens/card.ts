@@ -93,6 +93,9 @@ function draw(card: Card): THREE.CanvasTexture {
   return t;
 }
 
+/** What a screen that plays the channels the floor watches shows with nothing to play (see watch.ts). */
+export const channelsCard = (card: { title: string; lead: string; boxed: string[]; foot: string }): THREE.CanvasTexture => draw(card);
+
 /** Nothing in the floor's media folder yet: where to put videos. */
 export function idleCard(folder: string): THREE.CanvasTexture {
   return draw({ title: 'Nothing to play yet', lead: 'Drop videos in', boxed: wrapPath(folder, 54), foot: 'MP4 or WebM · they loop here, a different one on each screen' });

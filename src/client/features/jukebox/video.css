@@ -1,0 +1,16 @@
+/* The jukebox's video when it isn't on the lounge TV: docked in a corner of the HUD while a shared
+   screen has the TV, and the chip that turns its sound on in a browser that's waiting to be touched. */
+#hud > .jb-corner { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: none; }
+.jb-corner > * { pointer-events: auto; }
+
+/* Never narrower than 200px: YouTube's player has to stay big enough to see and to use. */
+.jb-dock { width: clamp(200px, 22vw, 280px); padding: 6px; border-radius: var(--r-lg); }
+.jb-dock-player { position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--r-md); background: #000; }
+/* Everyone's at the same point in it, so it isn't there to be paused or scrubbed: a click goes to the office. */
+.jb-dock-player iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; pointer-events: none; }
+.jb-dock-title { padding: 6px 5px 2px; font-size: 12px; font-weight: 500; color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.jb-chip { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); border-radius: 999px; cursor: pointer; transition: background-color .15s var(--ease), transform .12s var(--ease); }
+.jb-chip:hover { background-color: var(--glass-hover); }
+.jb-chip:active { transform: scale(.97); }
+.jb-chip:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 1px; }

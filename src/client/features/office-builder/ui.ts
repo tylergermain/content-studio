@@ -11,6 +11,7 @@ import { WING } from '../../../shared/layout';
 import { SNAP, type DeskPose } from '../../../shared/office-builder';
 import { store } from '../../state';
 import { h } from '../../ui/dom';
+import { mediaPicker } from './media-picker';
 
 /** What's picked, as the inspector shows it: a piece of furniture, or (with no `piece`) one of the room's desks. */
 export interface Picked {
@@ -51,7 +52,7 @@ export interface BuilderActions {
   recolor(color: string): void;
   resize(scale: number): void;
   retext(text: string): void;
-  /** The one video a screen plays, by its name in the floor's media folder; '' for every video there. */
+  /** What a screen plays: one video, by its name in the floor's media folder; WATCH_MEDIA; or '' for every video there. */
   remedia(media: string): void;
   duplicate(): void;
   remove(): void;
@@ -190,12 +191,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
         ),
       );
     }
-    if (p.piece && k?.plays) {
-      const input = h('input', { type: 'text', maxlength: 120, autocomplete: 'off', spellcheck: 'false', placeholder: 'every video in the folder' }) as HTMLInputElement;
-      input.value = p.piece.media ?? '';
-      input.addEventListener('change', () => act.remedia(input.value.trim()));
-      out.push(field('Plays (a file in the floor’s .agent-office/media)', input));
-    }
+    if (p.piece && k?.plays) out.push(...mediaPicker(p.piece.media, act.remedia));
     if (k?.fixed) out.push(h('p.ob-note', {}, 'The office has one of these. Remove it and this floor goes without; the catalog puts it back.'), button('Remove from this floor', 'Take it off this floor (Delete)', act.remove, '.danger'));
     else if (p.piece) out.push(h('div.ob-row', {}, button('Duplicate', 'Another one like it (Ctrl/⌘ D)', act.duplicate), button('Remove', 'Take it off the floor (Delete)', act.remove, '.danger')));
     else out.push(button('Change desk sign', 'The sign hanging over this desk', act.sign));

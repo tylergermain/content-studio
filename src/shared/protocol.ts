@@ -16,6 +16,7 @@ import type { SettingsClientMsg, SettingsServerMsg } from './protocol/settings.j
 import type { StudioClientMsg, StudioServerMsg } from './protocol/studio.js';
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
+import type { WatchServerMsg } from './protocol/watch.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
 
 export * from './protocol/accounts.js';
@@ -31,6 +32,7 @@ export * from './protocol/settings.js';
 export * from './protocol/studio.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
+export * from './protocol/watch.js';
 export * from './protocol/workers.js';
 
 export type ClientMsg =
@@ -70,4 +72,5 @@ export type ServerMsg =
   | SettingsServerMsg
   | UsageServerMsg
   | ToysServerMsg
-  | StudioServerMsg;
+  | StudioServerMsg
+  | WatchServerMsg;

@@ -20,6 +20,7 @@ import type { installBar } from '../features/bar';
 import type { installBarGames } from '../features/bargames';
 import type { installBasketball } from '../features/basketball';
 import type { installBoards } from '../features/boards';
+import type { installBossDesk } from '../features/boss-desk';
 import type { installBookshelf } from '../features/bookshelf';
 import type { installCabinet } from '../features/cabinet';
 import type { installCarrying } from '../features/carrying';
@@ -122,6 +123,7 @@ export interface Parts {
   hoops: Made<typeof installBasketball>;
   cards: Made<typeof installCarrying>;
   seating: Made<typeof installSeating>;
+  bossDesk: Made<typeof installBossDesk>;
   studio: Made<typeof installStudio>;
   emotes: Made<typeof installEmotes>;
   talk: Made<typeof installVoice>;

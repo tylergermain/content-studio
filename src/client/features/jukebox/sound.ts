@@ -1,5 +1,5 @@
 import { JUKEBOX_AT } from '../../sound/places';
-import { STREAM } from '../../../shared/jukebox';
+import { STREAM, YOUTUBE } from '../../../shared/jukebox';
 import type { AudioCore } from '../../sound/core';
 import { biquad, rms } from '../../sound/dsp';
 import { TunePlayer } from '../../sound/music';
@@ -92,6 +92,7 @@ export class Jukebox {
   beat(): number {
     if (this.tune) return this.tune.beat(this.musicAt());
     if (this.stream && !this.stream.paused) return 0.35 + 0.25 * Math.sin(performance.now() / 320);
+    if (this.jukebox?.track === YOUTUBE) return 0.35 + 0.25 * Math.sin(performance.now() / 320);
     return 0;
   }
 
@@ -126,6 +127,8 @@ export class Jukebox {
     const j = this.jukebox;
     if (!j) return;
     if (j.track === STREAM && j.url) return this.startStream(j.url);
+    // A YouTube video plays in YouTube's own player on the lounge TV (see video.ts), at heard().
+    if (j.track === YOUTUBE) return;
     const tune = (this.tune = new TunePlayer(ctx, this.musicIn, j.track));
     this.a.count('tune');
     // On a timer rather than every frame, so it carries on in a background tab.
@@ -174,8 +177,13 @@ export class Jukebox {
   /** A stream plays outside Web Audio (most don't allow that), so it gets quieter with distance by hand. */
   private hearStream() {
     if (!this.stream) return;
+    this.stream.volume = this.heard();
+  }
+
+  /** How loud what plays outside Web Audio (a stream, a video) is where you stand, 0–1: your music volume, fading with distance as the tunes do. */
+  heard(): number {
     const d = Math.max(MUSIC_REF, this.jukeboxDistance());
-    this.stream.volume = Math.min(1, this.musicGain() * (MUSIC_REF / (MUSIC_REF + MUSIC_ROLLOFF * (d - MUSIC_REF))));
+    return Math.min(1, this.musicGain() * (MUSIC_REF / (MUSIC_REF + MUSIC_ROLLOFF * (d - MUSIC_REF))));
   }
 
   private jukeboxDistance(): number {
