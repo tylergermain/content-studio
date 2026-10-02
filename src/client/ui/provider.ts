@@ -96,7 +96,9 @@ export function officeChoice(project: ProjectInfo | null): AgentChoice {
   if (picked && supportedProviders(project).includes(picked.provider)) {
     return { provider: picked.provider, ...(picked.model ? { model: picked.model } : {}), ...(picked.effort ? { effort: picked.effort } : {}) };
   }
-  return { provider: supportedProviders(project)[0] };
+  const supported = supportedProviders(project);
+  const configured = project?.defaultProvider;
+  return { provider: configured && supported.includes(configured) ? configured : supported[0] };
 }
 
 /** "Claude Code · Opus · High", "Claude Code", "OpenCode · anthropic/claude-sonnet-4", "Grok · grok-4.6". */
