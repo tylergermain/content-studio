@@ -64,13 +64,12 @@ export class WorkerManager {
   private worktrees: WorkerTrees;
   private prs: WorkerPrs;
   private usageTimer: NodeJS.Timeout;
-  /** Runs the workers' terminals outside the office, so they outlive a restart of it (see ptys.ts). */
   private host: PtyHost;
   /** Each worker's terminal on disk, so a restart doesn't wipe it (see history.ts). */
   private scrollback: ScrollbackStore;
   private drops: DropStore;
   private saveTimer: NodeJS.Timeout;
-  /** How many rows the floor's back office is built out: its desks past that aren't there to hire at (see WING). */
+  hiringPolicy?: (owner: string | undefined, specialist: string | undefined, kind: WorkerKind) => string | undefined;
   wing: () => number = () => 0;
 
   constructor(
@@ -222,6 +221,7 @@ export class WorkerManager {
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
   spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', specialist?: string): WorkerInfo | string {
+    const denied = this.hiringPolicy?.(owner,specialist,kind); if(denied) return denied;
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
     const modelError = validateWorkerModel(kind, selectedProvider, model);
@@ -313,6 +313,7 @@ export class WorkerManager {
   resume(id: string, prompt?: string): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
+    const denied = this.hiringPolicy?.(w.owner,w.info.specialist,w.info.kind); if(denied) return denied;
     if (w.pty || w.dsh) return 'Worker is already running';
     if (this.worktrees.checkLost(w, true)) return lostMessage(w.info);
     clockWork(w.info, 'starting');

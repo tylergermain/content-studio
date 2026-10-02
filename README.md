@@ -414,3 +414,7 @@ Worker chat adapts to smaller windows with Updates and Content preview views, ke
 ### Specialist agents
 
 Hire a Video Editor, Researcher, Designer, or custom specialist from an empty desk. Each role has its own `agents/<id>/AGENTS.md`, saved provider session, and optional native MCP configuration while sharing the floor's content. Admins can edit roles in **Manage specialists**. See [specialist setup and tool configuration](docs/specialists.md). This version uses local processes with shared access; role folders are not computer sandboxes.
+
+### Org chart and employee permissions
+
+Admins can open **Org chart** to assign human member accounts to positions and place specialist roles beneath them. Employees can hire only those specialist roles, including indirect reports; unassigned members cannot hire. Agent delegation inherits the hiring human's restrictions. See [org chart setup and account requirements](docs/org-chart.md). The policy controls managed studio workers; computer-level isolation remains a separate step.

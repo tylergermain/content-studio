@@ -17,7 +17,7 @@ const USAGE = `Usage:
   office-workers hire [options] <<'EOF'         hire a worker at a free desk; its task on stdin
   …the task…                                    (or --prompt "…"). Options: --provider <name>
   EOF                                           --model <m> --effort <e> --desk <id> --issue <n>
-                                                --no-worktree
+                                                --specialist <role-id> --no-worktree
   office-workers home <name|id>... [--cleanup auto|keep|worktree|all]
                                                 send workers home. auto (the default) deletes each
                                                 one's worktree and branch unless they hold work
@@ -117,12 +117,13 @@ export function parseArgs(argv) {
     return { cmd: 'pr', ...(none ? { unlink: true } : { pr: words[0] }), ...(opts['--worker'] !== undefined ? { worker: String(opts['--worker']).trim() } : {}), json: opts['--json'] === true };
   }
   if (cmd === 'hire') {
-    const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue'], ['--no-worktree', '--json']);
+    const { opts, words } = options(rest, ['--prompt', '--provider', '--model', '--effort', '--desk', '--issue', '--specialist'], ['--no-worktree', '--json']);
     if (words.length) throw new UsageError(`Unexpected argument: ${words[0]} (give the task on stdin or with --prompt)`);
     /** @type {Record<string, unknown>} */
     const out = { cmd: 'hire', json: opts['--json'] === true };
     if (opts['--prompt'] !== undefined) out.prompt = opts['--prompt'];
     if (opts['--provider'] !== undefined) out.provider = String(opts['--provider']).trim();
+    if (opts['--specialist'] !== undefined) out.specialist = String(opts['--specialist']).trim();
     if (opts['--model'] !== undefined) out.model = String(opts['--model']).trim();
     if (opts['--desk'] !== undefined) out.desk = String(opts['--desk']).trim();
     if (opts['--no-worktree']) out.worktree = false;
@@ -282,16 +283,17 @@ export const TOOLS = [
     name: 'hire_worker',
     title: 'Hire a worker',
     description:
-      'Hires a new coding agent (a worker) at a free desk in Agent Office to do a task. It starts right away, in its own git worktree on a fresh branch unless worktree is false, ' +
-      'and knows nothing but the prompt: make it complete (what to change and where, how to check it, and to open a pull request).',
+      'Hires a specialist or general worker at a free desk in Agent Office to do a task. It starts right away, in its own git worktree on a fresh branch unless worktree is false, ' +
+      'and follows its specialist instructions when a specialist is chosen. Make the prompt complete: make it complete (what to change and where, how to check it, and to open a pull request).',
     inputSchema: {
       type: 'object',
       properties: {
         prompt: { type: 'string', description: 'The task, complete on its own.' },
+        specialist: { type: 'string', description: 'Saved specialist role ID from list_workers. Employees may hire only roles below their org-chart position.' },
         provider: { type: 'string', description: "Which agent runs it (claude, codex, opencode...; list_workers' providers). Default: the office's." },
         model: { type: 'string', description: "A model for it, instead of the provider's default." },
         effort: { type: 'string', enum: EFFORTS, description: 'Reasoning effort, for agents that take one.' },
-        worktree: { type: 'boolean', description: 'Its own git worktree and branch (default true in a git checkout).' },
+        worktree: { type: 'boolean', description: 'General workers default to their own git worktree in a checkout. Specialists use their main-floor role folder and require false.' },
         desk: { type: 'string', description: 'A desk or bean bag id (desk-3). Default: the next free one.' },
         issue: { type: 'integer', minimum: 1, description: 'The GitHub issue it works on, assigned when it starts.' },
       },

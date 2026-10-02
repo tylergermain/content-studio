@@ -46,6 +46,7 @@ export interface FloorContext {
   /** Workers hired by an account run on its own sign-ins (see signins.ts). */
   runAs?: RunAs;
   /** How to run gh as an account: its own sign-in, the office's (undefined), or why it can't. */
+  hiringAllowed?(floor: Floor, owner: string | undefined, specialist: string | undefined, kind: 'agent' | 'shell'): string | undefined;
   ghAs(owner: string | undefined): GhAs | undefined | string;
   /** To everyone on this floor. */
   emit(floor: Floor, msg: ServerMsg, droppable?: boolean): void;
@@ -205,6 +206,7 @@ export class Floor {
       ctx.runAs,
       ctx.dshProfile,
     );
+    this.workers.hiringPolicy = (owner,specialist,kind) => ctx.hiringAllowed?.(this,owner,specialist,kind);
     this.workers.wing = () => this.plan.wing;
 
     this.github = new GitHub(

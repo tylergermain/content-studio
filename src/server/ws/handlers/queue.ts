@@ -12,6 +12,7 @@ export const queueHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (!floor) return;
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Employees must hire an allowed specialist at a desk; automatic general-agent hiring is admin-only');
     if (msg.provider !== undefined && (!isAgentProvider(msg.provider) || !floor.project.agentProviders.includes(msg.provider))) {
       ctx.warn(c, 'Unknown agent provider');
       return;

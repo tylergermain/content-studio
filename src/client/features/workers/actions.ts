@@ -491,9 +491,9 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       worktreeOption: !!store.project?.branch,
       providerOption: true,
       repoOptions: repoChoices(),
-      onSubmit: (prompt, to, worktree, provider, model, effort, repos) => {
+      onSubmit: (prompt, to, worktree, provider, model, effort, repos, specialist) => {
         if (to) net.send({ t: 'worker.prompt', workerId: to, prompt, issue });
-        else if (desk) hire(desk, prompt, worktree, provider, model, effort, issue, repos);
+        else if (desk) hire(desk, prompt, worktree, provider, model, effort, issue, repos, undefined, specialist);
       },
     });
   }

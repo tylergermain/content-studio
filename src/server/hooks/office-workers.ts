@@ -1,3 +1,7 @@
+import { employeeWorkerError } from '../org-chart/access.js';
+import { allowedSpecialists } from '../../shared/org-chart.js';
+import { readChart } from '../org-chart/policy.js';
+import { profiles } from '../specialists/profiles.js';
 import type http from 'node:http';
 import { notLeaving } from '../leave-on-merge.js';
 import { findWorker, readHireRequest, readHomeRequest, readPrRequest, workerRow, type PullsView } from '../office-workers.js';
@@ -60,6 +64,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
       leaveOnMerge: ctx.leaveOnMerge.on,
       providers: floor.project.agentProviders,
       defaultProvider: floor.workers.officeDefault.provider,
+      specialists: profiles(floor.dir).filter(p => { const owner=floor.workers.ownerOf(me.id);return !owner || ctx.accounts.get(owner)?.role==='admin' || allowedSpecialists(readChart(floor.dir),owner).includes(p.id); }).map(({id,name})=>({id,name})),
       freeDesk: free?.id ?? null,
       ...(ctx.ledger.hiringPaused ? { hiringPaused: ctx.ledger.hiringPaused } : {}),
       workers: list.map((w) => workerRow(w, view, me.id)),
@@ -98,6 +103,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     }
     // One at a time: git takes a lock on the repository's refs to delete a branch.
     for (const { w, why } of going) {
+      const denied=employeeWorkerError(ctx,floor,floor.workers.ownerOf(me.id),w.id);if(denied){results.push({worker:w.name,id:w.id,error:denied});continue;}
       if (floor.workers.get(w.id) !== w) {
         results.push({ worker: w.name, id: w.id, skipped: 'it had already gone' });
         continue;
@@ -115,6 +121,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     const b = (body ?? {}) as { worker?: unknown; prompt?: unknown };
     const w = findWorker(floor.workers.list(), str(b.worker, 64));
     if (typeof w === 'string') return send(res, 404, { error: w });
+    const denied=employeeWorkerError(ctx,floor,floor.workers.ownerOf(me.id),w.id);if(denied)return send(res,403,{error:denied});
     if (w.id === me.id) return send(res, 400, { error: "That's you" });
     // A shell would run it as a command, in someone's terminal.
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
@@ -132,6 +139,7 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
     if (typeof ask === 'string') return send(res, 400, { error: ask });
     const w = ask.worker ? findWorker(floor.workers.list(), ask.worker) : me;
     if (typeof w === 'string') return send(res, 404, { error: w });
+    const denied=employeeWorkerError(ctx,floor,floor.workers.ownerOf(me.id),w.id);if(denied)return send(res,403,{error:denied});
     if (w.kind !== 'agent') return send(res, 400, { error: `${w.name} is a shell, not an agent` });
     const pr = ask.pr === undefined ? undefined : await pullOf(floor, ask.pr, ask.repo);
     if (typeof pr === 'string') return send(res, 400, { error: pr });
@@ -148,13 +156,14 @@ export async function officeWorkers(ctx: Ctx, req: http.IncomingMessage, res: ht
   if (!desk) return send(res, 409, { error: 'Every desk and bean bag is taken: send someone home first' });
   // A model or effort is the office's default worker's unless it says whose.
   const provider = ask.provider ?? (ask.model || ask.effort ? floor.workers.officeDefault.provider : undefined);
-  const worktree = ask.worktree ?? !!floor.project.branch;
+  const worktree = ask.worktree ?? (!ask.specialist && !!floor.project.branch);
+  const owner = floor.workers.ownerOf(me.id);
+  const denied = floor.workers.hiringPolicy?.(owner,ask.specialist,'agent');if(denied)return send(res,403,{error:denied});
   // Its worktree starts from what's on GitHub now, like one hired from a desk.
   if (worktree) await floor.workers.fetchBase();
   if (!ctx.floors.has(floor.id)) return send(res, 410, { error: 'This floor closed' });
   // It runs as whoever the asking worker runs as.
-  const owner = floor.workers.ownerOf(me.id);
-  const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner);
+  const r = floor.workers.spawn(desk, who, ask.prompt, worktree, 'agent', provider, ask.model, ask.effort, undefined, owner, [], undefined, ask.specialist);
   if (typeof r === 'string') return send(res, 400, { error: r });
   ctx.toastFloor(floor, `${who} hired ${r.name}${ask.issue ? ` for issue #${ask.issue}` : ' with a task'}`);
   if (ask.issue) {
