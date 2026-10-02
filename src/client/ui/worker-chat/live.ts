@@ -8,6 +8,8 @@ export class WorkerLive {
   private media?: MediaStream;
   private audio = new Audio();
   private ready = false;
+  private starting = false;
+  private attempt = 0;
   private disposed = false;
   private closeTimer?: ReturnType<typeof setTimeout>;
   private voices: {role:string;text:string}[] = [];
@@ -16,13 +18,22 @@ export class WorkerLive {
   private snapshot?: ChatSnapshot;
   private contextStamp = '';
   constructor(private worker: string, private status: (text:string)=>void, private transcript: (role:string,text:string)=>void) { this.audio.autoplay=true; }
-  get active() { return !!this.connection; }
+  get active() { return this.starting || !!this.connection; }
   async start(snapshot:ChatSnapshot) {
-    if(this.connection)return;
-    this.disposed=false;this.voices=[];this.delegated.clear();this.pending=undefined;this.contextStamp='';this.snapshot=snapshot;this.status('Connecting to GPT-Live 1…');
+    if(this.active)return;
+    this.starting=true;
+    const attempt=++this.attempt;
+    this.disposed=false;this.voices=[];this.delegated.clear();this.pending=undefined;this.contextStamp='';this.snapshot=snapshot;this.status('Waiting for microphone permission. Allow access in your browser…');
     try {
-      this.media=await navigator.mediaDevices.getUserMedia({audio:true});
-      if(this.disposed){this.media.getTracks().forEach(t=>t.stop());return;}
+      let media: MediaStream;
+      let permissionTimer: ReturnType<typeof setTimeout> | undefined;
+      const microphone = navigator.mediaDevices.getUserMedia({audio:true});
+      microphone.then(media=>{if(this.disposed || attempt!==this.attempt)media.getTracks().forEach(t=>t.stop());}).catch(()=>{});
+      try {
+        media=await Promise.race([microphone,new Promise<never>((_,reject)=>{permissionTimer=setTimeout(()=>reject(new Error('Microphone permission is still pending. Allow microphone access, or open Content Studio in Chrome and try again.')),20000);})]);
+      } finally { clearTimeout(permissionTimer); }
+      if(this.disposed || attempt!==this.attempt){media.getTracks().forEach(t=>t.stop());return;}
+      this.media=media;this.status('Connecting to GPT-Live 1…');
       const pc=this.connection=new RTCPeerConnection();
       pc.ontrack=e=>{this.audio.srcObject=e.streams[0];void this.audio.play().catch(()=>this.status('Click Listen to enable voice playback'));};
       for(const track of this.media.getTracks())pc.addTrack(track,this.media);
@@ -40,7 +51,7 @@ export class WorkerLive {
       if(this.disposed)return;
       if(!result.transport?.sdp)throw new Error('GPT-Live returned no connection answer');
       await pc.setRemoteDescription({type:'answer',sdp:result.transport.sdp});
-    }catch(error){if(!this.disposed)this.status(error instanceof Error?error.message:'Live voice could not start');this.cleanup();}
+    }catch(error){if(attempt!==this.attempt)return;const show=!this.disposed;this.disposed=true;this.cleanup();if(show)this.status(error instanceof Error?error.message:'Live voice could not start');}
   }
   private send(type:string,content:string,delegation_id:string|null=null){
     if(this.ready&&this.events?.readyState==='open')this.events.send(JSON.stringify({type,event_id:crypto.randomUUID(),delegation_id,content:Array.from(content).slice(0,120).join('')}));
@@ -96,7 +107,7 @@ export class WorkerLive {
     if(this.ready&&this.events?.readyState==='open'){this.events.send(JSON.stringify({type:'session.close'}));this.status('Ending live voice…');this.closeTimer=setTimeout(()=>this.cleanup(),15000);}else this.cleanup();
   }
   private cleanup(){
-    clearTimeout(this.closeTimer);this.ready=false;this.media?.getTracks().forEach(t=>t.stop());this.media=undefined;
+    clearTimeout(this.closeTimer);this.starting=false;this.attempt++;this.ready=false;this.media?.getTracks().forEach(t=>t.stop());this.media=undefined;
     this.events?.close();this.events=undefined;const pc=this.connection;this.connection=undefined;pc?.close();this.audio.pause();this.audio.srcObject=null;
   }
 }
