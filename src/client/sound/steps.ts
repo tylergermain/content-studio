@@ -32,6 +32,7 @@ export function groundAt(a: AudioCore, feet: Pos): Ground {
  * and brighter.
  */
 export class Footsteps {
+  enabled = false;
   private readonly made = new Map<Ground, Footfalls>();
   /** The sample each list gave last, so the next one's another. */
   private readonly last = new Map<AudioBuffer[], AudioBuffer>();
@@ -44,7 +45,7 @@ export class Footsteps {
 
   /** One of your own footsteps, with your feet at `feet`. `pace` is 0 at a walk, 1 at a run. */
   step(feet: Pos, pace = 0) {
-    if (!this.a.ctx) return;
+    if (!this.enabled || !this.a.ctx) return;
     this.foot = -this.foot;
     // Your left foot a little to your left, and a touch lower than your right: no two shoes sound the same.
     this.fall(groundAt(this.a, feet), pace, 1, { dest: this.side(this.foot * 0.14) }, this.a.ctx.currentTime, 1 + this.foot * 0.015);
@@ -54,7 +55,7 @@ export class Footsteps {
   /** Landing a jump on both feet, `hard` from 0 (a hop) to 1 (off the loft). */
   land(feet: Pos, hard = 0.5) {
     const ctx = this.a.ctx;
-    if (!ctx) return;
+    if (!this.enabled || !ctx) return;
     const ground = groundAt(this.a, feet);
     const now = ctx.currentTime;
     const gap = rand(0.012, 0.03);
@@ -67,7 +68,7 @@ export class Footsteps {
 
   /** Someone else's footstep, where their feet are. */
   stepAt(feet: Pos, pace = 0) {
-    if (!this.a.ctx) return;
+    if (!this.enabled || !this.a.ctx) return;
     this.fall(groundAt(this.a, feet), pace, 1.8, { at: { x: feet.x, y: feet.y + 0.1, z: feet.z }, ref: 1.5, rolloff: 1.4 }, this.a.ctx.currentTime, 1);
     this.a.count('peerStep');
   }

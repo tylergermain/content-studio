@@ -386,3 +386,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## License
 
 [MIT](LICENSE)
+
+Footsteps and jump landings are muted by default. Enable them under Settings → Sound & voice → Footsteps; the choice is saved in your browser.
