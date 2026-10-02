@@ -406,3 +406,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
 
 Worker chat adapts to smaller windows with Updates and Content preview views, keeping the composer accessible without scrolling through the preview.
+
+### Specialist agents
+
+Hire a Video Editor, Researcher, Designer, or custom specialist from an empty desk. Each role has its own `agents/<id>/AGENTS.md`, saved provider session, and optional native MCP configuration while sharing the floor's content. Admins can edit roles in **Manage specialists**. See [specialist setup and tool configuration](docs/specialists.md). This version uses local processes with shared access; role folders are not computer sandboxes.

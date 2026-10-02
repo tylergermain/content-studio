@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSync, appendFileSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, appendFileSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -1673,4 +1673,19 @@ test("a worker whose worktree was deleted outside the office waits, marked lost,
   assert.equal(git(path.join(f.root, gone.worktree!.path), 'rev-parse', 'HEAD'), gone.worktree!.base);
   assert.equal(after.get(gone.id)?.lost, undefined);
   assert.deepEqual(toasts, []);
+});
+
+test('specialist hires launch in their own folder and preserve their role on restart', async t => {
+  const f=fixture();const previous=process.env.FAKE_AGENT_LOG;process.env.FAKE_AGENT_LOG=f.log;
+  t.after(()=>{if(previous===undefined) delete process.env.FAKE_AGENT_LOG;else process.env.FAKE_AGENT_LOG=previous;f.close();});
+  const workers=manager(f,f.claude,[]);t.after(()=>workers.shutdown());
+  const hired=workers.spawn('desk-1','test','Edit the footage',false,'agent','claude',undefined,undefined,undefined,undefined,[],undefined,'video-editor');
+  assert.equal(typeof hired,'object');if(typeof hired==='string')return;
+  assert.equal(hired.name,'Video Editor');assert.equal(hired.specialist,'video-editor');
+  assert.equal(workers.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
+  await waitFor(()=>f.read(),rows=>rows.some(r=>r.kind==='claude'));
+  workers.shutdown();
+  const restored=manager(f,f.claude,[]);t.after(()=>restored.shutdown());
+  assert.equal(restored.get(hired.id)?.specialist,'video-editor');
+  assert.equal(restored.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
 });
