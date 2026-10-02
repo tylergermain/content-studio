@@ -1,7 +1,7 @@
 import { h } from '../dom';
-import { store } from '../../state';
+import './ui.css';
 export function spotifyPanel(stopOfficeMusic: () => void) {
-  const root = h('section', { style: 'margin-top:24px;border-top:1px solid #ccc;padding-top:16px' });
+  const root = h('section.spotify-panel');
   let disposed = false, busy = false;
   let selected = '';
   async function request(path = '', body?: unknown) {
@@ -23,8 +23,8 @@ export function spotifyPanel(stopOfficeMusic: () => void) {
       note.textContent = '';
       if (!s.connected) {
         const connect = buttons('Connect Spotify', async () => { const result = await request('/connect', {}); window.open(result.url, '_blank', 'noopener,noreferrer'); note.textContent = 'Finish connecting in the Spotify tab, then click Refresh.'; });
-        const clientId = h('input', { 'aria-label': 'Spotify Client ID', placeholder: 'Spotify app Client ID', autocomplete: 'off' }) as HTMLInputElement;
-        const callback = h('input', { 'aria-label': 'Spotify redirect URI', value: `http://127.0.0.1:${location.port || '14600'}/api/spotify/callback` }) as HTMLInputElement;
+        const clientId = h('input', { type: 'text', 'aria-label': 'Spotify Client ID', placeholder: 'Spotify app Client ID', autocomplete: 'off' }) as HTMLInputElement;
+        const callback = h('input', { type: 'text', 'aria-label': 'Spotify redirect URI', value: `http://127.0.0.1:${location.port || '14600'}/api/spotify/callback` }) as HTMLInputElement;
         root.replaceChildren(title, intro, ...(s.configured ? [connect] : [clientId, callback, buttons('Save Spotify app', async () => { await request('/config', { clientId: clientId.value.trim(), redirect: callback.value.trim() }); await refresh(); })]), buttons('Refresh', refresh), note);
         return;
       }
@@ -34,7 +34,7 @@ export function spotifyPanel(stopOfficeMusic: () => void) {
       for (const d of s.devices ?? []) if (d.id && !d.is_restricted) devices.append(h('option', { value: d.id }, d.name));
       devices.value = selected || player?.device?.id || ''; selected = devices.value;
       devices.addEventListener('change', () => { selected = devices.value; });
-      const link = h('input', { 'aria-label': 'Spotify music link', placeholder: 'Paste a Spotify playlist, album, or track link' }) as HTMLInputElement;
+      const link = h('input', { type: 'text', 'aria-label': 'Spotify music link', placeholder: 'Paste a Spotify playlist, album, or track link' }) as HTMLInputElement;
       const action = async (action: string, uri?: string) => { await request('/playback', { action, device: selected, uri }); if (action === 'play') stopOfficeMusic(); await refresh(); };
       const playLink = buttons('Play link', async () => {
         let uri = link.value.trim();
