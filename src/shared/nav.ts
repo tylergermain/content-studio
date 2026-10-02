@@ -4,9 +4,12 @@
 // An office floor built out into the back office (see WING) has more of it to get round: the office's
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 
+import { DEFAULT_FURNITURE, furnitureObstacles, type Piece } from './furniture.js';
 import { deskRect } from './office-builder.js';
-import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
+import { FIXED, type Circle, type Rect } from './office-fixed.js';
+import { BALCONY, BALCONY_DOOR, BEANBAGS, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, KIOSK, PARACHUTE, ROAD, WING, builtDesks, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
+export type { Circle, Rect } from './office-fixed.js';
 
 export type Pt = [number, number];
 
@@ -14,8 +17,6 @@ const CELL = 0.5;
 /** Half the width of whoever walks it (the dog, a worker), plus a little room: how far they keep from things. */
 const R = 0.3;
 
-export type Rect = [number, number, number, number]; // minX, maxX, minZ, maxZ
-export type Circle = [number, number, number]; // x, z, radius
 /** What's in the way on a floor. */
 export interface Obstacles {
   rects: Rect[];
@@ -42,42 +43,25 @@ export function deskPoint(d: DeskDef, t: number, s: number): Pt {
   return [d.x + Math.cos(d.rotY) * t + Math.sin(d.rotY) * s, d.z - Math.sin(d.rotY) * t + Math.cos(d.rotY) * s];
 }
 
-/** What's in the way on the office floor, built out `wing` rows. The lounge, kitchen and plants are where world/office/room.ts (and world/kitchen.ts) put them. */
-function obstacles(wing: number, desks = builtDesks(wing)): Obstacles {
+/**
+ * What's in the way on the office floor, built out `wing` rows: its desks, its furniture (the lounge,
+ * the plants and whatever else the office builder put there) and everything built in (FIXED).
+ */
+function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly Piece[] = floorFurniture): Obstacles {
   const rects: Rect[] = [];
   const circles: Circle[] = [];
-  const hw = DESK_SIZE.width / 2;
-  const hd = DESK_SIZE.depth / 2;
   for (const d of desks) {
-    // Desks face ±z, so their tops are axis-aligned.
+    // Desks stand a quarter turn at a time, so their tops are axis-aligned.
     const b = deskRect(d);
     rects.push([b.minX, b.maxX, b.minZ, b.maxZ]);
     const [cx, cz] = deskPoint(d, 0, 0.9);
     circles.push([cx, cz, 0.35]); // the chair
   }
-  rects.push([10, 11, -2.2, 2.2]); // couch
-  rects.push([12.2, 13.8, -0.8, 0.8]); // coffee table
-  circles.push([12.5, 3.5, 0.5], [14.5, -3.4, 0.5]); // beanbags
-  rects.push([-17, -10.75, 11.7, 12.7]); // kitchen counter and fridge
-  for (const [x, z, s] of plantsAt(wing)) circles.push([x, z, 0.3 * s]);
-  // The loft's posts, the stairs up to it, and the elevator shaft.
-  for (const x of [LOFT.minX + 0.15, (LOFT.minX + LOFT.maxX) / 2]) circles.push([x, LOFT.minZ + 0.15, 0.14]);
-  rects.push([STAIRS.fromX, STAIRS.toX, STAIRS.minZ - 0.1, STAIRS.maxZ]);
-  rects.push([ELEVATOR.x - ELEVATOR.width / 2, ELEVATOR.x + ELEVATOR.width / 2, FLOOR.minZ, ELEVATOR_FRONT]);
-  // The gong's frame, as features/gong/world.ts puts it.
-  rects.push([GONG.x - GONG.width / 2 - 0.12, GONG.x + GONG.width / 2 + 0.3, GONG.z - 0.3, GONG.z + 0.3]);
-  // The whiteboard on its wheels, as features/whiteboard/world.ts puts it.
-  rects.push([WHITEBOARD.x - WHITEBOARD.width / 2 - 0.2, WHITEBOARD.x + WHITEBOARD.width / 2 + 0.2, WHITEBOARD.z - 0.48, WHITEBOARD.z + 0.48]);
-  // The jukebox, against the east wall.
-  rects.push([JUKEBOX.x - JUKEBOX.depth / 2 - 0.05, FLOOR.maxX, JUKEBOX.z - JUKEBOX.width / 2 - 0.05, JUKEBOX.z + JUKEBOX.width / 2 + 0.05]);
-  // The arcade cabinet next to it, as features/cabinet/world.ts puts it (its control panel sticks out a little).
-  rects.push([CABINET.x - 0.45, FLOOR.maxX, CABINET.z - CABINET.width / 2 - 0.02, CABINET.z + CABINET.width / 2 + 0.02]);
-  // The bookshelf against the south wall, as features/bookshelf/world.ts puts it.
-  rects.push([BOOKSHELF.x - BOOKSHELF.width / 2 - 0.04, BOOKSHELF.x + BOOKSHELF.width / 2 + 0.04, BOOKSHELF.z - BOOKSHELF.depth / 2 - 0.03, FLOOR.maxZ]);
-  // The ladder up the west wall, and the fire poles: a hole with a railing round it, or a landing mat.
-  // Which spot has which changes floor by floor, so the dog keeps off both.
-  rects.push([FLOOR.minX, FLOOR.minX + 0.3, LADDER.z - LADDER.width / 2 - 0.05, LADDER.z + LADDER.width / 2 + 0.05]);
-  for (const p of POLES) rects.push([p.x - POLE.rail - 0.05, p.x + POLE.rail + 0.05, p.z - POLE.rail - 0.05, p.z + POLE.rail + 0.05]);
+  const standing = furnitureObstacles(furniture, wing);
+  rects.push(...standing.rects);
+  circles.push(...standing.circles);
+  rects.push(...FIXED.rects.map((f) => f.rect));
+  circles.push(...FIXED.circles.map((f) => f.circle));
   // The overflow bean bags and their lap desks. They're only out while every desk is taken, but they
   // always come out in the same spots, so the dog keeps off those.
   for (const b of BEANBAGS) {
@@ -85,28 +69,6 @@ function obstacles(wing: number, desks = builtDesks(wing)): Obstacles {
     const xs = corners.map(([x]) => x);
     const zs = corners.map(([, z]) => z);
     rects.push([Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]);
-  }
-  // The board agents' kiosks, and the agent standing behind each one.
-  for (const k of STATIONS) {
-    const corners = [deskPoint(k, -KIOSK.width / 2, -KIOSK.depth / 2), deskPoint(k, KIOSK.width / 2, -KIOSK.depth / 2), deskPoint(k, -KIOSK.width / 2, KIOSK.stand + 0.35), deskPoint(k, KIOSK.width / 2, KIOSK.stand + 0.35)];
-    const xs = corners.map(([x]) => x);
-    const zs = corners.map(([, z]) => z);
-    rects.push([Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]);
-  }
-  // The meeting room under the loft: its glass walls, with the doorway in the north one, and the
-  // table with its chairs, as world/office/meeting-room.ts puts them.
-  const room = MEETING_ROOM;
-  const G = 0.06;
-  rects.push([room.minX - G, room.minX + G, room.minZ - G, room.maxZ]);
-  rects.push([room.minX - G, room.door.x0, room.minZ - G, room.minZ + G]);
-  rects.push([room.door.x1, room.maxX, room.minZ - G, room.minZ + G]);
-  const t = MEETING_TABLE;
-  rects.push([t.x - t.width / 2, t.x + t.width / 2, t.z - t.depth / 2, t.z + t.depth / 2]);
-  // Chairs tucked in at the table: just the middle of each, so there's a way round behind them, between
-  // their backs and the glass (or the back wall), which is one cell wide.
-  for (const d of MEETING_SEATS) {
-    const [cx, cz] = deskPoint(d, 0, 0.85);
-    circles.push([cx, cz, 0.18]);
   }
   return { rects, circles };
 }
@@ -311,14 +273,31 @@ export const pathLength = (pts: Pt[]) => pts.reduce((n, p, i) => (i ? n + Math.h
 
 /** The office floor downstairs (no stairs, no loft, no elevator), built out `wing` rows, made the first time it's needed. */
 const OFFICE_NAVS: NavGrid[] = [];
-export function clearOfficeNav() { OFFICE_NAVS.length = 0; }
-export function officeNav(wing = 0, desks?: DeskDef[]): NavGrid {
+/** The furniture on the floor the grids above are of (see setOfficeFurniture). */
+let floorFurniture: readonly Piece[] = DEFAULT_FURNITURE;
+
+/** The floor's desks moved (a browser moves the shared DESKS, see features/office-builder): its grids are made again when they're next needed. */
+export function clearOfficeNav() {
+  OFFICE_NAVS.length = 0;
+}
+
+/** The floor's furniture is `pieces` from now on (a browser shows one floor at a time): its grids are made again, round them. */
+export function setOfficeFurniture(pieces: readonly Piece[]) {
+  floorFurniture = pieces;
+  clearOfficeNav();
+}
+
+/**
+ * The office floor's grid. With `desks` (and `furniture`) it's a floor's own, made afresh for whoever
+ * keeps several floors at once (the server): otherwise it's the one floor a browser is on.
+ */
+export function officeNav(wing = 0, desks?: DeskDef[], furniture?: readonly Piece[]): NavGrid {
   const level = wingLevel(wing);
   // Through where the north wall was, into the back office: between its walls, short of its back one.
   const on: Floorplan = (x, z, m) =>
     (x > FLOOR.minX + m && x < FLOOR.maxX - m && z > FLOOR.minZ + m && z < FLOOR.maxZ - m) ||
     (level > 0 && x > WING.minX + m && x < WING.maxX - m && z > wingMinZ(level) + m && z < FLOOR.maxZ - m);
-  if (desks) return new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level, desks), on);
+  if (desks || furniture) return new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level, desks ?? builtDesks(level), furniture ?? DEFAULT_FURNITURE), on);
   return (OFFICE_NAVS[level] ??= new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level), on));
 }
 

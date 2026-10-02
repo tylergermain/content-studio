@@ -28,8 +28,6 @@ export interface Site {
   readonly desks: Map<string, DeskView>;
   /** The doors that open by themselves for anyone who comes up to them (see Office.update). */
   readonly doors: Door[];
-  /** What stands in the way into the back office, and its collider, put away while that's built out. */
-  readonly inTheWay: { group: THREE.Group; collider: Collider }[];
   /** What a fixture before this one gives the office. It throws if that one's further down the list. */
   get<K extends keyof OfficeHandles>(key: K): OfficeHandles[K];
 }

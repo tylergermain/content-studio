@@ -4,9 +4,9 @@ Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for ne
 
 Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.
 
-Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a visual office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
+Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a 3D office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
 
-Open **Menu → Office builder**, or press **B**, on an office floor as an admin. Drag desks on the floor plan, rotate them, change their signs, and expand the back office. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
+Open **Menu → Office builder**, or press **U**, on an office floor as an admin. The camera goes up over the room and you drag the desks and the furniture about on the floor itself: turn them, paint them, add sofas, tables, plants, rugs, dividers and signs from the catalog, repaint the room, and move the whiteboard, the jukebox and the rest of what the office comes with. **Team desks** are desks for people: sit down at one and your screen goes up on its monitor. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
 
 The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
 

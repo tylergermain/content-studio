@@ -74,7 +74,7 @@ export class Worker {
   /** Dressed up for a holiday (see setCostume), and what it's wearing. */
   private costume: Theme | null = null;
   private outfit: THREE.Object3D[] = [];
-  /** Where it is in its own shamble, so a room full of zombies doesn't sway in step. */
+  /** Where it is in its own slow breathing, so a cell full of them isn't in step (see slump). */
   private phase = Math.random() * Math.PI * 2;
   /** How far through its stride it is, walking in. */
   private stride = 0;
@@ -181,7 +181,7 @@ export class Worker {
     this.cheer(1.2);
   }
 
-  /** Dresses it up for a holiday (a zombie for Halloween, an elf for Christmas), or back in its own skin (null). */
+  /** Dresses it up for a holiday (an elf for Christmas), or back in its own skin (null). */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
@@ -461,13 +461,6 @@ export class Worker {
       : this.status === 'working' ? (this.action ?? 'type')
       : 'rest';
     const s = this.pose(act, dt, t);
-    // A zombie at rest stands with its arms out in front of it, groping, listing to one side and swaying.
-    const shamble = this.costume === 'halloween' ? Math.min(1, this.acts.get('rest') ?? 0) : 0;
-    if (shamble > 0) {
-      s.armLx += (-1.4 + Math.sin(t * 1.6 + this.phase) * 0.12 - s.armLx) * shamble;
-      s.armRx += (-1.4 + Math.sin(t * 1.6 + this.phase + 1.3) * 0.12 - s.armRx) * shamble;
-      s.roll += (0.09 + Math.sin(t * 1.1 + this.phase) * 0.05) * shamble;
-    }
 
     this.armL.rotation.set(s.armLx, 0, s.armLz);
     this.armR.rotation.set(s.armRx, 0, s.armRz);

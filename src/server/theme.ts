@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { ThemePick, ThemeState } from '../shared/protocol.js';
 import { activeTheme, isThemePick } from '../shared/theme.js';
 
-/** How often 'auto' looks at the calendar again, so October 1st turns the pumpkins on by itself. */
+/** How often 'auto' looks at the calendar again, so December 1st puts the tree up by itself. */
 const CHECK_MS = 10 * 60_000;
 
 interface Saved {
@@ -13,7 +13,7 @@ interface Saved {
 }
 
 /**
- * The building's holiday theme (Halloween, Christmas, none, or whichever the calendar says), picked
+ * The building's holiday theme (Christmas, none, or whichever the calendar says), picked
  * in ⚙️ Settings by anyone and kept in .agent-office/theme.json. Everyone sees the same one.
  */
 export class Themes {

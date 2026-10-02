@@ -3,6 +3,7 @@ import path from 'node:path';
 import { DESK_BY_ID, FLOOR, KIOSK, type DeskDef } from '../shared/layout.js';
 import { cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBreed, type DogState } from '../shared/dog.js';
 import { deskPoint, officeNav, type Pt } from '../shared/nav.js';
+import type { Piece } from '../shared/furniture.js';
 import { layoutDesks, type DeskLayout } from '../shared/office-builder.js';
 import { builtDesks } from '../shared/layout.js';
 import type { PeerInfo, WorkerInfo } from '../shared/protocol.js';
@@ -44,7 +45,8 @@ export interface DogEnv {
   send(dog: DogState): void;
   /** How many rows the floor's back office is built out, for getting round its desks too (see WING). */
   wing?(): number;
-  layout?(): DeskLayout;
+  /** How the floor's arranged (see the office builder), for getting round it: `revision` changes whenever it does. */
+  layout?(): { desks: DeskLayout; furniture: readonly Piece[]; revision: number };
 }
 
 type Leg = Omit<DogState, 'name' | 'coat' | 'breed' | 'elapsed'> & { start: number };
@@ -284,17 +286,19 @@ export class Dog {
   /** Curls up under a busy worker's desk, at its feet. */
   private navKey = '';
   private navGrid?: ReturnType<typeof officeNav>;
+  /** The floor's grid, as it's arranged now: made again when the back office or the layout changes. */
   private navigation() {
-    const layout = this.env.layout?.() ?? {};
-    const key = JSON.stringify([this.wing, layout]);
+    const layout = this.env.layout?.();
+    const key = `${this.wing}:${layout?.revision ?? 0}`;
     if (key !== this.navKey || !this.navGrid) {
       this.navKey = key;
-      this.navGrid = officeNav(this.wing, [...layoutDesks(layout), ...builtDesks(this.wing).filter(d => d.wing)]);
+      this.navGrid = officeNav(this.wing, [...layoutDesks(layout?.desks), ...builtDesks(this.wing).filter((d) => d.wing)], layout?.furniture);
     }
     return this.navGrid;
   }
+  /** A seat as this floor has it: a desk the builder moved is where it stands now. */
   private desk(id: string): DeskDef {
-    return layoutDesks(this.env.layout?.()).find(d => d.id === id) ?? DESK_BY_ID.get(id)!;
+    return layoutDesks(this.env.layout?.().desks).find((d) => d.id === id) ?? DESK_BY_ID.get(id)!;
   }
 
   private nap(w: WorkerInfo) {

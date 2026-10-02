@@ -1,12 +1,13 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
-import { validateLayout, type DeskLayout } from '../shared/office-builder.js';
-import { canLabel, cleanLabel, cleanPlan, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
-import { DESK_BY_ID, WING } from '../shared/layout.js';
+import { floorSeat, type Piece } from '../shared/furniture.js';
+import { layoutFurniture, validateLayout, type DeskLayout } from '../shared/office-builder.js';
+import { canLabel, cleanLabel, cleanLook, cleanPlan, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
+import { DESK_BY_ID, WING, type SeatDef } from '../shared/layout.js';
 
 /**
- * A floor's own layout: the signs over its desks, and how far its back office is built out. Saved in
- * .agent-office/floorplan.json.
+ * A floor's own layout: the signs over its desks, how far its back office is built out, and where its
+ * desks and furniture stand once the office builder's rearranged them. Saved in .agent-office/floorplan.json.
  */
 export class FloorPlanStore {
   private plan: FloorPlan;
@@ -18,11 +19,21 @@ export class FloorPlanStore {
   }
 
   state(): FloorPlan {
-    return { ...this.plan, labels: { ...this.plan.labels }, ...(this.plan.desks ? { desks: structuredClone(this.plan.desks) } : {}) };
+    return structuredClone(this.plan);
   }
 
   get wing(): number {
     return this.plan.wing;
+  }
+
+  /** How the floor's arranged now, for whoever gets round it (the dog): not copies, so not to be changed. */
+  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; revision: number } {
+    return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), revision: this.plan.layoutRevision ?? 0 };
+  }
+
+  /** The seat called `id` on this floor (see floorSeat), for whoever sits down. */
+  seat(id: string): SeatDef | undefined {
+    return floorSeat(layoutFurniture(this.plan), this.plan.wing, id);
   }
 
   /** Hangs a sign over a desk, or takes it down (no text). What it did, for the toast, or why it couldn't. */
@@ -61,19 +72,28 @@ export class FloorPlanStore {
     return desks.map((d) => d.id);
   }
 
-  layout(raw: unknown, revision: number, taken: (id: string) => boolean): string | undefined {
-    if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reopen the builder to load it';
-    const desks = validateLayout(raw);
-    if (typeof desks === 'string') return desks;
+  /**
+   * Saves the floor as the office builder arranged it: its desks, its furniture and its paint. `revision`
+   * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
+   * (`taken`) stays where it is. Why it couldn't, or nothing.
+   */
+  layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
+    if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reload it in the builder';
+    const layout = validateLayout(raw.desks, raw.furniture);
+    if (typeof layout === 'string') return layout;
     const before = this.plan.desks ?? {};
-    const moved = new Set([...Object.keys(before), ...Object.keys(desks)]);
-    for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
-    const next = { ...this.plan, desks: desks as DeskLayout, layoutRevision: revision + 1 };
+    const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
+    for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
+    const look = cleanLook(raw.look);
+    const { look: _was, ...rest } = this.plan;
+    const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };
     try {
       writeFileSync(this.file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 });
       renameSync(this.file + '.tmp', this.file);
       this.plan = next;
-    } catch { return 'The layout could not be saved to disk. Your current office is unchanged'; }
+    } catch {
+      return 'The layout could not be saved to disk. Your current office is unchanged';
+    }
   }
 
   private load(): FloorPlan {

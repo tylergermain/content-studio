@@ -221,7 +221,7 @@ declare module '../types' {
   interface OfficeHandles {
     /** The back office through the north wall, as far as this floor's built out (see WING). */
     wing: WingView;
-    /** Builds the back office out `level` rows, or walls it up: the plants in the way go too. */
+    /** Builds the back office out `level` rows, or walls it up. The furniture in the way is put away by whoever arranges it (see furnish.ts). */
     setWing(level: number): void;
   }
 }
@@ -230,16 +230,6 @@ declare module '../types' {
 export const wing: Fixture<'wing' | 'setWing'> = (site) => {
   const built = buildWing(site.group, site.colliders, site.interactables, site.desks, site.looks, site.looks.trim, site.planks, site.get('stack').ceiling, site.get('night'));
   site.wall('north', (WING.minX + FLOOR.maxX) / 2, WALL_HEIGHT / 2, FLOOR.maxX - WING.minX, WALL_HEIGHT);
-  const setWing = (level: number) => {
-    built.set(level);
-    for (const p of site.inTheWay) {
-      const out = built.level === 0;
-      if (p.group.visible === out) continue;
-      p.group.visible = out;
-      const i = site.colliders.indexOf(p.collider);
-      if (out && i < 0) site.colliders.push(p.collider);
-      else if (!out && i >= 0) site.colliders.splice(i, 1);
-    }
-  };
+  const setWing = (level: number) => built.set(level);
   return { handle: { wing: built, setWing } };
 };

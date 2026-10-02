@@ -24,6 +24,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['P', 'Prompt: give a task to a new or existing worker at the desk you face'],
   ['C', 'Changes: what the worker at the desk you face changed — files and diff, commit, discard, open a PR'],
   ['B', 'Open a shared shell (dev servers, git, tests) at an empty desk'],
+  ['U', 'Admins: the office builder. From up over the room, drag the desks and the furniture about, add more from the catalog (team desks you sit at to share your screen, sofas, plants, rugs, signs), repaint the room, and save it for everyone on the floor'],
   ['R', 'Resume a sleeping worker'],
   ['X', 'Send a worker home (frees the desk)'],
   ['L', 'Hang a big sign over the desk you face ("Operations", "Code cleanup"), or change or take down the one there'],

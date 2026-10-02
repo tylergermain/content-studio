@@ -1,6 +1,9 @@
-// A floor's own layout on top of the office everyone shares: the signs hung over its desks, and how
-// far its back office is built out (see WING in layout.ts). Saved by server/floorplan.ts.
+// A floor's own layout on top of the office everyone shares: the signs hung over its desks, how far
+// its back office is built out (see WING in layout.ts), and where its desks and furniture stand once
+// someone's rearranged them (see shared/office-builder.ts). Saved by server/floorplan.ts.
 
+import { FLOOR_PALETTES } from './floors.js';
+import type { Piece } from './furniture.js';
 import { validateLayout, type DeskLayout } from './office-builder.js';
 import { DESKS, WING, WING_DESKS, wingLevel } from './layout.js';
 
@@ -14,7 +17,13 @@ export interface DeskLabel {
 }
 
 export interface FloorPlan {
+  /** Where the room's desks stand, once they've been moved (see the office builder). */
   desks?: DeskLayout;
+  /** Everything else on the floor, once it's been rearranged: none is the office's as it comes (DEFAULT_FURNITURE). */
+  furniture?: Piece[];
+  /** Which of FLOOR_PALETTES the room's painted in, when the builder picked one over the floor's own. */
+  look?: number;
+  /** Goes up each time the layout's saved, so a builder working from an older one is told. */
   layoutRevision?: number;
   /** How many rows the back office is built out (0 is just the room), up to WING.rows. */
   wing: number;
@@ -78,8 +87,22 @@ export function cleanPlan(raw: unknown): FloorPlan {
       labels[id] = { text, color: signColor(s.color), by: typeof s.by === 'string' ? s.by : '?', at: typeof s.at === 'number' ? s.at : 0 };
     }
   }
-  const desks = validateLayout(r.desks);
-  return { wing: wingLevel(r.wing), labels, ...(typeof desks === "object" ? { desks, layoutRevision: Number.isSafeInteger(r.layoutRevision) && Number(r.layoutRevision) >= 0 ? Number(r.layoutRevision) : 0 } : {}) };
+  // A layout that no longer fits the office (it was saved by an older one) is dropped whole: the office as it comes.
+  const layout = r.desks === undefined && r.furniture === undefined ? undefined : validateLayout(r.desks, r.furniture);
+  const look = cleanLook(r.look);
+  return {
+    wing: wingLevel(r.wing),
+    labels,
+    ...(look !== undefined ? { look } : {}),
+    ...(typeof layout === 'object'
+      ? { desks: layout.desks, ...(r.furniture !== undefined ? { furniture: layout.furniture } : {}), layoutRevision: Number.isSafeInteger(r.layoutRevision) && Number(r.layoutRevision) >= 0 ? Number(r.layoutRevision) : 0 }
+      : {}),
+  };
+}
+
+/** Which of FLOOR_PALETTES `look` names, or undefined when it's none of them (the floor's own paint). */
+export function cleanLook(look: unknown): number | undefined {
+  return Number.isInteger(look) && (look as number) >= 0 && (look as number) < FLOOR_PALETTES.length ? (look as number) : undefined;
 }
 
 /** The desks a row of the back office brings: `row` from 1. */

@@ -26,7 +26,7 @@ export function createServices(ctx: Ctx): BuildingServices {
   // Day, night and the weather outside the windows, the same for everyone.
   const sky = new Sky({ city: cfg.city, weather: cfg.weather }, (state) => ctx.broadcast({ t: 'sky', state }));
   sky.start();
-  // Halloween or Christmas all over the building, the same for everyone (⚙️ Settings). On 'auto' it
+  // Christmas all over the building, the same for everyone (⚙️ Settings). On 'auto' it
   // goes by the calendar at the office, the sky's clock.
   const themes = new Themes(cfg.dataDir, () => sky.state.utcOffset, (state) => ctx.broadcast({ t: 'theme', state }));
   themes.start();

@@ -1,16 +1,16 @@
 import * as THREE from 'three';
-import { BOARDS, LOFT, MACHINE_MONITOR, PLANTS, SEATING_BY_ID, STAIRS, STREET_Y, TV, WALL_HEIGHT, plantByWing } from '../../../shared/layout';
+import { BOARDS, LOFT, MACHINE_MONITOR, STAIRS, STREET_Y, TV, WALL_HEIGHT } from '../../../shared/layout';
 import { wallFacing } from '../../../shared/decor';
 import type { NightParts } from '../outside';
 import { mesh, roundedBox, textPlane, toon, toonUnique } from '../toon';
-import type { Collider, Interactable } from '../types';
+import type { Interactable } from '../types';
 import type { Fixture } from './fixture';
 import { PALETTE } from './materials';
-import { coffeeTable, floorPlant, loungeCouch, pendant, plant, pouf, wallBoard } from './props';
-import { seatable } from './seats';
+import { pendant, wallBoard } from './props';
 
-// The room itself, past its walls and its seats: the rugs, what the sky lights and darkens, the boards
-// on the walls, the TV and the machine's monitor, the lounge, the plants and the lamps.
+// The room itself, past its walls and its seats: what the sky lights and darkens, the boards on the
+// walls, the TV and the machine's monitor, and the lamps. What stands on its floor (the lounge, the
+// rugs, the plants) is furniture, which the office builder arranges: see furnish.ts.
 
 declare module '../types' {
   interface OfficeHandles {
@@ -20,24 +20,8 @@ declare module '../types' {
     tvScreen: THREE.Mesh;
     /** The monitor on the west wall showing how busy the office's machine is (features/boards/machine.ts). */
     machineScreen: THREE.Mesh;
-    /** The potted plants round the room, in PLANTS' order. At Christmas world/holiday.ts hides their leaves (plantLeaves()) and stands a little tree in each pot. */
-    plants: THREE.Group[];
   }
 }
-
-/** Rugs under each desk cluster. */
-export const rugs: Fixture = (site) => {
-  [
-    [-10.5, -4],
-    [-1.5, -4],
-    [-10.5, 4],
-    [-1.5, 4],
-  ].forEach(([x, z], i) => {
-    const rug = mesh(roundedBox(6.2, 0.02, 4.6, 0.6), toon(PALETTE.rugs[i]), x, 0.011, z, false);
-    site.group.add(rug);
-  });
-  return {};
-};
 
 /** What the sky lights and darkens (see NightParts), which everything after it that has any adds to. */
 export const nightLights: Fixture<'night'> = () => ({
@@ -117,60 +101,6 @@ export const machineMonitor: Fixture<'machineScreen'> = (site) => {
   site.group.add(monitor);
   site.wall('west', MACHINE_MONITOR.z, MACHINE_MONITOR.y, MACHINE_MONITOR.width + 0.2, MACHINE_MONITOR.height + 0.2);
   return { handle: { machineScreen } };
-};
-
-/** The rest of the lounge: the couch, the coffee table, its rug, and a pouf either side. */
-export const lounge: Fixture = (site) => {
-  // The couch, its back to the room, turned from the model's +z to face the TV on the east wall (+x).
-  const couch = loungeCouch();
-  couch.position.set(10.5, 0, 0);
-  couch.rotation.y = Math.PI / 2;
-  site.group.add(couch);
-  // Its top on the seat cushions, so someone standing on the couch stands on them.
-  site.colliders.push({ minX: 10, maxX: 11, minZ: -2.2, maxZ: 2.2, top: 0.47 });
-  seatable(couch, 'couch', 2.6, site.interactables);
-
-  const table = coffeeTable();
-  table.position.set(13, 0, 0);
-  site.group.add(table);
-  site.colliders.push({ minX: 12.2, maxX: 13.8, minZ: -0.8, maxZ: 0.8, top: 0.46 });
-  const rug = mesh(roundedBox(7, 0.02, 7, 1.2), toon('#ffc6ff'), 13.4, 0.011, 0, false);
-  site.group.add(rug);
-
-  // A pouf either side of the lounge (the seats still called beanbags), turned to the TV like whoever sits on it.
-  for (const [i, [color, x, z]] of (
-    [
-      ['#06d6a0', 12.5, 3.5],
-      ['#ffd166', 14.5, -3.4],
-    ] as const
-  ).entries()) {
-    const id = `lounge-beanbag-${i + 1}`;
-    const seat = pouf(color);
-    seat.position.set(x, 0, z);
-    seat.rotation.y = SEATING_BY_ID.get(id)!.rotY;
-    site.group.add(seat);
-    // Its top on the pouf's, the button in the middle of it.
-    site.colliders.push({ minX: x - 0.5, maxX: x + 0.5, minZ: z - 0.5, maxZ: z + 0.5, top: 0.42 });
-    seatable(seat, id, 1.4, site.interactables);
-  }
-  return {};
-};
-
-/** Plants around the room: the ones in the way into the back office go while it's built out (see the wing). */
-export const plants: Fixture<'plants'> = (site) => {
-  const pots: THREE.Group[] = [];
-  for (const [i, spot] of PLANTS.entries()) {
-    const [x, z, s] = spot;
-    const p = plant(floorPlant(i), s);
-    p.position.set(x, 0, z);
-    site.group.add(p);
-    pots.push(p);
-    const r = 0.3 * s;
-    const collider: Collider = { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r, top: 0.5 * s };
-    site.colliders.push(collider);
-    if (plantByWing(spot)) site.inTheWay.push({ group: p, collider });
-  }
-  return { handle: { plants: pots } };
 };
 
 /** Ceiling lamps (cartoon pendants), hung on long cords down from the high ceiling. */

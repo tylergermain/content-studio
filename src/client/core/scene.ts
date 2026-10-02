@@ -31,7 +31,7 @@ export interface Stage {
   readonly sun: THREE.DirectionalLight;
   readonly office: Office;
   readonly sky: Sky;
-  /** Halloween or Christmas decorations, up while the building's dressed up for one (see dressUp in features/workers/views.ts). */
+  /** Christmas decorations, up while the building's dressed up for one (see dressUp in features/workers/views.ts). */
   readonly holiday: Holiday;
 }
 
@@ -81,7 +81,7 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   const office = buildOffice();
   scene.add(office.group);
   const sky = new Sky(scene, { sun, hemi, ambient }, office.night, () => store.officeNow());
-  // Halloween or Christmas decorations, up while the building's dressed up for one (see dressUp).
+  // Christmas decorations, up while the building's dressed up for one (see dressUp).
   const holiday = new Holiday(office);
   scene.add(holiday.group);
 

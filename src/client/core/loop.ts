@@ -170,7 +170,7 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
     if (!core.upTop && ctx.inOffice()) office.scenic.cull(camera.position, office.night.street, (scene.fog as THREE.Fog).far);
     // A map of its own lights itself its own way (the castle's torchlit hall), after the sky's had its say.
     if (!core.upTop) ctx.world().mood?.({ sun, hemi, ambient, scene }, sky.daylight, t, camera.position);
-    if (!core.upTop && ctx.inOffice()) holiday.update(t, sky.lampsOn, camera);
+    if (!core.upTop && ctx.inOffice()) holiday.update(t, sky.lampsOn);
     sound.setWeather(sky.rain, 1 - sky.daylight);
   }
 

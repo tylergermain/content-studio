@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { CABINET, FLOOR } from '../../../shared/layout';
+import { CABINET_AT } from '../../sound/places';
 import { mesh, roundedBox, toon } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -156,6 +157,13 @@ declare module '../../world/types' {
 export const cabinet: Fixture<'cabinet'> = (site) => {
   const built = buildCabinet();
   site.wall('east', CABINET.z, CABINET.height / 2, CABINET.width + 0.1, CABINET.height);
+  // The office builder stands it wherever the floor wants it, and its bleeps come from there.
+  site.get('furniture').adopt('arcade', {
+    group: built.group,
+    collider: built.collider,
+    use: built.interactable,
+    moved: (p) => Object.assign(CABINET_AT, { x: p.x + Math.sin(p.rotY) * 0.2, z: p.z + Math.cos(p.rotY) * 0.2 }),
+  });
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable], handle: { cabinet: built } };
 };
 

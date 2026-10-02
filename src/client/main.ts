@@ -61,6 +61,7 @@ import { installTv } from './features/tv';
 import { installVoice } from './features/voice';
 import { installWaiting } from './features/waiting';
 import { installWalking } from './features/walking';
+import { installWorkstation } from './features/workstation';
 import { installWhiteboard } from './features/whiteboard';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
@@ -141,7 +142,7 @@ parts.arrival = installArrival(ctx, core, parts);
 parts.maps = installMaps(ctx, core, parts);
 parts.peers = installPeers(ctx, core, parts);
 parts.walking = installWalking(ctx, core, parts);
-installOfficeBuilder(ctx);
+installOfficeBuilder(ctx, { effect: parts.stage.effect });
 parts.views = installWorkerViews(ctx, core, parts);
 parts.actions = installWorkerActions(ctx, core, parts);
 parts.waiting = installWaiting(ctx, core, parts);
@@ -168,6 +169,7 @@ parts.cards = installCarrying(ctx, {
   showMeeting: parts.meeting.showMeeting,
 });
 parts.seating = installSeating(ctx, { shares: () => parts.talk.currentShares(), watchShare: () => parts.talk.watchShare(), arcade: parts.arcade, showBar: parts.bar.showBar, usable: () => parts.pointer.usable() });
+installWorkstation(ctx);
 installGong(ctx, { burstOver: parts.views.burstOver, workerViews: parts.views.workerViews, court: () => parts.worlds.court(), idleAgents: () => parts.worlds.idleAgents() });
 
 parts.hintbar = installHintBar(ctx, core, parts);

@@ -53,8 +53,8 @@ def material(name):
 
 
 # Where things are (Blender space, metres, the counter's middle on the floor at the origin). The
-# counter is the old one's size, its top at the height the office's collider (and the holiday
-# pumpkins on it) count on; the machine and the fridge stand where the old ones did.
+# counter is the old one's size, its top at the height the office's collider counts on; the
+# machine and the fridge stand where the old ones did.
 BODY = (5.0, 1.0, 0.95)
 TOP = (5.1, 1.1, 0.08)
 TOP_Z = 1.03
@@ -206,8 +206,8 @@ def counter():
             panel(s, x, 0.13, 0.7, False)
     # The wooden top, a little over the cupboards all round.
     s.add("Wood", ao.box, (0, 0, TOP_Z - TOP[2] / 2), TOP, bevel=0.018, segments=2)
-    # A sink between the pumpkins' spots (see holiday.ts), under the window: a chrome rim round a
-    # dark basin, and a swan-neck tap at the back.
+    # A sink in the middle of the top, under the window: a chrome rim round a dark basin, and a
+    # swan-neck tap at the back.
     sink = (0.0, -0.03)
     s.add("Chrome", ao.box, (sink[0], sink[1], TOP_Z + 0.007), (0.66, 0.5, 0.014), bevel=0.02, segments=2)
     s.add("Dark", ao.box, (sink[0], sink[1], TOP_Z + 0.0145), (0.54, 0.38, 0.004), bevel=0.04, segments=2)

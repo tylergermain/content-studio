@@ -3,7 +3,7 @@
 //   breed=<breed>|all           which breed (dog-<breed>.glb, the pup by default), or a row of each, front to back
 //                               (with act=, side by side)
 //   coat=<n>                    which of DOG_COATS they wear
-//   theme=halloween|christmas   dressed up for a holiday
+//   theme=christmas             dressed up for the holiday
 //   act=<act>                   just that one, close up (stand, walk, run, wag, sniff, sit, bark, lie, nap)
 //   face=<radians>              which way they face: 0 looks at the camera, the default is three-quarters
 //   walk=<m/s>, run=<m/s>       how fast the walker and the runner go (the server's TROT is 1.3, RUN 3.4)
@@ -43,7 +43,7 @@ const ROW = 1.6;
 const q = new URLSearchParams(location.search);
 const breeds: DogBreed[] = q.get('breed') === 'all' ? [...DOG_BREEDS] : [dogBreed(q.get('breed'))];
 const coat = Number(q.get('coat') ?? 0);
-const theme: Theme | null = q.get('theme') === 'halloween' || q.get('theme') === 'christmas' ? (q.get('theme') as Theme) : null;
+const theme: Theme | null = q.get('theme') === 'christmas' ? 'christmas' : null;
 const only = ACTS.find((a) => a === q.get('act'));
 const face = q.has('face') ? Number(q.get('face')) : 0.9;
 const speeds = { walk: Number(q.get('walk') ?? 1.3), run: Number(q.get('run') ?? 3.4) };

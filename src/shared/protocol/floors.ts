@@ -3,6 +3,7 @@
 import type { CabinetView } from '../cabinet.js';
 import type { Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
+import type { Piece } from '../furniture.js';
 import type { DeskLayout } from '../office-builder.js';
 import type { FloorPlan } from '../floorplan.js';
 import type { CarState } from '../garage.js';
@@ -106,7 +107,7 @@ export interface FloorView {
   queue: QueueState;
   /** Pictures on this floor's walls. */
   decor: Decoration[];
-  /** The signs over this floor's desks, and how far its back office is built out. */
+  /** The signs over this floor's desks, how far its back office is built out, and how it's arranged. */
   plan: FloorPlan;
   services: ServicesState;
   /** The floor's dog; null in a building with no floors yet. */
@@ -151,7 +152,12 @@ export type PlanClientMsg =
   /** Knock the back office out another row, with two more desks; or wall its last row back up. */
   | { t: 'floor.expand' }
   | { t: 'floor.shrink' }
-  | { t: 'floor.layout'; desks: DeskLayout; revision: number };
+  /**
+   * Save the floor as the office builder arranged it (admins only): where its desks stand, its
+   * furniture, and its paint (`look`, one of FLOOR_PALETTES; none is the floor's own). `revision` is
+   * the layout it was arranged from (FloorPlan.layoutRevision): a newer one saved meanwhile refuses it.
+   */
+  | { t: 'floor.layout'; desks: DeskLayout; furniture: Piece[]; look?: number; revision: number };
 
 export type FloorServerMsg =
   /** You arrived on another floor: everything on it, replacing the last one's, and where everyone is now. */
@@ -163,5 +169,5 @@ export type FloorServerMsg =
   | { t: 'floor.added'; repo: string; floor?: string; error?: string }
   /** The projects folder moved (see floor.projectsDir). */
   | { t: 'projectsDir'; state: ProjectsDirState }
-  /** Your floor's signs changed, or its back office was built out or walled up. */
+  /** Your floor's signs changed, its back office was built out or walled up, or the office builder rearranged it. */
   | { t: 'plan'; plan: FloorPlan };

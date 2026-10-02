@@ -19,7 +19,8 @@ import { kitchen } from '../kitchen';
 import { signs } from '../desksigns';
 import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '../types';
 import { PALETTE, floorTexture, paintPlanks, type Looks } from './materials';
-import { boards, clearOfStairs, lamps, lounge, machineMonitor, nightLights, plants, rugs, tv } from './room';
+import { boards, clearOfStairs, lamps, machineMonitor, nightLights, tv } from './room';
+import { furniture } from './furnish';
 import { plug, walls, type Door } from './shell';
 import { balcony } from './balcony';
 import { downstairs } from './ground';
@@ -40,7 +41,6 @@ import type { Fixture, Gives, Site } from './fixture';
 function floorPlan() {
   return [
     stack,
-    rugs,
     nightLights,
     walls,
     balcony,
@@ -52,15 +52,15 @@ function floorPlan() {
     beanbags,
     kiosks,
     boards,
-    // The lounge: the TV, the couch and its table and poufs, and the jukebox and the arcade in the corner.
+    // The lounge: the TV, and the jukebox and the arcade in the corner. Its couch, table and poufs are
+    // furniture, with the rugs and the plants: whatever the office builder can move.
     tv,
     machineMonitor,
-    lounge,
+    furniture,
     jukebox,
     cabinet,
     bookshelf,
     kitchen,
-    plants,
     lamps,
     wing,
     signs,
@@ -103,7 +103,6 @@ export function buildOffice(): Office {
     planks,
     desks,
     doors,
-    inTheWay: [],
     get: (key) => {
       if (!(key in given)) throw new Error(`The office's ${key} isn't built yet: its fixture comes later in the plan`);
       return given[key]!;

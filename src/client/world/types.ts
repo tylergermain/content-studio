@@ -70,6 +70,9 @@ export interface DeskView {
   vacancy: THREE.Group;
   /** How high the vacancy marker floats. */
   vacancyY: number;
+  /** What you bump into of it and what you use it by, for a desk the office builder can move (see features/office-builder). */
+  collider?: Collider;
+  interact?: Interactable;
 }
 
 /**

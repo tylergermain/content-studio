@@ -128,7 +128,7 @@ export type PresenceServerMsg =
       machine: MachineState;
       /** Outside the windows: the same on every floor. */
       sky: SkyState;
-      /** Halloween or Christmas decorations, all over the building, or none. */
+      /** Christmas decorations, all over the building, or none. */
       theme: ThemeState;
       /** What the building looks like inside. */
       map: MapState;

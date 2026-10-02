@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { JUKEBOX } from '../../../shared/layout';
+import { JUKEBOX_AT } from '../../sound/places';
 import { mesh, roundedBox, textSprite, toon, toonUnique } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -142,5 +143,7 @@ declare module '../../world/types' {
 export const jukebox: Fixture<'jukebox'> = (site) => {
   const built = buildJukebox();
   site.wall('east', JUKEBOX.z, JUKEBOX.height / 2, JUKEBOX.width + 0.1, JUKEBOX.height);
+  // The office builder stands it wherever the floor wants it, and its music comes from there.
+  site.get('furniture').adopt('jukebox', { group: built.group, collider: built.collider, use: built.interactable, moved: (p) => Object.assign(JUKEBOX_AT, { x: p.x, z: p.z }) });
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable], handle: { jukebox: built } };
 };

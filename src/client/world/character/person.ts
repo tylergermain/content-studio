@@ -8,7 +8,7 @@ import { HIPS, type PersonRig } from './rig';
 import { axeModel, dartModel } from '../../features/bargames/world';
 import { OpenBook } from '../../features/bookshelf/book';
 import { HeldCard } from '../../features/carrying/card';
-import { UNDEAD_SKIN, santaHat, warlockHat } from '../costumes';
+import { santaHat } from '../costumes';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
 import { cigarette, coffeeMug, drinkGlass, putDownGlass, undress } from './props';
@@ -110,7 +110,7 @@ export class Person {
    * `top`) or taking it back all by itself first (`autoT`), and how long until the next is in hand.
    */
   private oche: Oche | null = null;
-  /** Dressed up for a holiday (see setCostume): a warlock's hat and undead skin, or a Santa hat. */
+  /** Dressed up for a holiday (see setCostume): a Santa hat. */
   private costume: Theme | null = null;
   private hat: THREE.Object3D[] = [];
   /** A hand on someone's shoulder, marching them along (see holdOn). */
@@ -232,12 +232,12 @@ export class Person {
     this.dress();
   }
 
-  /** Dresses up for a holiday: a crooked warlock's hat and undead skin for Halloween, a Santa hat for Christmas. Null takes it off. */
+  /** Dresses up for a holiday: a Santa hat for Christmas. Null takes it off. */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
     undress(this.hat);
-    const hat = theme === 'halloween' ? warlockHat() : theme === 'christmas' ? santaHat() : null;
+    const hat = theme === 'christmas' ? santaHat() : null;
     if (hat) {
       hat.traverse((o) => ((o as THREE.Mesh).castShadow = true));
       this.head.add(hat);
@@ -249,7 +249,6 @@ export class Person {
   /** The skin and hair under the costume: hair that would poke through a hat's crown hides under it. */
   private dress() {
     this.skin.color.set(SKIN_TONES[this.look.skin]);
-    if (this.costume === 'halloween') this.skin.color.lerp(UNDEAD_SKIN, 0.7);
     const style = HAIR_STYLES[this.look.style];
     this.hair.visible = !this.costume || !(style === 'Spiky' || style === 'Bun' || style === 'Curly');
   }
