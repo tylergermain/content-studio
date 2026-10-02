@@ -1,4 +1,5 @@
 import './terminal.css';
+import { openWorkerChat } from './worker-chat/ui';
 import { Terminal } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -98,7 +99,7 @@ export function openTerminalFor(): string | null {
   return current?.workerId ?? null;
 }
 
-export function openTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind, opts: TerminalOptions = {}) {
+function openRawTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind, opts: TerminalOptions = {}) {
   if (current?.workerId === workerId) {
     if (find) current.find(find);
     return;
@@ -504,4 +505,12 @@ export function openTerminal(net: Net, workerId: string, onChanges?: () => void,
   refresh();
   net.send({ t: 'worker.attach', workerId });
   if (!opts.keypad) setTimeout(() => term.focus(), 50);
+}
+
+/** Agent desks open their conversation and previews; shells and search hits retain the terminal. */
+export function openTerminal(net: Net, workerId: string, onChanges?: () => void, find?: TerminalFind, opts: TerminalOptions = {}) {
+  if (store.workers.get(workerId)?.kind === 'agent' && !find) {
+    current?.modal.close();
+    openWorkerChat(workerId, () => openRawTerminal(net, workerId, onChanges, undefined, opts), onChanges);
+  } else openRawTerminal(net, workerId, onChanges, find, opts);
 }

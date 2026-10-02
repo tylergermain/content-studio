@@ -1,5 +1,7 @@
 # Content Studio
 
+Worker desks now open a conversation panel with content previews and optional GPT-Live 1 voice. Click **Talk live** to configure an OpenAI project API key privately on the Studio. Text chat works without an API key. See [Worker chat and live voice](docs/worker-chat.md).
+
 Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for new workers, queue tasks, meetings, and the office default. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` and trusts the office hooks. Pi uses its normal unrestricted tools with `--approve` for project trust. These defaults apply to fresh and resumed launches. Restart existing workers to apply them.
 
 Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.

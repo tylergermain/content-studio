@@ -437,7 +437,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
         doing ? aside(doing) : '',
         spent ? h('span.cost', { title: usageTitle(w.usage!, provider) }, spent) : '',
         key('E', isAsleep(w.status) ? 'Wake with a prompt' : 'Prompt'),
-        key('O', 'Terminal'),
+        key('O', w.kind === 'agent' ? 'Chat & previews' : 'Terminal'),
         key('X', 'Send home'),
       ],
     };

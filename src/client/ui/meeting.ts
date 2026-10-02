@@ -92,7 +92,7 @@ function renderStatus(m: Meeting, body: HTMLElement, foot: HTMLElement, net: Net
         w ? h('span.pill', { class: w.status }, STATUS_LABEL[w.status]) : h('span.pill.exited', {}, 'gone home'),
         part ? h('span.meeting-part', { title: t?.file ?? '' }, part) : null,
         s.tokens ? h('span.muted', {}, `${fmtTokens(s.tokens)} tokens`) : null,
-        w ? h('button.btn.small', { type: 'button', onclick: () => actions.openTerminal(w.id) }, '🖥️ Terminal') : null,
+        w ? h('button.btn.small', { type: 'button', onclick: () => actions.openTerminal(w.id) }, '💬 Chat & previews') : null,
       );
     }),
   );

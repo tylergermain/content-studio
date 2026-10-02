@@ -29,7 +29,6 @@ import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, Worke
 import { clamp, safeEq, truncate } from './util.js';
 import { COLORS, NAMES, newWorker } from './worker.js';
 import { WorkerTrees, lostMessage } from './worktree.js';
-
 const SCREEN_INTERVAL_MS = 250;
 /** How often a steady typist's "last typed" time is refreshed for everyone. */
 const TYPED_REFRESH_MS = 15_000;
@@ -181,6 +180,7 @@ export class WorkerManager {
     return [...this.workers.values()].map((w) => w.info);
   }
 
+  sessionContext(id: string) { return this.workers.get(id); }
   get(id: string): WorkerInfo | undefined {
     return this.workers.get(id)?.info;
   }
