@@ -437,3 +437,7 @@ Hire a Video Editor, Researcher, Designer, or custom specialist from an empty de
 Admins can open **Org chart** to assign human member accounts to positions and place specialist roles beneath them. Employees can hire only those specialist roles, including indirect reports; unassigned members cannot hire. Agent delegation inherits the hiring human's restrictions. See [org chart setup and account requirements](docs/org-chart.md). The policy controls managed studio workers; computer-level isolation remains a separate step.
 
 Look at an agent and press **Q** for an in-world live voice conversation. They turn to face you while you talk, and Q or Esc ends the conversation. See [worker chat](docs/worker-chat.md) for setup and controls.
+
+Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and content previews, with the raw Terminal available from that workspace.
+
+With the basketball in hand, hold **E or click** to charge and release to throw exactly where you aim. Short holds barely move it; long holds throw hard. **Space** jumps for layups and floaters. Dunking requires an airborne downward release from above and immediately beside the rim, followed by a real physics basket.
