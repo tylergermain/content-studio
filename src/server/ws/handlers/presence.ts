@@ -6,6 +6,8 @@ import { sanitizeLook } from '../../../shared/avatar.js';
 import { isEmote } from '../../../shared/emotes.js';
 import { ROOF, isDrink } from '../../../shared/rooftop.js';
 import { isBarGame } from '../../../shared/bargames.js';
+import { roomOf } from '../../../shared/floorplan.js';
+import { cleanBay, teeBays } from '../../../shared/tees.js';
 import { throttle, type Client } from '../../office/client.js';
 import type { Ctx } from '../../office/context.js';
 import { COLOR_RE, issueNumber, num, str } from '../../office/input.js';
@@ -52,12 +54,16 @@ export const presenceHandlers = {
       return;
     }
     if (typeof msg.golf === 'boolean') {
-      // The tee's on an office floor's balcony; there's none up on the roof.
+      // The tees are on an office floor's balcony; there's none up on the roof. A floor with two has a
+      // second bay: anywhere else, it's the first they're at.
       const golf = msg.golf && c.peer.floor !== ROOF;
-      if (golf === !!c.peer.golfing) return;
+      const bay = golf ? cleanBay(msg.bay, teeBays(roomOf(ctx.floorOf(c)?.plan.state()).tees)) : 0;
+      if (golf === !!c.peer.golfing && bay === (c.peer.golfing ? (c.peer.golfBay ?? 0) : 0)) return;
       if (golf) c.peer.golfing = true;
       else delete c.peer.golfing;
-      ctx.broadcast({ t: 'peer.act', id: c.id, golf }, c.id, true);
+      if (bay) c.peer.golfBay = bay;
+      else delete c.peer.golfBay;
+      ctx.broadcast({ t: 'peer.act', id: c.id, golf, ...(bay ? { bay } : {}) }, c.id, true);
       return;
     }
     if (msg.throwing !== undefined) {

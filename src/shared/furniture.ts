@@ -4,8 +4,10 @@
 // in its plan (shared/floorplan.ts). The workers' desks are the builder's too, but they're seats with
 // ids of their own (see DeskLayout).
 
+import type { RoomOptions } from './floorplan.js';
 import { HOOP } from './hoop.js';
 import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
+import { LOFT_SEATS, hasLoft } from './office-fixed.js';
 
 export type FurnitureGroup = 'Work' | 'Rooms' | 'Seating' | 'Tables' | 'Plants' | 'Play' | 'Decor';
 
@@ -53,7 +55,7 @@ export interface KindDef {
   /** Where you walk up to it to use it: `z` out from its middle toward its front, and how near's near enough. */
   use?: { z: number; radius: number };
   /** What E does there, for the things that are for playing with (see client/features/playthings). */
-  play?: 'punch' | 'snack';
+  play?: 'punch' | 'snack' | 'rally' | 'foosball' | 'spin' | 'strike';
   /** You bounce on it: how hard it throws you back up, in m/s. */
   bounce?: number;
   /** It has a screen that plays the floor's own videos (see Piece.media, and client/features/screens). */
@@ -75,8 +77,12 @@ export const FURNITURE = {
   'long-table': { label: 'Long table', icon: '🪵', group: 'Work', w: 3.6, d: 1.2, top: 0.76, color: '#c9a36b' },
   'podcast-desk': { label: 'Podcast desk', icon: '🎙️', group: 'Work', w: 2, d: 1, top: 0.76, color: '#c9a36b' },
   screen: { label: 'Video screen', icon: '📺', group: 'Work', w: 2.3, d: 0.5, top: 1.85, color: '#2b2d42', plays: true },
+  // The same screen with no stand, hung at eye level: pushed up against a wall, with nothing in the way under it.
+  'wall-screen': { label: 'Wall screen', icon: '🖥️', group: 'Work', w: 2.2, d: 0.12, top: 0, color: '#2b2d42', plays: true, use: { z: 1.3, radius: 1.9 } },
   // Hung from the ceiling over wherever the news is: the market's prices sliding along it (see TickerSetup). Nothing's in the way under it.
   ticker: { label: 'Stock ticker', icon: '📈', group: 'Work', w: 6, d: 0.3, top: 0 },
+  // The same prices as a table, on a screen on a stand: for a corner of the newsroom, where the bar's too long.
+  'ticker-screen': { label: 'Market board', icon: '📊', group: 'Work', w: 1.6, d: 0.3, top: 1.5, color: '#2b2d42' },
   softbox: { label: 'Softbox light', icon: '💡', group: 'Work', r: 0.45, top: 2, color: '#f7f3ea' },
   camera: { label: 'Camera on a tripod', icon: '🎥', group: 'Work', r: 0.4, top: 1.6 },
   backdrop: { label: 'Backdrop', icon: '🎬', group: 'Work', w: 3, d: 0.5, top: 2.5, color: '#218cff' },
@@ -97,14 +103,25 @@ export const FURNITURE = {
   'lounge-chair': { label: 'Lounge chair', icon: '💺', group: 'Seating', w: 0.9, d: 0.9, top: 0.42, color: '#e9dfcf', seat: { label: '💺 Lounge chair', places: [0], hips: 0.46, depth: -0.02, out: 0.85 } },
   stool: { label: 'Stool', icon: '🪑', group: 'Seating', r: 0.24, top: 0.72, color: '#2b2d42', seat: { label: '🪑 Stool', places: [0], hips: 0.78, depth: 0, out: 0.7 } },
   cushion: { label: 'Floor cushion', icon: '🧘', group: 'Seating', r: 0.42, top: 0.14, color: '#b388eb', seat: { label: '🧘 Cushion', places: [0], hips: 0.3, depth: 0, out: 0.9 } },
-  trampoline: { label: 'Trampoline', icon: '🤸', group: 'Play', r: 1.3, top: 0.34, color: '#5bc0eb', bounce: 8.6 },
+  // Its top is the mat, low enough to step up onto (see STEP in client/player/collide.ts).
+  trampoline: { label: 'Trampoline', icon: '🤸', group: 'Play', r: 1.3, top: 0.3, color: '#5bc0eb', bounce: 8.6 },
   'punching-bag': { label: 'Punching bag', icon: '🥊', group: 'Play', r: 0.5, top: 2.1, color: '#ef476f', use: { z: 0.95, radius: 1.3 }, play: 'punch' },
   'vending-machine': { label: 'Vending machine', icon: '🥤', group: 'Play', w: 1, d: 0.8, top: 1.95, color: '#118ab2', use: { z: 1.1, radius: 1.3 }, play: 'snack' },
-  'ping-pong': { label: 'Ping-pong table', icon: '🏓', group: 'Play', w: 2.74, d: 1.53, top: 0.76, color: '#1a7f5a' },
-  foosball: { label: 'Foosball table', icon: '⚽', group: 'Play', w: 1.5, d: 0.8, top: 0.9, color: '#8a5a3b' },
+  // Its front is an end of the table, where you stand for a rally.
+  'ping-pong': { label: 'Ping-pong table', icon: '🏓', group: 'Play', w: 1.53, d: 2.74, top: 0.76, color: '#1a7f5a', use: { z: 1.95, radius: 1.3 }, play: 'rally' },
+  foosball: { label: 'Foosball table', icon: '⚽', group: 'Play', w: 1.5, d: 0.8, top: 0.9, color: '#8a5a3b', use: { z: 0.95, radius: 1.3 }, play: 'foosball' },
+  // A pad to step onto: its tiles light up and sound under your feet.
+  'dance-mat': { label: 'Dance mat', icon: '🕺', group: 'Play', w: 1.8, d: 1.8, top: 0.05, color: '#2b2d42' },
+  'prize-wheel': { label: 'Prize wheel', icon: '🎡', group: 'Play', w: 1.1, d: 0.6, top: 1.9, color: '#ef476f', use: { z: 0.95, radius: 1.3 }, play: 'spin' },
+  'high-striker': { label: 'High striker', icon: '🔔', group: 'Play', w: 0.9, d: 1.1, top: 2.7, color: '#ef476f', use: { z: 1.2, radius: 1.3 }, play: 'strike' },
   monstera: { label: 'Monstera', icon: '🪴', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
   'snake-plant': { label: 'Snake plant', icon: '🌿', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
   ficus: { label: 'Ficus', icon: '🌳', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
+  // Each in a planter of its own (the pothos's on a plant stand): what you bump into is the planter, as high as its rim.
+  'fiddle-leaf': { label: 'Fiddle-leaf fig', icon: '🎋', group: 'Plants', r: 0.3, top: 0.55, sizes: true },
+  palm: { label: 'Palm', icon: '🌴', group: 'Plants', r: 0.3, top: 0.6, sizes: true },
+  'bird-of-paradise': { label: 'Bird of paradise', icon: '🌺', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
+  pothos: { label: 'Pothos on a stand', icon: '🍃', group: 'Plants', r: 0.3, top: 0.93, sizes: true },
   planter: { label: 'Planter box', icon: '🌱', group: 'Plants', w: 1.8, d: 0.45, top: 1, color: '#2b2d42' },
   rug: { label: 'Rug', icon: '🟦', group: 'Decor', w: 6.2, d: 4.6, top: 0, color: '#bde0fe' },
   'rug-large': { label: 'Large rug', icon: '🟪', group: 'Decor', w: 7, d: 7, top: 0, color: '#ffc6ff' },
@@ -327,8 +344,10 @@ export function furnitureSeats(pieces: readonly Piece[], wing = 0): SeatDef[] {
 /**
  * The seat called `id` on a floor with this furniture, up on the roof or down on the floor: the
  * furniture's own, else one of the office's that isn't furniture (the loft's, the balcony's, the roof's).
+ * The loft's go with the loft: a floor whose `room` is all one level has none of them.
  */
-export function floorSeat(pieces: readonly Piece[], wing: number, id: string): SeatDef | undefined {
+export function floorSeat(pieces: readonly Piece[], wing: number, id: string, room: RoomOptions = {}): SeatDef | undefined {
+  if (LOFT_SEATS.has(id) && !hasLoft(room)) return undefined;
   return furnitureSeats(pieces, wing).find((s) => s.id === id) ?? (DEFAULT_SEAT_IDS.has(id) ? undefined : SEATING_BY_ID.get(id));
 }
 

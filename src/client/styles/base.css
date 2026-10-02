@@ -154,6 +154,9 @@ b, strong { font-weight: 600; }
 .modal textarea:focus, .modal input[type=text]:focus, .modal input[type=password]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 .modal ::placeholder { color: rgba(60, 60, 67, .5); }
 .modal label { font-weight: 500; font-size: 13px; display: block; margin-bottom: 6px; }
+/* A drop-down, in whichever window has one: a quiet chevron in place of the system's arrow. */
+.modal select { -webkit-appearance: none; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 8'%3E%3Cpath d='M1.5 1.5l4.5 4.5 4.5-4.5' fill='none' stroke='%23636366' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 9px center; background-size: 10px; padding-right: 26px; outline: none; }
+.modal select:focus-visible { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
 /* The ✕: a quiet round button, in a window's header or (.corner) on its top right corner. */
 .btn.close { width: 30px; height: 30px; padding: 0; justify-content: center; flex: none; border-radius: 50%; border-color: transparent; background-color: var(--wash); box-shadow: none; color: var(--muted); font-size: 13px; font-weight: 600; }
 .btn.close:hover { background-color: var(--wash-2); color: var(--ink); }

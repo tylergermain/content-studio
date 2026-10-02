@@ -4,7 +4,8 @@
  * something where it can't stand is put back, with why (see shared/office-builder.ts).
  */
 import { DEFAULT_FURNITURE, isRound, kindDef, newPieceId, pieceBox, pieceRadius, type Box, type FurnitureKind, type Piece } from '../../../shared/furniture';
-import { ORIGINAL_DESKS, SNAP, deskRect, layoutProblems, problemAt, type DeskLayout, type DeskPose } from '../../../shared/office-builder';
+import { ORIGINAL_DESKS, SNAP, deskRect, layoutProblems, mezzanineProblem, problemAt, type DeskLayout, type DeskPose } from '../../../shared/office-builder';
+import { hasLoft } from '../../../shared/office-fixed';
 import type { RoomOptions } from '../../../shared/floorplan';
 import type { Arrangement } from './sync';
 
@@ -75,9 +76,9 @@ export class DraftLayout {
     return { box: pieceBox(p), ...(isRound(p) ? { radius: pieceRadius(p) } : {}) };
   }
 
-  /** What's wrong with where `id` stands, or nothing. */
+  /** What's wrong with where `id` stands in the room as the draft has it (with the mezzanine's stairs to keep off, or without), or nothing. */
   problem(id: string): string | undefined {
-    return problemAt(this.now, id);
+    return problemAt(this.now, id, this.now.room);
   }
 
   /** `before` is what Undo goes back to, if the draft's changed since. */
@@ -108,12 +109,15 @@ export class DraftLayout {
 
   /**
    * Changes the draft, unless that leaves something where it can't stand (`check`, the one thing that
-   * changed, or anything at all): then it's put back, and this is why.
+   * changed, or anything at all): then it's put back, and this is why. Bringing the mezzanine back is
+   * such a change, while something stands where its stairs or its posts go.
    */
   edit(change: (d: Draft) => void, check?: string | null): string | undefined {
     const before = this.key();
+    const flat = !hasLoft(this.now.room);
     change(this.now);
-    const why = check ? this.problem(check) : (layoutProblems(this.now).values().next().value as string | undefined);
+    const room = this.now.room;
+    const why = (flat && hasLoft(room) && mezzanineProblem(this.now, room)) || (check ? this.problem(check) : (layoutProblems(this.now, room).values().next().value as string | undefined));
     if (why) this.restore(before);
     else this.remember(before);
     return why;

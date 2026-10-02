@@ -4,7 +4,8 @@
 
 import { DESKS, DESK_SIZE, FLOOR, type DeskDef } from './layout.js';
 import { DEFAULT_FURNITURE, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, type Box, type Piece } from './furniture.js';
-import { FIXED, KEEP_CLEAR } from './office-fixed.js';
+import type { RoomOptions } from './floorplan.js';
+import { fixedIn, keepClearIn } from './office-fixed.js';
 
 export interface DeskPose {
   x: number;
@@ -78,15 +79,19 @@ function touching(a: Standing, b: Standing): boolean {
   return overlaps(a.box, b.box);
 }
 
-/** Why `s` can't stand where it is in the room, whatever else is on the floor; or nothing, if it can. */
-function misplaced(s: Standing): string | undefined {
+/**
+ * Why `s` can't stand where it is in a room like `room` (what's built into it goes by its options: a
+ * floor with no mezzanine has no stairs to keep off), whatever else is on the floor; or nothing, if it can.
+ */
+function misplaced(s: Standing, room: RoomOptions): string | undefined {
   if (outside(s.box)) return `${s.label} must stay inside the room`;
-  for (const f of FIXED.rects) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} is in the way of ${f.what}`;
-  for (const f of FIXED.circles) {
+  const fixed = fixedIn(room);
+  for (const f of fixed.rects) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} is in the way of ${f.what}`;
+  for (const f of fixed.circles) {
     const [x, z, r] = f.circle;
     if (touching(s, { label: f.what, as: f.what, box: { minX: x - r, maxX: x + r, minZ: z - r, maxZ: z + r }, round: { x, z, r } })) return `${s.label} is in the way of ${f.what}`;
   }
-  for (const f of KEEP_CLEAR) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} would block ${f.what}`;
+  for (const f of keepClearIn(room)) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} would block ${f.what}`;
   return undefined;
 }
 
@@ -117,14 +122,15 @@ function cleanDesks(raw: unknown): DeskLayout | string {
 /**
  * What's wrong with where things stand, by the id of each desk or piece that's somewhere it can't be:
  * off the floor, on something built in, in a doorway, or on top of something else. Rugs lie under
- * anything, as long as they're in the room.
+ * anything, as long as they're in the room. `room` is the floor's own (see RoomOptions): the office's
+ * as it comes, when it isn't said.
  */
-export function layoutProblems(layout: OfficeLayout): Map<string, string> {
+export function layoutProblems(layout: OfficeLayout, room: RoomOptions = {}): Map<string, string> {
   const problems = new Map<string, string>();
   const desks = layoutDesks(layout.desks).map((d) => ({ id: d.id, s: standingDesk(d) }));
   const pieces = layout.furniture.map((p) => ({ id: p.id, s: standingPiece(p), solid: isSolid(p) }));
   for (const d of desks) {
-    const why = misplaced(d.s);
+    const why = misplaced(d.s, room);
     if (why) problems.set(d.id, why);
   }
   for (const p of pieces) {
@@ -132,7 +138,7 @@ export function layoutProblems(layout: OfficeLayout): Map<string, string> {
       if (outside(p.s.box)) problems.set(p.id, `${p.s.label} must stay inside the room`);
       continue;
     }
-    const why = misplaced(p.s);
+    const why = misplaced(p.s, room);
     if (why) problems.set(p.id, why);
   }
   const solid = [...desks, ...pieces.filter((p) => p.solid)];
@@ -152,7 +158,7 @@ export function layoutProblems(layout: OfficeLayout): Map<string, string> {
  * What's wrong with where the desk or piece `id` stands in `layout`, or nothing: the same check as
  * layoutProblems, for the one thing being dragged about.
  */
-export function problemAt(layout: OfficeLayout, id: string): string | undefined {
+export function problemAt(layout: OfficeLayout, id: string, room: RoomOptions = {}): string | undefined {
   const desk = layoutDesks(layout.desks).find((d) => d.id === id);
   const piece = desk ? undefined : layout.furniture.find((p) => p.id === id);
   if (!desk && !piece) return undefined;
@@ -160,7 +166,7 @@ export function problemAt(layout: OfficeLayout, id: string): string | undefined 
   if (piece && !isSolid(piece)) {
     return outside(s.box) ? `${s.label} must stay inside the room` : undefined;
   }
-  const why = misplaced(s);
+  const why = misplaced(s, room);
   if (why) return why;
   for (const other of [...layoutDesks(layout.desks).filter((d) => d.id !== id).map(standingDesk), ...layout.furniture.filter((p) => p.id !== id && isSolid(p)).map(standingPiece)]) {
     if (touching(s, other)) return `${s.label} overlaps ${other.as}`;
@@ -169,15 +175,27 @@ export function problemAt(layout: OfficeLayout, id: string): string | undefined 
 }
 
 /**
- * A layout from somewhere it can't be trusted (a browser, a file): the desks and the furniture as
- * they're kept, or why it won't do. No furniture at all is the office's as it comes.
+ * Why a floor arranged like `layout` can't have the mezzanine (back): what stands where its stairs or
+ * its posts go, which is fine on a floor that's all one level. Nothing, if it can. For whoever's
+ * turning it back on (the builder, and the office when it saves), so the reason names the mezzanine.
  */
-export function validateLayout(desks: unknown, furniture?: unknown): OfficeLayout | string {
+export function mezzanineProblem(layout: OfficeLayout, room: RoomOptions = {}): string | undefined {
+  const flat = layoutProblems(layout, { ...room, loft: false });
+  for (const [id, why] of layoutProblems(layout, { ...room, loft: true })) if (!flat.has(id)) return `Clear the floor for the mezzanine first: ${why}`;
+  return undefined;
+}
+
+/**
+ * A layout from somewhere it can't be trusted (a browser, a file): the desks and the furniture as
+ * they're kept, or why it won't do. No furniture at all is the office's as it comes. It's checked
+ * against the room it's for (`room`, the floor's own options): the office's as it comes, when it isn't said.
+ */
+export function validateLayout(desks: unknown, furniture?: unknown, room: RoomOptions = {}): OfficeLayout | string {
   const d = cleanDesks(desks);
   if (typeof d === 'string') return d;
   const f = furniture === undefined ? DEFAULT_FURNITURE.map((p) => ({ ...p })) : cleanFurniture(furniture);
   if (typeof f === 'string') return f;
   const layout = { desks: d, furniture: f };
-  const [first] = layoutProblems(layout).values();
+  const [first] = layoutProblems(layout, room).values();
   return first ?? layout;
 }

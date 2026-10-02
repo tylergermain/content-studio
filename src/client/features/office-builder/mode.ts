@@ -186,7 +186,7 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
 
     function save() {
       if (pending || conflict || !dirty() || !net.up) return;
-      const clean = validateLayout(draft.now.desks, draft.now.furniture);
+      const clean = validateLayout(draft.now.desks, draft.now.furniture, roomOf(draft.now));
       if (typeof clean === 'string') {
         say(clean, 'warn');
         return ui.render();

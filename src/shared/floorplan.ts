@@ -114,9 +114,10 @@ export function cleanPlan(raw: unknown): FloorPlan {
     }
   }
   // A layout that no longer fits the office (it was saved by an older one) is dropped whole: the office as it comes.
-  const layout = r.desks === undefined && r.furniture === undefined ? undefined : validateLayout(r.desks, r.furniture);
-  const look = cleanLook(r.look);
+  // (Checked against the room it was saved with: a floor that's all one level may have furniture where the stairs were.)
   const room = cleanRoom(r.room);
+  const layout = r.desks === undefined && r.furniture === undefined ? undefined : validateLayout(r.desks, r.furniture, room);
+  const look = cleanLook(r.look);
   return {
     wing: wingLevel(r.wing),
     labels,

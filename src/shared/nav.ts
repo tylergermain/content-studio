@@ -6,7 +6,8 @@
 
 import { DEFAULT_FURNITURE, furnitureObstacles, type Piece } from './furniture.js';
 import { deskRect } from './office-builder.js';
-import { FIXED, type Circle, type Rect } from './office-fixed.js';
+import type { RoomOptions } from './floorplan.js';
+import { fixedIn, hasLoft, type Circle, type Rect } from './office-fixed.js';
 import { BALCONY, BALCONY_DOOR, BEANBAGS, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, KIOSK, PARACHUTE, ROAD, WING, builtDesks, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 export type { Circle, Rect } from './office-fixed.js';
@@ -45,9 +46,10 @@ export function deskPoint(d: DeskDef, t: number, s: number): Pt {
 
 /**
  * What's in the way on the office floor, built out `wing` rows: its desks, its furniture (the lounge,
- * the plants and whatever else the office builder put there) and everything built in (FIXED).
+ * the plants and whatever else the office builder put there) and everything built into a room like
+ * `room` (see fixedIn: the stairs are only in the way on a floor with the mezzanine).
  */
-function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly Piece[] = floorFurniture): Obstacles {
+function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly Piece[] = floorFurniture, room: RoomOptions = floorRoom): Obstacles {
   const rects: Rect[] = [];
   const circles: Circle[] = [];
   for (const d of desks) {
@@ -60,8 +62,9 @@ function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly P
   const standing = furnitureObstacles(furniture, wing);
   rects.push(...standing.rects);
   circles.push(...standing.circles);
-  rects.push(...FIXED.rects.map((f) => f.rect));
-  circles.push(...FIXED.circles.map((f) => f.circle));
+  const fixed = fixedIn(room);
+  rects.push(...fixed.rects.map((f) => f.rect));
+  circles.push(...fixed.circles.map((f) => f.circle));
   // The overflow bean bags and their lap desks. They're only out while every desk is taken, but they
   // always come out in the same spots, so the dog keeps off those.
   for (const b of BEANBAGS) {
@@ -273,8 +276,9 @@ export const pathLength = (pts: Pt[]) => pts.reduce((n, p, i) => (i ? n + Math.h
 
 /** The office floor downstairs (no stairs, no loft, no elevator), built out `wing` rows, made the first time it's needed. */
 const OFFICE_NAVS: NavGrid[] = [];
-/** The furniture on the floor the grids above are of (see setOfficeFurniture). */
+/** The furniture on the floor the grids above are of (see setOfficeFurniture), and the room it's in (see setOfficeRoom). */
 let floorFurniture: readonly Piece[] = DEFAULT_FURNITURE;
+let floorRoom: RoomOptions = {};
 
 /** The floor's desks moved (a browser moves the shared DESKS, see features/office-builder): its grids are made again when they're next needed. */
 export function clearOfficeNav() {
@@ -287,17 +291,24 @@ export function setOfficeFurniture(pieces: readonly Piece[]) {
   clearOfficeNav();
 }
 
+/** The floor's room is `room` from now on (with the mezzanine and its stairs, or all one level): its grids are made again, for that room. */
+export function setOfficeRoom(room: RoomOptions) {
+  if (hasLoft(room) === hasLoft(floorRoom)) return;
+  floorRoom = { loft: hasLoft(room) };
+  clearOfficeNav();
+}
+
 /**
- * The office floor's grid. With `desks` (and `furniture`) it's a floor's own, made afresh for whoever
- * keeps several floors at once (the server): otherwise it's the one floor a browser is on.
+ * The office floor's grid. With `desks` (and `furniture`, and its `room`) it's a floor's own, made
+ * afresh for whoever keeps several floors at once (the server): otherwise it's the one floor a browser is on.
  */
-export function officeNav(wing = 0, desks?: DeskDef[], furniture?: readonly Piece[]): NavGrid {
+export function officeNav(wing = 0, desks?: DeskDef[], furniture?: readonly Piece[], room?: RoomOptions): NavGrid {
   const level = wingLevel(wing);
   // Through where the north wall was, into the back office: between its walls, short of its back one.
   const on: Floorplan = (x, z, m) =>
     (x > FLOOR.minX + m && x < FLOOR.maxX - m && z > FLOOR.minZ + m && z < FLOOR.maxZ - m) ||
     (level > 0 && x > WING.minX + m && x < WING.maxX - m && z > wingMinZ(level) + m && z < FLOOR.maxZ - m);
-  if (desks || furniture) return new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level, desks ?? builtDesks(level), furniture ?? DEFAULT_FURNITURE), on);
+  if (desks || furniture || room) return new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level, desks ?? builtDesks(level), furniture ?? DEFAULT_FURNITURE, room ?? {}), on);
   return (OFFICE_NAVS[level] ??= new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level), on));
 }
 

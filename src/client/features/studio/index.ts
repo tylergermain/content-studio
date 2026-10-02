@@ -1,7 +1,7 @@
 /**
  * A floor made its own (see shared/studio.ts): its wall boards as bulletins of its own (a newsroom,
  * the team's Slack, how the socials are doing), the agents at its kiosks under its own names, and the
- * ticker round its walls. Admins set a floor up from the office builder, or from a board's window.
+ * prices on its stock ticker. Admins set a floor up from the office builder, or from a board's window.
  */
 import type * as THREE from 'three';
 import { BOARDS } from '../../../shared/layout';
@@ -12,7 +12,7 @@ import { store } from '../../state';
 import { textPlane } from '../../world/toon';
 import { BulletinTexture } from './board';
 import { openStudioSetup } from './setup';
-import { TickerBand } from './ticker';
+import { MarketTicker } from './ticker';
 import { openBulletin } from './window';
 
 export interface StudioDeps {
@@ -69,10 +69,13 @@ export function installStudio(ctx: Ctx, deps: StudioDeps) {
   // "5m ago" moves on by itself.
   setInterval(() => (store.studio.setup.boards.issues || store.studio.setup.boards.pulls) && sync(), 60_000);
 
-  const ticker = new TickerBand();
-  office.group.add(ticker.group);
-  store.on('ticker', () => ticker.set(store.ticker));
-  ctx.ticks.add('world', ({ dt }) => ticker.update(dt));
+  // The prices go wherever the floor has a ticker bar or a market board (furniture, both): on a floor with neither, nowhere.
+  const ticker = new MarketTicker(ctx.renderer.capabilities.maxTextureSize);
+  const prices = () => ticker.set(store.ticker, store.studio.setup.ticker?.symbols ?? []);
+  store.on('ticker', prices);
+  store.on('studio', prices);
+  prices();
+  ctx.ticks.add('world', ({ dt }) => ticker.update(dt, office.furniture.all()));
 
   /** The floor's own board where `board` hangs, if it has one there. */
   function bulletin(board: StudioBoard): Bulletin | null {

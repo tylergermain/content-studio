@@ -1,5 +1,5 @@
 // A floor made its own (see shared/studio.ts): what its wall boards and kiosks are for, what's posted
-// on the boards, the ticker round its walls, and what the office is signed in to so it can fill
+// on the boards, the prices on its stock ticker, and what the office is signed in to so it can fill
 // boards by itself.
 
 import type { IntegrationsState, SlackChannel, StudioBoard, StudioSetup, StudioState, TickerState } from '../studio.js';

@@ -55,7 +55,7 @@ function paintGrowSign(c: HTMLCanvasElement, level: number) {
   g.font = '800 88px Nunito, ui-rounded, system-ui, sans-serif';
   g.fillText(full ? '🏢 As big as it gets' : '🚧 Room to grow', w / 2, h * 0.4);
   g.font = '700 46px Nunito, ui-rounded, system-ui, sans-serif';
-  g.fillText(full ? 'The back office is built all the way out' : level ? 'Press E to go back another row: 2 more desks' : 'Press E to knock through: 2 more desks', w / 2, h * 0.68);
+  g.fillText(full ? 'The back office is built all the way out' : level ? 'Admins press E for another row: 2 more desks' : 'Admins press E to knock through: 2 more desks', w / 2, h * 0.68);
 }
 
 /**

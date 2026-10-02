@@ -4,14 +4,16 @@ import { cloneLabel, cloneStep, floorPalette, normalizeRepo, sameRepo } from '..
 import { ROOF, ROOF_NAME } from '../../shared/rooftop';
 import type { Net } from '../net';
 import { store } from '../state';
+import { elevatorWords } from './building-admin';
 import { h, openModal, timeAgo, toast, type Modal } from './dom';
 import { floorTools, folderFloor } from './elevator-folder';
 import { confirmDialog } from './prompt';
 
-// The elevator's panel: a button for every floor (every project), and "add a project", which clones
-// one of the repositories the office's gh login can see and makes it a new floor. The first time
-// the office runs there are no floors, and this is where you start. Admins can take a floor off the
-// building here too; its checkout stays on disk. Under the floors, it goes down to the garage.
+// The elevator's panel: a button for every floor (every project), the roof over them and the garage
+// under them. That's all of it for most people: managing the building is the admins'. For them there's
+// "add a project" too, which clones one of the repositories the office's gh login can see and makes it
+// a new floor, and each floor's row has its tools (rename, move, take it off the building; its checkout
+// stays on disk). The first time the office runs there are no floors, and this is where an admin starts.
 
 /**
  * The garage under the building, where the elevator goes too. It isn't a floor: it's down under the
@@ -110,6 +112,8 @@ export function openElevator(opts: ElevatorOptions): void {
 
   const needRepos = () => {
     const r = store.repos;
+    // The list is there to add a floor from, and the office only gives it to whoever may.
+    if (!store.me.admin) return;
     if (r.loading || (r.at && Date.now() - r.at < REPOS_STALE_MS && !r.error)) return;
     store.repos = { ...r, loading: true };
     net.send({ t: 'floor.repos' });
@@ -152,16 +156,15 @@ export function openElevator(opts: ElevatorOptions): void {
     return btn;
   };
 
-  /** The floor's button, with a 🗑 beside it for admins to take it off the building (⏹ to stop it while it's cloned). */
+  /** The floor's button; for admins, with its tools beside it: rename, move, and 🗑 to take it off the building (⏹ to stop it while it's cloned). */
   const floorRow = (f: FloorInfo, i: number) => {
     const btn = floorButton(f, i);
+    if (!store.me.admin) return btn;
     if (f.cloning) {
-      if (!store.me.admin && !(adding && sameRepo(f.repo, adding))) return btn;
       const stop = h('button.btn.floor-off', { type: 'button', title: `Stop cloning ${f.repo ?? f.name}`, 'aria-label': `Stop cloning ${f.name}` }, '⏹️');
       stop.addEventListener('click', () => confirmDialog(`Stop cloning ${f.repo ?? f.name}?`, "What's come down so far is thrown away. You can add it again any time.", '⏹️ Stop cloning', () => net.send({ t: 'floor.cancel', floor: f.id })));
       return h('div.floor-row', {}, btn, stop);
     }
-    if (!store.me.admin) return btn;
     const off = h('button.btn.floor-off', { type: 'button', title: `Take ${f.name} off the building`, 'aria-label': `Remove ${f.name}` }, '🗑');
     off.addEventListener('click', () => confirmRemove(f));
     return h('div.floor-row', {}, btn, h('div.floor-tools', {}, ...floorTools(net, f, i, store.floors.filter((o) => !o.cloning).length), off));
@@ -256,6 +259,14 @@ export function openElevator(opts: ElevatorOptions): void {
   };
 
   const renderAdd = () => {
+    // Adding a project is an admin's job: everyone else has the floors, and nothing under them.
+    addEl.classList.toggle('hidden', !store.me.admin);
+    if (!store.me.admin) {
+      addEl.replaceChildren();
+      addBtn.classList.add('hidden');
+      built = false;
+      return;
+    }
     if (!showAdd) {
       const open = h('button.btn', { type: 'button' }, '➕ Add a project');
       open.addEventListener('click', () => {
@@ -282,8 +293,8 @@ export function openElevator(opts: ElevatorOptions): void {
     listEl.replaceChildren(...rows);
     const pick = choice();
     const dest = pick ? `${store.projectsDir.dir}/${pick}` : `${store.projectsDir.dir}/<owner>/<repo>`;
-    const change = store.me.admin ? h('button.btn.dir-change', { type: 'button', title: 'Clone new projects into another folder on the office’s machine' }, '📁 Change folder') : null;
-    change?.addEventListener('click', () => editDir(true));
+    const change = h('button.btn.dir-change', { type: 'button', title: 'Clone new projects into another folder on the office’s machine' }, '📁 Change folder');
+    change.addEventListener('click', () => editDir(true));
     // While it clones: how far it's got (the office asks GitHub about it first).
     const on = addingFloor();
     const lines = adding
@@ -307,7 +318,7 @@ export function openElevator(opts: ElevatorOptions): void {
         statusEl,
         dirEl,
         // Or a floor that's just a folder, nothing to do with GitHub.
-        ...(store.me.admin ? [folderFloor(net)] : []),
+        folderFloor(net),
       );
     }
   };
@@ -387,23 +398,26 @@ export function openElevator(opts: ElevatorOptions): void {
     net.send({ t: 'floor.repos', refresh: true });
   });
 
-  const intro = setup
-    ? h(
-        'p.intro',
-        {},
-        store.floors.length
-          ? 'Every project is a floor of this building. Pick a floor to ride to, or add another project.'
-          : "Every project is a floor of this building, and it doesn't have any yet. Pick one of your repositories: the office clones it and it becomes the first floor.",
-      )
-    : null;
-  const el = h(
-    'div.modal.elevator',
-    { role: 'dialog', 'aria-label': 'Elevator' },
-    h('header', {}, h('h2', {}, setup ? '🏢 Welcome to Agent Office' : '🛗 Elevator'), close),
-    h('div.body', {}, intro, floorsEl, addEl),
-    h('footer', {}, h('span.grow', {}, setup ? 'Your office, one floor per project · Esc to look around first' : 'Pick a floor · Esc to stay here'), addBtn),
-  );
-  const unsubs = [store.on('floors', () => (checkAdding(), renderFloors(), renderAdd())), store.on('repos', renderAdd), store.on('projectsDir', () => (editDir(false), renderAdd())), store.on('floor', renderFloors), store.on('peers', renderFloors), store.on('me', () => (renderFloors(), renderAdd()))];
+  // What the panel says around the floors: to an admin, how to add one; to everyone else, where they can ride.
+  const titleEl = h('h2');
+  const introEl = h('p.intro');
+  const footEl = h('span.grow');
+  const renderWords = () => {
+    const words = elevatorWords({ admin: store.me.admin, setup, floors: store.floors.length });
+    titleEl.textContent = words.title;
+    introEl.textContent = words.intro ?? '';
+    introEl.classList.toggle('hidden', !words.intro);
+    footEl.textContent = words.footer;
+  };
+  const el = h('div.modal.elevator', { role: 'dialog', 'aria-label': 'Elevator' }, h('header', {}, titleEl, close), h('div.body', {}, introEl, floorsEl, addEl), h('footer', {}, footEl, addBtn));
+  /** You were made an admin (or stopped being one) with the panel open: the tools come and go with it. */
+  const meChanged = () => {
+    renderWords();
+    renderFloors();
+    if (showAdd) needRepos();
+    renderAdd();
+  };
+  const unsubs = [store.on('floors', () => (checkAdding(), renderWords(), renderFloors(), renderAdd())), store.on('repos', renderAdd), store.on('projectsDir', () => (editDir(false), renderAdd())), store.on('floor', renderFloors), store.on('peers', renderFloors), store.on('me', meChanged)];
   const modal = openModal(el, {
     doing: '🛗 at the elevator',
     // A stray click shouldn't lose the first-run panel; ✕ and Esc still close it.
@@ -417,8 +431,9 @@ export function openElevator(opts: ElevatorOptions): void {
   });
   current = modal;
   close.addEventListener('click', () => modal.close());
+  renderWords();
   renderFloors();
   if (showAdd) needRepos();
   renderAdd();
-  if (showAdd) setTimeout(() => input.focus(), 30);
+  if (showAdd && store.me.admin) setTimeout(() => input.focus(), 30);
 }

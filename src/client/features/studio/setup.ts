@@ -6,8 +6,8 @@ import { store } from '../../state';
 import { h, openModal, toast } from '../../ui/dom';
 
 // Making a floor its own (admins): what the two wall boards are for and where their posts come from,
-// who stands at each kiosk and what they're told, the ticker round the walls, and what the office is
-// signed in to so it can fill a board by itself.
+// who stands at each kiosk and what they're told, the prices on its stock ticker, and what the office
+// is signed in to so it can fill a board by itself.
 
 const WHERE: Record<StudioBoard, string> = { issues: 'Left board (where Issues hangs)', pulls: 'Right board (where Pull Requests hangs)' };
 const KIOSK: Record<StationKind, string> = { issues: 'Kiosk by the left board', queue: 'Kiosk by the task queue', pulls: 'Kiosk by the right board' };
@@ -134,7 +134,13 @@ export function openStudioSetup(net: Net) {
       h('h3', {}, 'Kiosk agents'),
       ...agents.map((a) => a.el),
       h('h3', {}, 'Ticker'),
-      h('section.studio-section', {}, field('Symbols round the walls, in order (none for no ticker)', symbols), h('p.note', {}, 'Live prices, read every minute. Stocks by their symbol, indexes like ^GSPC, crypto like BTC-USD.')),
+      h(
+        'section.studio-section',
+        {},
+        field('Symbols the ticker bar shows, in order (none for no prices)', symbols),
+        h('p.note', {}, 'Live prices, read every minute. Stocks by their symbol, indexes like ^GSPC, crypto like BTC-USD.'),
+        h('p.note', {}, 'They slide along the stock ticker bar, and go up as a table on the market board: both come from the office builder’s catalog (Work › Stock ticker, Work › Market board). A floor with neither shows no prices.'),
+      ),
       h('h3', {}, 'Connections'),
       connections,
     ),

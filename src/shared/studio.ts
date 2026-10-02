@@ -1,5 +1,5 @@
-// A floor made its own: what its wall boards are for, who stands at its kiosks, and the ticker round
-// its walls. The office as it comes has an Issues board and a Pull Requests board, with an agent by
+// A floor made its own: what its wall boards are for, who stands at its kiosks, and the prices on
+// its stock ticker. The office as it comes has an Issues board and a Pull Requests board, with an agent by
 // each (and one by the task queue), all about a GitHub repository. A floor that's a team's place
 // rather than a repository's can turn either board into a bulletin of its own ("Newsroom", "Leads"),
 // which its people and its agents post to, and brief each kiosk's agent for the job it has there.
@@ -41,7 +41,7 @@ export interface AgentSetup {
   brief: string;
 }
 
-/** The ticker round the walls: the symbols it shows, in order. None, and there's no ticker. */
+/** The floor's stock ticker (the bar and the market board in the builder's catalog): the symbols they show, in order. None, and there are no prices to show. */
 export interface TickerSetup {
   symbols: string[];
 }

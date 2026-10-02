@@ -20,6 +20,8 @@ export interface PieceView {
   seat?: Interactable;
   /** What you use it by, when it's something to play with (see KindDef.play, and features/playthings). */
   play?: Interactable;
+  /** What you watch it by, when it has a screen that plays the floor's videos (see KindDef.plays, and features/screens). */
+  watch?: Interactable;
   /** Its screen: a team desk's monitor (features/workstation), a video screen's face (features/screens). */
   screen?: ScreenMesh;
   /** A stock ticker's faces (features/studio), and the part of a punching bag that swings (features/playthings). */
@@ -106,9 +108,10 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
       }
     }
     if (a.collider) {
-      const i = site.colliders.indexOf(a.collider);
-      if (away && i >= 0) site.colliders.splice(i, 1);
-      else if (!away && i < 0) site.colliders.push(a.collider);
+      // Put away, every copy of it goes: the feature's own fixture hands the office the same collider
+      // once it's built (see buildOffice), after it was adopted here, so it can be in the list twice.
+      if (away) for (let i = site.colliders.indexOf(a.collider); i >= 0; i = site.colliders.indexOf(a.collider)) site.colliders.splice(i, 1);
+      else if (!site.colliders.includes(a.collider)) site.colliders.push(a.collider);
     }
     if (a.use) a.use.off = away;
     a.moved?.(away ? undefined : p);
@@ -131,6 +134,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     if (v.collider) drop(site.colliders, v.collider);
     if (v.seat) drop(site.interactables, v.seat);
     if (v.play) drop(site.interactables, v.play);
+    if (v.watch) drop(site.interactables, v.watch);
     views.delete(v.piece.id);
   }
 
@@ -183,6 +187,19 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     } else if (v.play) {
       drop(site.interactables, v.play);
       v.play = undefined;
+      delete v.group.userData.interact;
+    }
+
+    // A screen that plays: walk up to its front, or look at it, to watch what's on it.
+    if (k.plays && !v.away) {
+      const use = k.use ?? { z: (k.d ?? 0) / 2 + 1, radius: 1.9 };
+      const at = { x: p.x + Math.sin(p.rotY) * use.z, z: p.z + Math.cos(p.rotY) * use.z, radius: use.radius };
+      if (!v.watch) site.interactables.push((v.watch = { kind: 'screen', pieceId: p.id, ...at }));
+      else Object.assign(v.watch, at);
+      v.group.userData.interact = v.watch;
+    } else if (v.watch) {
+      drop(site.interactables, v.watch);
+      v.watch = undefined;
       delete v.group.userData.interact;
     }
   }

@@ -122,7 +122,7 @@ Options:
                           next start) and exit
       --no-open           Don't open the office in your browser when it starts
                           (env AGENT_OFFICE_NO_OPEN=1)
-      --agent <cmd>       Default agent command (default "claude", env AGENT_OFFICE_AGENT)
+      --agent <cmd>       Default agent command (default "codex", env AGENT_OFFICE_AGENT)
       --agent-args <str>  Extra args for the configured agent, e.g. "--model opus"
                           Workers can also select Claude Code, OpenCode, Codex, Grok,
                           Muse or DeepSeek Harness in the UI
@@ -218,7 +218,7 @@ export function loadConfig(argv: string[]): Config {
   let host = '127.0.0.1';
   let open = !process.env.AGENT_OFFICE_NO_OPEN || process.env.AGENT_OFFICE_NO_OPEN === '0';
   let password = process.env.AGENT_OFFICE_PASSWORD || '';
-  let agentCmd = process.env.AGENT_OFFICE_AGENT || 'claude';
+  let agentCmd = process.env.AGENT_OFFICE_AGENT || 'codex';
   let agentArgs: string[] = splitArgs(process.env.AGENT_OFFICE_AGENT_ARGS || '');
   let dshProfile = process.env.AGENT_OFFICE_DSH_PROFILE || 'acp';
   let tlsCert = '';

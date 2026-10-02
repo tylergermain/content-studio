@@ -135,7 +135,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
     h('h4', {}, 'Back office'),
     backOffice,
     h('h4', {}, 'Boards and agents'),
-    h('p.ob-note', {}, 'What this floor’s wall boards are for, who stands at its kiosks, and the ticker round its walls.'),
+    h('p.ob-note', {}, 'What this floor’s wall boards are for, who stands at its kiosks, and the prices on its stock ticker (the bar is in the catalog, under Work).'),
     button('🪧 Set up the floor…', 'Boards, kiosk agents, the ticker, Slack and Metricool', act.setup),
   );
 

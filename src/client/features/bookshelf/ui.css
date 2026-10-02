@@ -26,7 +26,7 @@
 .bs-meta { display: flex; gap: 10px; align-items: center; color: var(--muted); font-weight: 400; font-size: 12px; white-space: nowrap; }
 .bs-meta a { color: var(--accent-text); font-weight: 500; text-decoration: none; }
 .bs-meta a:hover { text-decoration: underline; }
-.bs-toc { font: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); padding: 4px 8px; max-width: 220px; background: var(--control); cursor: pointer; }
+.bs-toc { font: inherit; font-size: 12.5px; font-weight: 500; color: var(--ink); border: 1px solid var(--hairline-2); border-radius: var(--r-sm); padding: 4px 8px; max-width: 220px; background-color: var(--control); cursor: pointer; }
 .bs-page { flex: 1; overflow: auto; min-height: 0; outline: none; }
 .bs-page .md { max-width: 860px; margin: 0 auto; padding: 28px 44px 72px; font-size: 15.5px; line-height: 1.7; }
 .bs-page .md h1 { font-size: 28px; }

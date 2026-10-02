@@ -2,7 +2,7 @@
 .accounts .dot { background: var(--wash-2); }
 .accounts .dot.on { background: var(--good); }
 .accounts .you { color: var(--muted); font-weight: 400; }
-.accounts .invite-row select { font: inherit; font-weight: 500; border: 1px solid var(--hairline-2); border-radius: var(--r-md); padding: 0 8px; background: var(--control); color: var(--ink); }
+.accounts .invite-row select { font: inherit; font-weight: 500; border: 1px solid var(--hairline-2); border-radius: var(--r-md); padding: 0 26px 0 10px; background-color: var(--control); color: var(--ink); }
 .accounts .cmd { margin-top: 10px; }
 .accounts .team-head .btn { padding: 3px 10px; font-size: 13px; }
 .role { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--wash); color: var(--muted); }

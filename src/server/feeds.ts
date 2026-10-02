@@ -4,7 +4,7 @@ import type { Floor } from './floor.js';
 import type { IntegrationsState, Post, Quote, SlackChannel, TickerState } from '../shared/studio.js';
 
 // What the office reads from outside by itself, for the floors that show it (see shared/studio.ts):
-// the market's prices for a ticker round the walls, the latest in the Slack channels a board
+// the market's prices for a floor's stock ticker, the latest in the Slack channels a board
 // watches, and how the socials are doing on Metricool. One of these for the whole building.
 
 const TICKER_MS = 60_000;

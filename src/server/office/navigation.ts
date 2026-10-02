@@ -53,6 +53,7 @@ export function navigation(ctx: Ctx): Navigation {
     Object.assign(c.peer, { x: spot.x, y: spot.y, z: spot.z, rotY: spot.rotY, moving: false });
     delete c.peer.seat;
     delete c.peer.golfing;
+    delete c.peer.golfBay;
     delete c.peer.throwing;
     // An issue card belongs to the board it came off, which is on the floor they left; a drink stays at the bar.
     delete c.peer.carrying;

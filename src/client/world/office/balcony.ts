@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { ASHTRAY, BALCONY, EXIT_STAIRS, SLAB, STREET_Y } from '../../../shared/layout';
+import { teeBays } from '../../../shared/tees';
 import { bulb, type NightParts } from '../outside';
 import { mergeByMaterial, mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, Interactable } from '../types';
@@ -31,9 +32,11 @@ function stringLights(a: THREE.Vector3, b: THREE.Vector3, sag: number, bulbs: [s
 /**
  * The smoking balcony off the south wall, over the garage entrance: a deck with a glass railing on
  * its three open sides, string lights, a bench under the window, a bistro table, plants and the
- * ashtray, where you take a smoke break.
+ * ashtray, where you take a smoke break. It hands back what brings the bistro table and its stools
+ * out or puts them away: a floor with a second driving tee has that where they stand (see TEES in
+ * shared/tees.ts).
  */
-export function buildBalcony(group: THREE.Group, colliders: Collider[], interactables: Interactable[], night: NightParts) {
+export function buildBalcony(group: THREE.Group, colliders: Collider[], interactables: Interactable[], night: NightParts): (bistro: boolean) => void {
   const { minX, maxX, minZ, maxZ } = BALCONY;
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -101,16 +104,21 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
   group.add(bench);
   colliders.push({ minX: -10, maxX: -8, minZ, maxZ: minZ + 0.55, top: 0.49 });
   seatable(bench, 'bench', 1.6, interactables);
+  // The table and its stools are a set of their own (not merged with the rest), so they can be put away.
   const tx = 0.2;
   const tz = cz + 0.2;
+  const bistro = new THREE.Group();
+  const bistroColliders: Collider[] = [];
+  const bistroSeats: Interactable[] = [];
   const table = new THREE.Group();
   table.add(mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.05, 20), toon('#fffaf3'), 0, 0.74, 0));
   table.add(mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.7, 8), ink, 0, 0.37, 0));
   table.add(mesh(new THREE.CylinderGeometry(0.25, 0.28, 0.04, 16), ink, 0, 0.02, 0));
   table.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), toon('#ef476f'), 0.15, 0.82, 0.05));
-  table.position.set(tx, 0, tz);
-  parts.add(table);
-  colliders.push({ minX: tx - 0.4, maxX: tx + 0.4, minZ: tz - 0.4, maxZ: tz + 0.4, top: 0.77 });
+  const tableTop = mergeByMaterial(table);
+  tableTop.position.set(tx, 0, tz);
+  bistro.add(tableTop);
+  bistroColliders.push({ minX: tx - 0.4, maxX: tx + 0.4, minZ: tz - 0.4, maxZ: tz + 0.4, top: 0.77 });
   for (const sx of [-1, 1]) {
     const x = tx + sx * 0.8;
     const stool = new THREE.Group();
@@ -118,10 +126,13 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
     stool.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.44, 6), ink, 0, 0.22, 0));
     stool.add(mesh(new THREE.CylinderGeometry(0.16, 0.18, 0.03, 12), ink, 0, 0.015, 0));
     stool.position.set(x, 0, tz);
-    group.add(stool);
-    colliders.push({ minX: x - 0.2, maxX: x + 0.2, minZ: tz - 0.2, maxZ: tz + 0.2, top: 0.49 });
+    bistro.add(stool);
+    bistroColliders.push({ minX: x - 0.2, maxX: x + 0.2, minZ: tz - 0.2, maxZ: tz + 0.2, top: 0.49 });
     seatable(stool, sx < 0 ? 'stool-1' : 'stool-2', 0.9, interactables);
+    bistroSeats.push(stool.userData.interact as Interactable);
   }
+  group.add(bistro);
+  colliders.push(...bistroColliders);
   for (const [i, [px, pz, sc]] of [
     [maxX - 0.55, minZ + 0.5, 1.1],
     [minX + 0.55, maxZ - 0.55, 0.9],
@@ -163,11 +174,22 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
   sign.scale.multiplyScalar(0.8);
   sign.position.set(-6.5, 2.2, minZ + 0.02);
   group.add(sign);
+
+  return (out) => {
+    bistro.visible = out;
+    for (const seat of bistroSeats) seat.off = !out;
+    for (const c of bistroColliders) {
+      const at = colliders.indexOf(c);
+      if (out && at < 0) colliders.push(c);
+      else if (!out && at >= 0) colliders.splice(at, 1);
+    }
+  };
 }
 
-/** The smoking balcony, out the glass doors on the south wall. */
+/** The smoking balcony, out the glass doors on the south wall: its bistro table makes way for a floor's second tee. */
 export const balcony: Fixture = (site) => {
-  buildBalcony(site.group, site.colliders, site.interactables, site.get('night'));
+  const setBistro = buildBalcony(site.group, site.colliders, site.interactables, site.get('night'));
+  site.get('room').on((room) => setBistro(teeBays(room.tees) < 2));
   return {};
 };
 

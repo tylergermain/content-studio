@@ -6,7 +6,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FloorPlanStore } from '../src/server/floorplan.js';
-import { cleanPlan } from '../src/shared/floorplan.js';
+import { ROOM_DEFAULTS, cleanPlan } from '../src/shared/floorplan.js';
 import { DEFAULT_FURNITURE, FURNITURE, FURNITURE_KINDS, MAX_PIECES, cleanFurniture, floorSeat, furnitureSeats, pieceAway, pieceBox, pieceCollider, setFloorSeats, type Piece } from '../src/shared/furniture.js';
 import { ELEVATOR, ELEVATOR_FRONT, SEATING, SEATING_BY_ID, seatAt } from '../src/shared/layout.js';
 import { officeNav } from '../src/shared/nav.js';
@@ -94,6 +94,23 @@ test('furniture keeps off what\'s built in, out of the doorways, and off other f
   // Turned a quarter, a table's long side runs the other way.
   const box = pieceBox({ id: 't', kind: 'table', x: 0, z: 0, rotY: Math.PI / 2 });
   assert.ok(Math.abs(box.maxX - box.minX - 1.1) < 1e-9 && Math.abs(box.maxZ - box.minZ - 2.4) < 1e-9);
+});
+
+test("the rules go by the floor's own room: with no mezzanine there are no stairs to keep off", () => {
+  const sofa = withPiece({ id: 'new', kind: 'sofa', x: 6, z: 12.25, rotY: 0 });
+  // No room said is the office as it comes, mezzanine and all: what everything that doesn't say gets.
+  assert.match(problemAt(sofa, 'new')!, /in the way of the stairs/);
+  assert.equal(problemAt(sofa, 'new', ROOM_DEFAULTS), problemAt(sofa, 'new'));
+  assert.match(validateLayout({}, sofa.furniture) as string, /in the way of the stairs/);
+  // How many tees are out on the balcony changes nothing on the floor.
+  assert.match(validateLayout({}, sofa.furniture, { tees: 2 }) as string, /the stairs/);
+  // All one level, the floor where they stood is floor: for the piece, the whole layout, and the plan it's kept in.
+  assert.equal(problemAt(sofa, 'new', { loft: false }), undefined);
+  assert.equal(layoutProblems(sofa, { loft: false }).size, 0);
+  assert.equal(typeof validateLayout({}, sofa.furniture, { tees: 2, loft: false }), 'object');
+  assert.equal(cleanPlan({ desks: {}, furniture: sofa.furniture, room: { loft: false } }).furniture?.length, sofa.furniture.length);
+  assert.equal(cleanPlan({ desks: {}, furniture: sofa.furniture }).furniture, undefined);
+  // (The rest of what a floor's room changes is in tests/room-options.test.ts.)
 });
 
 test('a team desk is a desk you bump into and a chair you sit in, facing it, that shares your screen', () => {

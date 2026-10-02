@@ -1,15 +1,19 @@
 import * as THREE from 'three';
-import { BALCONY, FLOOR, GOLF_HOLE, GOLF_TEE, ROAD, SLAB, STOREY, STREET_Y, WALL_HEIGHT, WALL_T } from '../../../shared/layout';
-import type { Collider, Interactable } from '../../world/types';
+import { BALCONY, FLOOR, GOLF_HOLE, ROAD, SLAB, STOREY, STREET_Y, WALL_HEIGHT, WALL_T } from '../../../shared/layout';
+import type { Collider } from '../../world/types';
 import type { Fixture, StreetSite } from '../../world/office/fixture';
 import { bulb, neighbourBoxes, streetLamp, tree, type NightParts } from '../../world/outside';
 import { disposeSprite, mergeByMaterial, mesh, textPlane, textSprite, toon } from '../../world/toon';
+import { BALL_R, golfBall, mownTexture, teeBall } from './tee';
 
-// Golf off the balcony: the tee out there (a square of turf, a ball on a tee, a bag of clubs), the
-// hole across the street it's hit at (a green with a flag on it, a fairway up to it, bunkers), and
-// the balls on their way. A shot is only a heading, a loft and how hard it was hit; where it goes
-// from there is worked out the same way on every screen (see fly), so everyone on the floor sees the
-// same ball land in the same place.
+// Golf off the balcony: the hole across the street the tees are hit at (a green with a flag on it, a
+// fairway up to it, bunkers), and the balls on their way; the tees themselves are in tee.ts. A shot
+// is only a heading, a loft and how hard it was hit, off one of the bays; where it goes from there is
+// worked out the same way on every screen (see fly), so everyone on the floor sees the same ball land
+// in the same place.
+
+// The tees' fixture, for the floor's plan (world/office/build.ts), beside the green's below.
+export { tee } from './tee';
 
 /** A shot: its heading (0 is straight out, south, +z; it turns toward +x), how steeply it leaves the club, and how hard it's hit (0–1). */
 export interface Shot {
@@ -25,26 +29,6 @@ export const LOFT_MAX = THREE.MathUtils.degToRad(60);
 export const AIM_MAX = 1.2;
 /** How fast the ball leaves the club at full power, in m/s. */
 const SPEED = 30;
-/** The ball's radius. A real one's is 2.1 cm; this one's bigger, so it can be seen from the tee. */
-export const BALL_R = 0.05;
-/** The turf mat, and the tee on it. */
-const MAT_H = 0.03;
-const TEE_H = 0.015;
-/** The ball on the tee, ready to hit. */
-export const TEE_BALL = new THREE.Vector3(GOLF_TEE.ball.x, MAT_H + TEE_H + BALL_R, GOLF_TEE.ball.z);
-/** The golfer stands this far from the ball, square to the line. */
-export const STANCE = 0.57;
-
-/** Where the golfer stands for a shot heading `yaw`, and which way they face: across the line, with the hole on their left. */
-export function stance(yaw: number): { x: number; z: number; facing: number } {
-  return { x: GOLF_TEE.ball.x + Math.cos(yaw) * STANCE, z: GOLF_TEE.ball.z - Math.sin(yaw) * STANCE, facing: yaw - Math.PI / 2 };
-}
-
-/** Which way from the tee the pin is. */
-export const PIN_YAW = Math.atan2(GOLF_HOLE.x - GOLF_TEE.ball.x, GOLF_HOLE.z - GOLF_TEE.ball.z);
-/** From the tee to the pin, along the ground. */
-export const PIN_DISTANCE = Math.hypot(GOLF_HOLE.x - GOLF_TEE.ball.x, GOLF_HOLE.z - GOLF_TEE.ball.z);
-
 // ---- The course -------------------------------------------------------------------------------------
 
 /** The green's collar of longer grass. */
@@ -96,96 +80,9 @@ function lieAt(x: number, z: number): Lie {
   return 'rough';
 }
 
-/** A square of green stripes, mown two ways, for the fairway and the tee's mat. */
-function mownTexture(light: string, dark: string, stripes: number, border?: string): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = c.height = 128;
-  const g = c.getContext('2d')!;
-  for (let i = 0; i < stripes; i++) {
-    g.fillStyle = i % 2 ? dark : light;
-    g.fillRect(0, (i * 128) / stripes, 128, 128 / stripes + 1);
-  }
-  if (border) {
-    g.strokeStyle = border;
-    g.lineWidth = 6;
-    g.strokeRect(5, 5, 118, 118);
-  }
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 8;
-  return t;
-}
-
 function flat(geo: THREE.BufferGeometry, mat: THREE.Material, x: number, y: number, z: number): THREE.Mesh {
   const m = mesh(geo.rotateX(-Math.PI / 2), mat, x, y, z, false);
   return m;
-}
-
-export interface Tee {
-  /** The ball waiting on the tee; hidden from the moment it's hit until the next one's teed up. */
-  ball: THREE.Mesh;
-}
-
-/**
- * The tee on the balcony: a square of turf, a ball on a tee, a pair of tee markers along its front,
- * and a golf bag leaning on the wall behind it.
- */
-export function buildTee(group: THREE.Group, colliders: Collider[], interactables: Interactable[]): Tee {
-  const { x, z, size } = GOLF_TEE;
-  const it: Interactable = { kind: 'golf', x, z, radius: 1.5 };
-  interactables.push(it);
-  const mat = new THREE.Mesh(new THREE.BoxGeometry(size, MAT_H, size), [
-    toon('#3f8f45'),
-    toon('#3f8f45'),
-    new THREE.MeshToonMaterial({ map: mownTexture('#7ed957', '#6cc24a', 6, '#fffaf3'), gradientMap: (toon('#fff') as THREE.MeshToonMaterial).gradientMap }),
-    toon('#3f8f45'),
-    toon('#3f8f45'),
-    toon('#3f8f45'),
-  ]);
-  mat.position.set(x, MAT_H / 2, z);
-  mat.receiveShadow = true;
-  mat.userData.interact = it;
-  group.add(mat);
-
-  const parts = new THREE.Group();
-  const { ball: b } = GOLF_TEE;
-  parts.add(mesh(new THREE.CylinderGeometry(0.012, 0.006, TEE_H + 0.02, 8), toon('#ffd166'), b.x, MAT_H + (TEE_H + 0.02) / 2 - 0.01, b.z, false));
-  // Tee markers: a red ball either side, a little in front of the ball.
-  for (const s of [-1, 1]) parts.add(mesh(new THREE.SphereGeometry(0.06, 12, 8), toon('#ef476f'), b.x + s * 0.55, MAT_H + 0.05, z + size / 2 - 0.12));
-  // The bag: leaning back on the wall, three clubs sticking out of the top.
-  const bag = new THREE.Group();
-  bag.add(mesh(new THREE.CylinderGeometry(0.17, 0.15, 0.85, 14), toon('#1d3557'), 0, 0.43, 0));
-  bag.add(mesh(new THREE.CylinderGeometry(0.175, 0.175, 0.1, 14), toon('#ef476f'), 0, 0.62, 0));
-  bag.add(mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.05, 14), toon('#fffaf3'), 0, 0.86, 0));
-  for (const [cx, cz, tilt] of [
-    [-0.06, 0.04, -0.12],
-    [0.05, 0.05, 0.1],
-    [0, -0.06, 0.02],
-  ]) {
-    const club = new THREE.Group();
-    club.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.5, 6), toon('#adb5bd'), 0, 0.25, 0, false));
-    club.add(mesh(new THREE.BoxGeometry(0.1, 0.07, 0.05), toon('#8d99ae'), 0.03, 0.52, 0));
-    club.position.set(cx, 0.8, cz);
-    club.rotation.z = tilt;
-    bag.add(club);
-  }
-  bag.rotation.x = -0.14;
-  bag.position.set(GOLF_TEE.bag.x, 0, GOLF_TEE.bag.z);
-  parts.add(bag);
-  colliders.push({ minX: GOLF_TEE.bag.x - 0.2, maxX: GOLF_TEE.bag.x + 0.2, minZ: BALCONY.minZ, maxZ: GOLF_TEE.bag.z + 0.2, top: 1 });
-  const merged = mergeByMaterial(parts);
-  for (const m of merged.children) m.userData.interact = it;
-  group.add(merged);
-
-  const ball = golfBall();
-  ball.position.copy(TEE_BALL);
-  ball.userData.interact = it;
-  group.add(ball);
-  return { ball };
-}
-
-export function golfBall(): THREE.Mesh {
-  return mesh(new THREE.SphereGeometry(BALL_R, 14, 10), toon('#ffffff'), 0, 0, 0, false);
 }
 
 export interface Green {
@@ -275,16 +172,12 @@ export function buildGreen(ground: THREE.Group, colliders: Collider[], night: Ni
 
 declare module '../../world/types' {
   interface OfficeHandles {
-    /** The golf tee on the balcony, and the hole across the street it's hit at. */
-    tee: Tee;
+    /** The hole across the street the balcony's tees are hit at. */
     green: Green;
   }
 }
 
-/** The golf tee, out on the balcony. */
-export const tee: Fixture<'tee'> = (site) => ({ handle: { tee: buildTee(site.group, site.colliders, site.interactables) } });
-
-/** The green across the street, with the hole the tee's shots are hit at. */
+/** The green across the street, with the hole the tees' shots are hit at. */
 export const green: Fixture<'green', StreetSite> = (site) => {
   const built = buildGreen(site.ground, site.groundColliders, site.get('night'));
   return { handle: { green: built }, update: (t) => built.update(t) };
@@ -318,6 +211,8 @@ export interface Hit {
 
 export interface Flight {
   shot: Shot;
+  /** Which bay it was hit off (see TEES in shared/tees.ts). */
+  bay: number;
   /** Where the ball is, every 1/60 s from the moment it's hit: x, y, z. */
   path: Float32Array;
   hits: Hit[];
@@ -332,19 +227,20 @@ export interface Flight {
 }
 
 /**
- * Where a shot goes, from the tee on a floor `index` up the building (the street is `street` below
- * it): up off the tee, over the railing (or off it), down onto the street, a roof or a balcony
- * further down, bouncing and rolling to a stop, or into the cup. The same shot always goes the same
- * way, so the one number sent round is enough for everyone to see it.
+ * Where a shot goes, off bay `bay`'s tee on a floor `index` up the building (the street is `street`
+ * below it): up off the tee, over the railing (or off it), down onto the street, a roof or a balcony
+ * further down, bouncing and rolling to a stop, or into the cup. The same shot off the same bay
+ * always goes the same way, so those few numbers sent round are enough for everyone to see it.
  */
-export function fly(shot: Shot, street: number, index: number): Flight {
+export function fly(shot: Shot, street: number, index: number, bay = 0): Flight {
   const power = THREE.MathUtils.clamp(shot.power, 0, 1);
   const loft = THREE.MathUtils.clamp(shot.loft, LOFT_MIN, LOFT_MAX);
   const yaw = THREE.MathUtils.clamp(shot.yaw, -AIM_MAX, AIM_MAX);
   const v = SPEED * power;
-  let x = TEE_BALL.x;
-  let y = TEE_BALL.y;
-  let z = TEE_BALL.z;
+  const from = teeBall(bay);
+  let x = from.x;
+  let y = from.y;
+  let z = from.z;
   let vx = v * Math.cos(loft) * Math.sin(yaw);
   let vy = v * Math.sin(loft);
   let vz = v * Math.cos(loft) * Math.cos(yaw);
@@ -484,6 +380,7 @@ export function fly(shot: Shot, street: number, index: number): Flight {
   const down = lie !== 'lost' && lie !== 'deck' && lie !== 'roof' && lie !== 'below';
   return {
     shot: { yaw, loft, power },
+    bay,
     path: Float32Array.from(path),
     hits,
     seconds: (path.length / 3 - 1) / (STEPS / KEEP),

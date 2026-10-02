@@ -1,8 +1,10 @@
-// A floor's plan: the signs over its desks, and how far its back office is built out.
+// A floor's plan: the signs over its desks (anyone hangs one), and how far its back office is built
+// out (admins build it).
 import type { Floor } from '../../floor.js';
 import { DESK_BY_ID } from '../../../shared/layout.js';
 import { EMPTY_PLAN } from '../../../shared/floorplan.js';
 import type { PlanClientMsg } from '../../../shared/protocol.js';
+import type { Client } from '../../office/client.js';
 import type { Ctx } from '../../office/context.js';
 import { str } from '../../office/input.js';
 import { here } from './common.js';
@@ -14,6 +16,13 @@ export const planView: ViewPieces['plan'] = (_ctx, floor) => floor?.plan.state()
 const planChanged = (ctx: Ctx, floor: Floor) => {
   ctx.toFloor(floor, { t: 'plan', plan: floor.plan.state() });
   ctx.floorsChanged();
+};
+
+/** Whether `c` may build the back office out or wall it up: it changes the floor's shape for everyone on it, so admins do it. If not, they're told so. */
+const mayBuild = (ctx: Ctx, c: Client): boolean => {
+  if (ctx.meOf(c.accountId).admin) return true;
+  ctx.warn(c, 'Only admins can build the back office out or wall it up');
+  return false;
 };
 
 export const planHandlers = {
@@ -32,6 +41,7 @@ export const planHandlers = {
   },
   'floor.expand'(ctx, c) {
     const who = c.peer.name;
+    if (!mayBuild(ctx, c)) return;
     const floor = here(ctx, c);
     if (!floor) return;
     const r = floor.plan.expand();
@@ -41,6 +51,7 @@ export const planHandlers = {
   },
   'floor.shrink'(ctx, c) {
     const who = c.peer.name;
+    if (!mayBuild(ctx, c)) return;
     const floor = here(ctx, c);
     if (!floor) return;
     const r = floor.plan.shrink((id) => floor.workers.deskOccupied(id));

@@ -226,9 +226,9 @@ body.telescope-active #hud { visibility: hidden; }
 .share-thumb video { width: 100%; display: block; aspect-ratio: 16/9; object-fit: contain; background: #111; }
 .share-thumb .who { position: absolute; left: 6px; bottom: 6px; background: var(--glass-dark); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); color: #fff; border-radius: 7px; padding: 2px 8px; font-size: 12px; font-weight: 500; }
 
-/* Screen share viewer */
-.modal.viewer { width: min(1400px, 100%); background: #111; }
-.modal.viewer video { width: 100%; max-height: calc(100vh - 120px); background: #111; display: block; }
+/* Screen share viewer: the screen is dark, the window round it glass like any other. */
+.modal.viewer { width: min(1400px, 100%); }
+.modal.viewer video { width: 100%; max-height: calc(100vh - 120px); background: #000; display: block; }
 
 @media (max-width: 800px) {
   .side { width: min(250px, calc(100vw - 24px)); max-height: calc(100vh - 290px); }

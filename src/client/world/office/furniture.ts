@@ -5,7 +5,9 @@ import { mesh, roundedBox, textPlane, toon } from '../toon';
 import { DARK_WOOD, legs, placeholder, type BuiltPiece, type Builders } from './furniture-kit';
 import { PLAY_BUILDERS } from './furniture-play';
 import { ROOMS_BUILDERS } from './furniture-rooms';
+import { SCREENS_BUILDERS } from './furniture-screens';
 import { STUDIO_BUILDERS } from './furniture-studio';
+import { TICKER_BUILDERS } from './furniture-ticker';
 import { PALETTE, box } from './materials';
 
 export type { BuiltPiece } from './furniture-kit';
@@ -226,6 +228,8 @@ const BUILDERS: Builders = {
   sign: (p, color) => sign(color, p.text ?? kindDef(p.kind).text ?? ''),
   ...ROOMS_BUILDERS,
   ...STUDIO_BUILDERS,
+  ...SCREENS_BUILDERS,
+  ...TICKER_BUILDERS,
   ...PLAY_BUILDERS,
 };
 

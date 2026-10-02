@@ -1,11 +1,15 @@
 // The building's floors: riding the elevator between them and up to the roof, and adding and taking
-// off floors.
+// off floors. Anyone rides; managing the building (adding a project, stopping its clone, taking a
+// floor off, renaming or moving one, moving the workspace folder) is the admins'.
 import type { FloorClientMsg } from '../../../shared/protocol.js';
 import { ROOF } from '../../../shared/rooftop.js';
 import { arrivalSpot, str } from '../../office/input.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
 export const projectView: ViewPieces['project'] = (_ctx, floor) => floor?.project ?? null;
+
+/** What anyone else is told: a new floor is a clone on the office's machine, with its gh login, that everyone's workers then run in. */
+const ADMINS_ADD = 'Only admins can add a project to the building';
 
 export const floorHandlers = {
   'floor.go'(ctx, c, msg) {
@@ -19,6 +23,8 @@ export const floorHandlers = {
     else ctx.goToFloor(c, floor, arrivalSpot(msg.at));
   },
   'floor.repos'(ctx, c, msg) {
+    // What the office's own gh login can see, there to pick a new floor from: it's for whoever may add one.
+    if (!ctx.meOf(c.accountId).admin) return ctx.sendTo(c, { t: 'floor.repos', repos: [], error: ADMINS_ADD });
     void ctx.building.repos(msg.refresh === true).then(
       (repos) => ctx.sendTo(c, { t: 'floor.repos', repos }),
       (err: Error) => ctx.sendTo(c, { t: 'floor.repos', repos: [], error: `Couldn't list your repositories with gh: ${err.message}` }),
@@ -27,6 +33,7 @@ export const floorHandlers = {
   'floor.add'(ctx, c, msg) {
     const who = c.peer.name;
     const repo = str(msg.repo, 200);
+    if (!ctx.meOf(c.accountId).admin) return ctx.sendTo(c, { t: 'floor.added', repo, error: ADMINS_ADD });
     void ctx.building
       .add(
         repo,
@@ -49,10 +56,11 @@ export const floorHandlers = {
   },
   'floor.cancel'(ctx, c, msg) {
     const who = c.peer.name;
-    const admin = ctx.meOf(c.accountId).admin;
+    // Only admins add a floor, so only they stop one on its way.
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can stop a floor being cloned');
     const id = str(msg.floor, 64);
     const def = ctx.building.pending().find((d) => d.id === id);
-    const err = ctx.building.cancel(id, `${who} stopped the clone`, (owner) => admin || (!!owner && owner === c.accountId));
+    const err = ctx.building.cancel(id, `${who} stopped the clone`, () => true);
     if (err) ctx.warn(c, err);
     else ctx.toastAll(`🛗 ${who} stopped cloning ${def?.repo ?? def?.name ?? 'a floor'}`);
   },

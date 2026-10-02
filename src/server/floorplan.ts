@@ -1,8 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { floorSeat, type Piece } from '../shared/furniture.js';
-import { layoutFurniture, validateLayout, type DeskLayout } from '../shared/office-builder.js';
-import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
+import { layoutFurniture, mezzanineProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
+import { hasLoft } from '../shared/office-fixed.js';
+import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type RoomOptions } from '../shared/floorplan.js';
 import { DESK_BY_ID, WING, type SeatDef } from '../shared/layout.js';
 
 /**
@@ -26,14 +27,14 @@ export class FloorPlanStore {
     return this.plan.wing;
   }
 
-  /** How the floor's arranged now, for whoever gets round it (the dog): not copies, so not to be changed. */
-  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; revision: number } {
-    return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), revision: this.plan.layoutRevision ?? 0 };
+  /** How the floor's arranged now, and the room it's in, for whoever gets round it (the dog): not copies, so not to be changed. */
+  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; room: Required<RoomOptions>; revision: number } {
+    return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), room: roomOf(this.plan), revision: this.plan.layoutRevision ?? 0 };
   }
 
-  /** The seat called `id` on this floor (see floorSeat), for whoever sits down. */
+  /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without one. */
   seat(id: string): SeatDef | undefined {
-    return floorSeat(layoutFurniture(this.plan), this.plan.wing, id);
+    return floorSeat(layoutFurniture(this.plan), this.plan.wing, id, roomOf(this.plan));
   }
 
   /** Hangs a sign over a desk, or takes it down (no text). What it did, for the toast, or why it couldn't. */
@@ -73,19 +74,25 @@ export class FloorPlanStore {
   }
 
   /**
-   * Saves the floor as the office builder arranged it: its desks, its furniture and its paint. `revision`
+   * Saves the floor as the office builder arranged it: its desks, its furniture, its paint and its room
+   * (the layout's checked against the room it's saved with: furniture can stand where the stairs were
+   * on a floor that's all one level, and has to be off them before the mezzanine comes back). `revision`
    * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
    * (`taken`) stays where it is. Why it couldn't, or nothing.
    */
   layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown; room?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
     if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reload it in the builder';
-    const layout = validateLayout(raw.desks, raw.furniture);
-    if (typeof layout === 'string') return layout;
+    const room = cleanRoom(raw.room);
+    const layout = validateLayout(raw.desks, raw.furniture, room);
+    if (typeof layout === 'string') {
+      // Bringing the mezzanine back to a floor that was all one level: what's in its way says so.
+      const flat = hasLoft(room) && !hasLoft(this.plan.room) ? validateLayout(raw.desks, raw.furniture, { ...room, loft: false }) : undefined;
+      return (typeof flat === 'object' && mezzanineProblem(flat, room)) || layout;
+    }
     const before = this.plan.desks ?? {};
     const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
     for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
     const look = cleanLook(raw.look);
-    const room = cleanRoom(raw.room);
     const { look: _was, room: _had, ...rest } = this.plan;
     const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), ...(Object.keys(room).length ? { room } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };
     try {

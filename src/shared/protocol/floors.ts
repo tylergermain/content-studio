@@ -140,9 +140,9 @@ export type FloorClientMsg =
    * floor list), or the ladder or fire pole you came by.
    */
   | { t: 'floor.go'; floor: string; at?: { x: number; y: number; z: number; rotY: number } }
-  /** The repositories that could become a floor; answered with `floor.repos`. */
+  /** The repositories that could become a floor (admins only); answered with `floor.repos`. */
   | { t: 'floor.repos'; refresh?: boolean }
-  /** Clone a repository and make it a new floor; answered with `floor.added` once it's there. */
+  /** Clone a repository and make it a new floor (admins only); answered with `floor.added` once it's there. */
   | { t: 'floor.add'; repo: string }
   /**
    * Make a folder on the office's machine a floor (admins only): no repository, nothing to do with
@@ -151,7 +151,7 @@ export type FloorClientMsg =
   | { t: 'floor.folder'; dir: string; name?: string }
   /** Rename a floor, or move it to storey `to` (0 is the bottom one): admins only. */
   | { t: 'floor.edit'; floor: string; name?: string; to?: number }
-  /** Stop a floor's clone before it's there (admins, or whoever added it); the one who added it hears `floor.added` with why. */
+  /** Stop a floor's clone before it's there (admins only); the one who added it hears `floor.added` with why. */
   | { t: 'floor.cancel'; floor: string }
   /** Take a floor off the building (admins only). Its checkout stays on disk; everyone on it rides to another floor. */
   | { t: 'floor.remove'; floor: string }
@@ -161,7 +161,7 @@ export type FloorClientMsg =
 export type PlanClientMsg =
   /** Hang a sign over a desk on your floor (a SIGN_COLORS color), or take it down with no text. */
   | { t: 'desk.label'; deskId: string; text: string; color?: string }
-  /** Knock the back office out another row, with two more desks; or wall its last row back up. */
+  /** Knock the back office out another row, with two more desks; or wall its last row back up (admins only). */
   | { t: 'floor.expand' }
   | { t: 'floor.shrink' }
   /**

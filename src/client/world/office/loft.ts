@@ -7,11 +7,23 @@ import { PALETTE, box, floorTexture, glassPane, type Looks } from './materials';
 import { floorPlant, pendant, plant } from './props';
 import { chair, seatable } from './seats';
 
+/** The loft as it's built: all of it in a group of its own, with what's in the way of it and what there is to use up there. */
+interface Loft {
+  group: THREE.Group;
+  colliders: Collider[];
+  interactables: Interactable[];
+  /** The monitor on the boss's desk. */
+  screen: THREE.Mesh;
+}
+
 /**
  * The upstairs office: a loft on posts in the south-east corner, with glass on the two sides that
  * face the desks, reached by stairs along the south wall.
  */
-export function buildLoft(group: THREE.Group, colliders: Collider[], interactables: Interactable[], looks: Looks): THREE.Mesh {
+export function buildLoft(looks: Looks): Loft {
+  const group = new THREE.Group();
+  const colliders: Collider[] = [];
+  const interactables: Interactable[] = [];
   const { minX, maxX, minZ, maxZ, y: floorY, height } = LOFT;
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -194,10 +206,11 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   lamp.position.set(deskX, roofY - 0.4, cz);
   group.add(lamp);
 
-  // Signs: one on the back wall inside, one over the glass for everyone downstairs.
+  // Signs: one on the back wall inside, one over the glass for everyone downstairs. The one inside is
+  // up under the ceiling, which leaves the wall behind the desk free for a row of pictures.
   const inside = textPlane('👑 Boss Office', { bg: '#fffaf3', size: 64 });
-  inside.scale.multiplyScalar(0.8);
-  inside.position.set(maxX - 3, floorY + 1.9, maxZ - 0.04);
+  inside.scale.multiplyScalar(0.6);
+  inside.position.set(maxX - 3, floorY + 2.52, maxZ - 0.04);
   inside.rotation.y = Math.PI;
   group.add(inside);
   const outside = textPlane('👑 Boss Office', { bg: '#2b2d42', color: '#fffaf3', size: 64, border: '#fffaf3' });
@@ -206,7 +219,7 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   outside.position.set(cx, roofY + 0.2, minZ - 0.07);
   outside.rotation.y = Math.PI;
   group.add(outside);
-  return screen;
+  return { group, colliders, interactables, screen };
 }
 
 declare module '../types' {
@@ -216,5 +229,33 @@ declare module '../types' {
   }
 }
 
-/** The loft up the stairs, over the meeting room: the boss's office. */
-export const loft: Fixture<'bossScreen'> = (site) => ({ handle: { bossScreen: buildLoft(site.group, site.colliders, site.interactables, site.looks) } });
+/** Puts `items` in `list` (those that aren't in it), or takes them out of it. */
+function keep<T>(list: T[], items: readonly T[], there: boolean) {
+  for (const item of items) {
+    const i = list.indexOf(item);
+    if (there && i < 0) list.push(item);
+    else if (!there && i >= 0) list.splice(i, 1);
+  }
+}
+
+/**
+ * The loft up the stairs, over the meeting room: the boss's office. It's the floor's choice (see
+ * RoomOptions.loft): on one that's all one level the lot is put away, the loft and its posts, the
+ * stairs and everything upstairs, with what you'd bump into and what you'd use or sit on up there, so
+ * the floor where the stairs stood is floor like any other. The meeting room under it stays (see
+ * meeting-room.ts, which caps its glass where the loft's floor was).
+ */
+export const loft: Fixture<'bossScreen'> = (site) => {
+  const built = buildLoft(site.looks);
+  let there = false;
+  site.get('room').on((room) => {
+    if (room.loft === there) return;
+    there = room.loft;
+    built.group.visible = there;
+    keep(site.colliders, built.colliders, there);
+    keep(site.interactables, built.interactables, there);
+    // Whatever still has hold of one (what you were aiming at) can't use it either.
+    for (const it of built.interactables) it.off = !there;
+  });
+  return { group: built.group, handle: { bossScreen: built.screen } };
+};

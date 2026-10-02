@@ -1,0 +1,10 @@
+/* The window a video screen opens (see ui.ts): the video, as big as the window and its own shape allow. */
+.modal.screen-window { width: auto; min-width: min(300px, 100%); max-width: 100%; }
+.screen-window .screen-stage { display: grid; place-items: center; background: #000; border-radius: 0 0 var(--r-xl) var(--r-xl); overflow: hidden; }
+.screen-window video, .screen-window img {
+  --shape: 1.7778;
+  display: block; background: #000; object-fit: contain; aspect-ratio: var(--shape);
+  /* As wide as the window takes, unless that would make it taller than the page. */
+  width: min(1100px, calc(100vw - 34px), calc((100vh - 100px) * var(--shape)));
+}
+.screen-window video:focus-visible { outline: none; }

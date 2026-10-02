@@ -29,6 +29,7 @@ import { golf, type GolfSound } from '../features/golf/sound';
 import { gong } from '../features/gong/sound';
 import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
 import { needsYou } from '../features/needsyou/sound';
+import { plaything, type PlaySound } from '../features/playthings/sound';
 import type { Pos } from './places';
 import { Footsteps, pageTurn, paper } from './steps';
 import { toss, type TossSound } from '../features/bargames/sound';
@@ -216,6 +217,11 @@ export class OfficeSound {
 
   arcade(kind: 'land' | 'clear' | 'over', lines = 1) {
     arcade(this.a, kind, lines);
+  }
+
+  /** Something on the floor to play with (features/playthings), heard from `at`; `amount` is each sound's own (see plaything). */
+  plaything(kind: PlaySound, at: Pos, amount = 1) {
+    plaything(this.a, kind, at, amount);
   }
 
   // ---- The cars in the garage (features/cars) -----------------------------------------------------
