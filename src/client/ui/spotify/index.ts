@@ -48,6 +48,6 @@ export function spotifyPanel(stopOfficeMusic: () => void) {
         h('div.webhook', {}, link, playLink), buttons('Refresh', refresh), buttons('Disconnect Spotify', async () => { await request('/disconnect', {}); await refresh(); }), note);
     } catch (e) { if (!disposed) { root.replaceChildren(h('h3', {}, 'Spotify'), note); note.textContent = e instanceof Error ? e.message : 'Could not load Spotify'; } }
   }
-  if (store.me.admin) void refresh();
+  void refresh();
   return { element: root, dispose() { disposed = true; } };
 }
