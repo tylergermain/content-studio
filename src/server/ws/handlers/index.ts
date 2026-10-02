@@ -10,6 +10,7 @@ import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
+import { goatHandlers, goatView } from './goat.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { meetingHandlers, meetingView } from './meetings.js';
 import { officeBuilderHandlers } from './office-builder.js';
@@ -23,7 +24,7 @@ import { signinsHandlers } from './signins.js';
 import { teamHandlers } from './team.js';
 import { usageHandlers } from './usage.js';
 import { whiteboardHandlers, whiteboardHooks, whiteboardView } from './whiteboard.js';
-import { jailView, workerHandlers, workerHooks, workersView } from './workers.js';
+import { workerHandlers, workerHooks, workersView } from './workers.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
 /** Each domain's handlers put together, in alphabetical order. */
@@ -37,6 +38,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...dogHandlers,
   ...floorHandlers,
   ...githubHandlers,
+  ...goatHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
   ...planHandlers,
@@ -70,9 +72,9 @@ export const views: ViewPieces = {
   plan: planView,
   services: servicesView,
   dog: dogView,
+  goat: goatView,
   ball: ballView,
   cars: carsView,
-  jail: jailView,
   jukebox: jukeboxView,
   whiteboard: whiteboardView,
   meeting: meetingView,

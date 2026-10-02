@@ -11,7 +11,6 @@ import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 const CLEANUPS = new Set(['keep', 'worktree', 'all']);
 
 export const workersView: ViewPieces['workers'] = (_ctx, floor) => floor?.workers.list() ?? [];
-export const jailView: ViewPieces['jail'] = (_ctx, floor) => floor?.jail.state() ?? { prisoners: [], bones: 0 };
 
 /** The least time between two 'term.typing' notes from one person in one terminal. */
 const TYPING_GAP_MS = 500;
@@ -38,7 +37,7 @@ export const workerHandlers = {
     }
     // A shell is theirs too: `claude auth login` or `gh auth login` typed there signs them in.
     const hire = () => {
-      const r = floor.workers.spawn(str(msg.deskId, 32), who, str(msg.prompt, 20000) || undefined, msg.worktree === true, kind, msg.provider, model, effort, undefined, c.accountId, repos, msg.via === 'herald' ? 'herald' : undefined, str(msg.specialist,48) || undefined);
+      const r = floor.workers.spawn(str(msg.deskId, 32), who, str(msg.prompt, 20000) || undefined, msg.worktree === true, kind, msg.provider, model, effort, undefined, c.accountId, repos, str(msg.specialist,48) || undefined);
       const issue = kind === 'agent' ? issueNumber(msg.issue) : undefined;
       const across = repos.length ? ` across ${[floor.def.name, ...repos.map((x) => x.name)].join(' + ')}` : '';
       if (typeof r === 'string') ctx.warn(c, r);

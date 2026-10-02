@@ -103,7 +103,7 @@ export function jukeboxVideo(ctx: Ctx, screen: THREE.Mesh, deps: JukeboxVideoDep
   /** Puts the video where it belongs now, in step and at the right volume. Every frame, and when the TV changes hands. */
   function update() {
     const j = store.jukebox;
-    const on = j.on && j.track === YOUTUBE && !!j.video && ctx.inOffice() && !ctx.upTop();
+    const on = j.on && j.track === YOUTUBE && !!j.video && !ctx.upTop();
     const want = !on ? null : deps.shared() ? 'dock' : 'tv';
     const key = want ? `${want}|${playOf(j)}` : '';
     if (key !== shown) {

@@ -1,7 +1,8 @@
-import { FONT, H, W, banner, best, setBest, type Press, type ScreenGame } from './game';
+import type { GameFrame, TilesFrame } from '../../../shared/cabinet';
+import { FONT, H, W, banner, best, holder, placed, setBest, type GameSound, type Press, type ScreenGame } from './game';
 
 /**
- * 2048 for the boss's monitor (ui.ts): the arrows slide every tile as far as it goes, two of the same
+ * 2048 (see game.ts): the arrows slide every tile as far as it goes, two of the same
  * that meet become one of twice as much, and a new tile comes in after every move that moved anything.
  */
 const N = 4;
@@ -10,7 +11,7 @@ const GAP = 12;
 const SIZE = N * CELL + (N + 1) * GAP;
 const X0 = (W - SIZE) / 2;
 const Y0 = (H - SIZE) / 2;
-/** The columns either side of the board: your score on the left, your best and a new game on the right. */
+/** The columns either side of the board: your score on the left, the building's best and a new game on the right. */
 const LEFT = X0 / 2;
 const RIGHT = W - X0 / 2;
 const AGAIN = { x: RIGHT - 82, y: 318, w: 164, h: 48 };
@@ -66,6 +67,8 @@ function line(n: number, dx: number, dy: number): number[] {
 
 export class Twenty48 implements ScreenGame {
   readonly id = '2048';
+  office = '';
+  sound?: GameSound;
   readonly icon = '🔢';
   readonly name = '2048';
   readonly tip = 'Arrows or W A S D slide the tiles · same tiles merge';
@@ -74,9 +77,10 @@ export class Twenty48 implements ScreenGame {
   /** For each cell, how long ago its tile came in or was made (seconds), while it's still popping. */
   private age: number[] = [];
   score = 0;
+  /** Moves that moved something, this game. */
+  private moves = 0;
   /** No move left that moves anything. */
   stuck = false;
-  private top = best(this.id);
   /** The mouse is on the new-game button. */
   private aimed = false;
 
@@ -89,11 +93,16 @@ export class Twenty48 implements ScreenGame {
     return this.tiles;
   }
 
+  get left(): number | null {
+    return this.moves && !this.stuck ? this.score : null;
+  }
+
   reset() {
     this.keep();
     this.tiles = new Array<number>(N * N).fill(0);
     this.age = new Array<number>(N * N).fill(POP);
-    this.score = 0;
+    this.score = this.moves = 0;
+    this.office = '';
     this.stuck = false;
     this.add();
     this.add();
@@ -113,6 +122,7 @@ export class Twenty48 implements ScreenGame {
   move(dx: number, dy: number): boolean {
     if (this.stuck) return false;
     let moved = false;
+    const before = this.score;
     for (let n = 0; n < N; n++) {
       const at = line(n, dx, dy);
       const { row, gained, merged } = slide(at.map((i) => this.tiles[i]));
@@ -124,9 +134,12 @@ export class Twenty48 implements ScreenGame {
       this.score += gained;
     }
     if (!moved) return false;
+    this.moves++;
     this.add();
     this.stuck = !this.movable();
     if (this.stuck) this.keep();
+    if (this.stuck) this.sound?.('over');
+    else if (this.score > before) this.sound?.('land');
     return true;
   }
 
@@ -180,7 +193,13 @@ export class Twenty48 implements ScreenGame {
     g.font = `900 64px ${FONT}`;
     g.fillText('2048', LEFT, 110);
     readout(g, 'SCORE', this.score, LEFT);
-    readout(g, 'BEST', Math.max(this.top, this.score), RIGHT);
+    const top = best(this.id);
+    readout(g, 'BEST', Math.max(top, this.score), RIGHT);
+    if (top >= this.score && top) {
+      g.fillStyle = DIM;
+      g.font = `800 16px ${FONT}`;
+      g.fillText(holder(this.id).slice(3, 21), RIGHT, 302);
+    }
     if (this.tiles.some((n) => n >= 2048)) {
       g.fillStyle = '#06d6a0';
       g.font = `800 20px ${FONT}`;
@@ -192,7 +211,7 @@ export class Twenty48 implements ScreenGame {
     g.font = `800 20px ${FONT}`;
     g.fillText('New game', RIGHT, AGAIN.y + AGAIN.h / 2 + 1);
 
-    if (this.stuck) banner(g, 'No moves left', 'Enter for a new game', 'rgba(230, 57, 70, 0.92)');
+    if (this.stuck) banner(g, 'No moves left', `${placed(this.id, this.office)}Enter for a new game`, 'rgba(230, 57, 70, 0.92)');
   }
 
   private paintTile(g: CanvasRenderingContext2D, i: number, cx: number, cy: number) {
@@ -223,11 +242,22 @@ export class Twenty48 implements ScreenGame {
     return this.tiles.some((n, i) => !n || (i % N < N - 1 && n === this.tiles[i + 1]) || (i + N < N * N && n === this.tiles[i + N]));
   }
 
+  frame(): TilesFrame {
+    return { tiles: [...this.tiles], score: this.score, moves: this.moves, state: this.stuck ? 'over' : 'play' };
+  }
+
+  show(frame: GameFrame) {
+    const f = frame as TilesFrame;
+    this.tiles = [...f.tiles];
+    this.age = this.tiles.map(() => POP);
+    this.score = f.score;
+    this.moves = f.moves;
+    this.stuck = f.state === 'over';
+  }
+
   /** Your score so far is your best here, if it beats it. */
   private keep() {
-    if (this.score <= this.top) return;
-    this.top = this.score;
-    setBest(this.id, this.top);
+    setBest(this.id, this.score);
   }
 }
 

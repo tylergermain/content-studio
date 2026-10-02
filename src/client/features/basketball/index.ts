@@ -214,7 +214,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   ctx.ticks.add('others', ({ dt, now }) => {
     // A floor without the hoop has no ball either.
     ball.group.visible = !office.hoop.away;
-    if (!ctx.upTop() && ctx.inOffice() && !office.hoop.away) updateBall(now, dt);
+    if (!ctx.upTop() && !office.hoop.away) updateBall(now, dt);
   });
 
   /** The wind-up meter over the hint, while you hold E: charge increases with hold time, without a guaranteed scoring band. */

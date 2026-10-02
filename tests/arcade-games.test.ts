@@ -62,10 +62,10 @@ test('no game takes Esc, V or M: they are the window’s and the call’s', () =
   }
 });
 
-test('your best is nothing where there is nowhere to keep it, and keeping it there does no harm', () => {
+test('until the table has arrived your best is what this browser kept: nothing where there is nowhere to keep it, and keeping it there does no harm', () => {
   assert.equal(best('snake'), 0);
   assert.doesNotThrow(() => setBest('snake', 12));
-  assert.equal(best('no-such-game'), 0);
+  assert.equal(best('minesweeper'), 0);
 });
 
 test('2048: a row slides to its start, and two of the same become one, each tile once a move', () => {

@@ -1,7 +1,8 @@
-import { FONT, H, W, banner, best, setBest, type ScreenGame } from './game';
+import { SNAKE_START, type GameFrame, type SnakeFrame } from '../../../shared/cabinet';
+import { FONT, H, W, banner, best, holder, placed, setBest, type GameSound, type ScreenGame } from './game';
 
 /**
- * Snake for the boss's monitor (ui.ts): it never stops, the arrows turn it, every apple makes it one
+ * Snake (see game.ts): it never stops, the arrows turn it, every apple makes it one
  * longer and a little quicker, and a wall or its own tail ends it.
  */
 const CELL = 30;
@@ -12,7 +13,7 @@ const PACE = 0.14;
 const QUICKER = 0.002;
 const QUICKEST = 0.07;
 /** How long it starts out. */
-const LONG = 3;
+const LONG = SNAKE_START;
 const WAITING = 'rgba(79, 134, 247, 0.88)';
 
 interface Cell {
@@ -24,10 +25,14 @@ const LEFT: Cell = { x: -1, y: 0 };
 const RIGHT: Cell = { x: 1, y: 0 };
 const UP: Cell = { x: 0, y: -1 };
 const DOWN: Cell = { x: 0, y: 1 };
+/** The ways it goes, as a frame numbers them. */
+const WAYS = [RIGHT, DOWN, LEFT, UP];
 const DIRS: Record<string, Cell> = { ArrowLeft: LEFT, KeyA: LEFT, ArrowRight: RIGHT, KeyD: RIGHT, ArrowUp: UP, KeyW: UP, ArrowDown: DOWN, KeyS: DOWN };
 
 export class Snake implements ScreenGame {
   readonly id = 'snake';
+  office = '';
+  sound?: GameSound;
   readonly icon = '🐍';
   readonly name = 'Snake';
   readonly tip = 'Arrows or W A S D turn · eat the apples, mind the walls';
@@ -41,7 +46,8 @@ export class Snake implements ScreenGame {
   state: 'ready' | 'play' | 'paused' | 'over' = 'ready';
   /** Seconds until the next step. */
   private wait = 0;
-  private top = best(this.id);
+  /** Steps taken this game. */
+  private steps = 0;
 
   constructor(private readonly rng: () => number = Math.random) {
     this.reset();
@@ -59,12 +65,17 @@ export class Snake implements ScreenGame {
     return this.body.length;
   }
 
+  get left(): number | null {
+    return this.state === 'paused' ? this.body.length : null;
+  }
+
   reset() {
     const y = Math.floor(ROWS / 2);
     this.body = Array.from({ length: LONG }, (_, i) => ({ x: COLS / 2 - i, y }));
     this.dir = RIGHT;
     this.turns = [];
-    this.wait = 0;
+    this.wait = this.steps = 0;
+    this.office = '';
     this.state = 'ready';
     this.feed();
   }
@@ -115,7 +126,7 @@ export class Snake implements ScreenGame {
       const y = Math.floor(i / COLS);
       if ((x + y) % 2) g.fillRect(x * CELL, y * CELL, CELL, CELL);
     }
-    // How long it is, and your longest here, written big across the grass behind it.
+    // How long it is, and the longest in the building, written big across the grass behind it.
     g.textAlign = 'center';
     g.textBaseline = 'middle';
     g.fillStyle = 'rgba(241, 237, 228, 0.07)';
@@ -123,7 +134,8 @@ export class Snake implements ScreenGame {
     g.fillText(String(this.body.length), W / 2, H / 2 - 10);
     g.fillStyle = 'rgba(241, 237, 228, 0.16)';
     g.font = `900 26px ${FONT}`;
-    g.fillText(`LONGEST HERE ${Math.max(this.top, this.body.length)}`, W / 2, H - 46);
+    const top = best(this.id);
+    g.fillText(this.body.length > top ? `LONGEST ${this.body.length}` : `LONGEST ${top}${holder(this.id)}`, W / 2, H - 46);
 
     // The apple, with its leaf.
     const ax = (this.apple.x + 0.5) * CELL;
@@ -163,10 +175,26 @@ export class Snake implements ScreenGame {
     // Waiting for a key: said low on the screen, clear of where the snake sets off from.
     if (this.state === 'ready') banner(g, 'Snake', 'Press an arrow to set off', WAITING, H - 120);
     else if (this.state === 'paused') banner(g, 'Paused', 'Press an arrow to carry on', WAITING, H - 120);
-    else if (dead) banner(g, this.body.length === COLS * ROWS ? 'Nowhere left to go!' : 'Ouch!', `${this.body.length} long · Enter for a new game`, 'rgba(230, 57, 70, 0.92)');
+    else if (dead) banner(g, this.body.length === COLS * ROWS ? 'Nowhere left to go!' : 'Ouch!', `${placed(this.id, this.office) || `${this.body.length} long · `}Enter for a new game`, 'rgba(230, 57, 70, 0.92)');
+  }
+
+  frame(): SnakeFrame {
+    const at = (c: Cell) => c.y * COLS + c.x;
+    return { body: this.body.map(at), apple: at(this.apple), dir: WAYS.indexOf(this.dir), steps: this.steps, state: this.state };
+  }
+
+  show(frame: GameFrame) {
+    const f = frame as SnakeFrame;
+    const cell = (i: number): Cell => ({ x: i % COLS, y: Math.floor(i / COLS) });
+    this.body = f.body.map(cell);
+    this.apple = cell(f.apple);
+    this.dir = WAYS[f.dir] ?? RIGHT;
+    this.steps = f.steps;
+    this.state = f.state;
   }
 
   private step() {
+    this.steps++;
     this.dir = this.turns.shift() ?? this.dir;
     const head = { x: this.head.x + this.dir.x, y: this.head.y + this.dir.y };
     const eats = head.x === this.apple.x && head.y === this.apple.y;
@@ -174,8 +202,9 @@ export class Snake implements ScreenGame {
     const tail = eats ? this.body : this.body.slice(0, -1);
     if (head.x < 0 || head.x >= COLS || head.y < 0 || head.y >= ROWS || tail.some((c) => c.x === head.x && c.y === head.y)) return this.end();
     this.body.unshift(head);
-    if (eats) this.feed();
-    else this.body.pop();
+    if (!eats) return void this.body.pop();
+    this.sound?.('land');
+    this.feed();
   }
 
   /** A new apple, anywhere the snake isn't. With nowhere left, it has the whole screen: that's the game. */
@@ -190,8 +219,7 @@ export class Snake implements ScreenGame {
 
   private end() {
     this.state = 'over';
-    if (this.body.length <= this.top) return;
-    this.top = this.body.length;
-    setBest(this.id, this.top);
+    this.sound?.('over');
+    setBest(this.id, this.body.length);
   }
 }

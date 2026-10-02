@@ -1,6 +1,5 @@
-// Getting around a floor on a coarse grid, round the furniture: the dog's walks (server/dog.ts), a
-// worker's way out when it's sent home, and on a map of its own (see shared/maps), a worker's walks
-// about the hall. The office's grid is below; a map builds one from its plan (NavGrid).
+// Getting around a floor on a coarse grid, round the furniture: the dog's walks (server/dog.ts) and a
+// worker's way in to a meeting, or out when it's sent home.
 // An office floor built out into the back office (see WING) has more of it to get round: the office's
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 

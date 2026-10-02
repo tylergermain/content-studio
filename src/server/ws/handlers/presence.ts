@@ -1,9 +1,9 @@
 // People in the office: walking about, reaching for things, sitting, carrying issue cards, emotes,
 // their name and look, what they have open, voice and screen sharing, and chat.
 import type { ChatLine, PresenceClientMsg } from '../../../shared/protocol.js';
-import { seatHereOn } from '../../../shared/maps/index.js';
 import { sanitizeLook } from '../../../shared/avatar.js';
 import { isEmote } from '../../../shared/emotes.js';
+import { seatHere } from '../../../shared/layout.js';
 import { ROOF, isDrink } from '../../../shared/rooftop.js';
 import { isBarGame } from '../../../shared/bargames.js';
 import { roomOf } from '../../../shared/floorplan.js';
@@ -14,14 +14,13 @@ import { COLOR_RE, issueNumber, num, str } from '../../office/input.js';
 import type { HandlerMap } from './types.js';
 
 /**
- * Whether `key` names a place to sit where `c` is: on the roof, on a map of its own, or on an office
- * floor, where the lounge's seats (and any others) are that floor's furniture (see the office builder).
+ * Whether `key` names a place to sit where `c` is: on the roof, or on an office floor, where the
+ * lounge's seats (and any others) are that floor's furniture (see the office builder).
  */
 function seatThere(ctx: Ctx, c: Client, key: string): boolean {
-  const plan = ctx.maps.plan();
   const onRoof = c.peer.floor === ROOF;
   const floor = ctx.floorOf(c);
-  if (plan.style !== 'office' || onRoof || !floor) return !!seatHereOn(plan, key, onRoof);
+  if (onRoof || !floor) return !!seatHere(key, onRoof);
   const m = /^([\w-]+):(\d+)$/.exec(key);
   const seat = m ? floor.plan.seat(m[1]) : undefined;
   return !!seat && !seat.roof && Number(m![2]) < seat.places.length;
@@ -87,7 +86,7 @@ export const presenceHandlers = {
     const key = str(msg.seat, 40);
     const seat = seatThere(ctx, c, key) ? key : undefined;
     if (seat === c.peer.seat) return;
-    // Somebody on the floor got there first (two people arriving at an empty throne at once).
+    // Somebody on the floor got there first (two people sitting down in the same place at once).
     // (Not yourself, on a connection that hasn't timed out yet after a reconnect.)
     const same = (o: typeof c) => o.peer.name === c.peer.name || (!!o.accountId && o.accountId === c.accountId);
     const there = seat && [...ctx.clients.values()].find((o) => o !== c && !same(o) && o.peer.seat === seat && o.peer.floor === c.peer.floor);

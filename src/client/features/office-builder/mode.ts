@@ -48,9 +48,9 @@ interface Session {
 export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
   let session: Session | null = null;
 
-  const canBuild = () => store.me.admin && !!store.floor && ctx.inOffice() && !ctx.upTop() && !ctx.trip();
+  const canBuild = () => store.me.admin && !!store.floor && !ctx.upTop() && !ctx.trip();
 
-  // Anything else that takes you somewhere (another floor, another map) closes the builder first.
+  // Anything else that takes you somewhere (another floor) closes the builder first.
   ctx.activities.add({ id: 'office-builder', active: () => !!session, stop: () => session?.close(), takesCamera: true, hidesHands: true });
   ctx.ticks.add('me', ({ dt }) => session?.frame(dt));
   ctx.ticks.add('hud', () => session?.late());
@@ -524,7 +524,6 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
 
     const offs = [
       store.on('workers', () => ui.render()),
-      store.on('map', () => !ctx.inOffice() && close()),
       net.onMessage((m) => {
         // The office said no to the save (a warning, to you alone).
         if (m.t === 'toast' && pending && m.level !== 'info') {

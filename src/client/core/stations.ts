@@ -47,7 +47,6 @@ export function idleAgentsIn(w: World): IdleAgent[] {
       model.setName(stationName(kind));
       model.setTask({ name: stationInfo(kind).offer, summary: stationInfo(kind).does });
     });
-    model.setOutfit(w.plan.agents.outfit === 'peasant' ? 'peasant' : null);
     // It runs on whatever the office hires by default, and wears that on its antenna.
     const wear = () => model.setProvider(resolvedProvider(undefined, store.project));
     wear();

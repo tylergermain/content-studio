@@ -117,7 +117,6 @@ export async function openFloors(ctx: Ctx, hookPort: number): Promise<FloorsOpen
       for (const f of floors.values()) if (f !== floor && worksIn(f, floor)) f.sendLandedHome();
     },
     lent: (floor) => [...floors.values()].some((f) => f !== floor && worksIn(f, floor)),
-    locksUp: () => !!ctx.maps.plan().sendHome?.keeps,
     hiringAllowed: (floor,owner,specialist,kind) => employeeHireError(floor.dir,ctx.accounts,owner,specialist,kind),
     runAs: ctx.signins,
     ghAs: (owner) => (owner ? ctx.signins.ghAs(owner) : undefined),

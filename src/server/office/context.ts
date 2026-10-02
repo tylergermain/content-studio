@@ -22,7 +22,6 @@ import type { Sky } from '../sky.js';
 import type { Themes } from '../theme.js';
 import type { Feeds } from '../feeds.js';
 import type { Watch } from '../watch.js';
-import type { Maps } from '../maps.js';
 import type { OfficePrompts } from '../prompts.js';
 import type { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ChatLog } from '../history.js';
@@ -64,7 +63,6 @@ export interface BuildingServices {
   /** The YouTube channels the floors watch, and the newest videos from each (see watch.ts). */
   watch: Watch;
   themes: Themes;
-  maps: Maps;
   prompts: OfficePrompts;
   leaveOnMerge: LeaveOnMerge;
   ledger: Ledger;

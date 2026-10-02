@@ -93,7 +93,6 @@ export function installHanging(ctx: Ctx, deps: HangingDeps) {
   /** F: hang a picture on a wall of this floor. There are no walls for them up on the roof. */
   function startHanging() {
     if (ctx.upTop()) return toast('No walls to hang pictures on up here — take the elevator down to a floor', 'warn');
-    if (!ctx.inOffice()) return toast(`${ctx.plan().icon} ${ctx.plan().name}'s walls are hung already — pictures go up in the office`, 'warn');
     hanger.start();
   }
 

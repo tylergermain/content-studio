@@ -7,6 +7,7 @@ import dogDachshundUrl from '../models/dog-dachshund.glb?url';
 import dogPugUrl from '../models/dog-pug.glb?url';
 import dogPupUrl from '../models/dog-pup.glb?url';
 import dogShibaUrl from '../models/dog-shiba.glb?url';
+import goatUrl from '../models/goat.glb?url';
 import greeneryUrl from '../models/greenery.glb?url';
 import kitchenUrl from '../models/kitchen.glb?url';
 import loungeUrl from '../models/lounge.glb?url';
@@ -27,6 +28,7 @@ const MODELS = {
   'dog-dachshund': { url: dogDachshundUrl, preload: false },
   'dog-pug': { url: dogPugUrl, preload: false },
   'dog-shiba': { url: dogShibaUrl, preload: false },
+  goat: { url: goatUrl, preload: false },
   desk_props: { url: deskPropsUrl, preload: true },
   kitchen: { url: kitchenUrl, preload: true },
   lounge: { url: loungeUrl, preload: true },

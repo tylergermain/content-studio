@@ -19,7 +19,6 @@ import { DropStore } from '../drops.js';
 import type { Capacity } from '../machine.js';
 import { PROVIDERS, providerAdapter, titleNoise, type LaunchPlan, type ProviderFloor } from '../providers/index.js';
 import { launchAcp } from './acp.js';
-import { clockWork } from './clock.js';
 import { childEnv } from './env.js';
 import { midTurn } from './lifecycle.js';
 import { restoreWorkers, saveWorkers } from './persist.js';
@@ -220,8 +219,9 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', specialist?: string): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], specialist?: string): WorkerInfo | string {
     const denied = this.hiringPolicy?.(owner,specialist,kind); if(denied) return denied;
+    // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
     const modelError = validateWorkerModel(kind, selectedProvider, model);
@@ -283,7 +283,6 @@ export class WorkerManager {
       acked: true,
       createdBy: by,
       createdAt: Date.now(),
-      ...(via ? { via } : {}),
       prompt: kind === 'shell' ? undefined : prompt?.trim() || undefined,
       worktree: wt,
       repos: others,
@@ -316,7 +315,6 @@ export class WorkerManager {
     const denied = this.hiringPolicy?.(w.owner,w.info.specialist,w.info.kind); if(denied) return denied;
     if (w.pty || w.dsh) return 'Worker is already running';
     if (this.worktrees.checkLost(w, true)) return lostMessage(w.info);
-    clockWork(w.info, 'starting');
     w.info.status = 'starting';
     w.info.exitCode = undefined;
     const station = DESK_BY_ID.get(w.info.deskId)?.station;
@@ -392,7 +390,7 @@ export class WorkerManager {
     w.term?.dispose();
     this.scrollback.remove(id);
     this.drops.remove(id);
-    this.events.remove(id, w.info);
+    this.events.remove(id);
     this.persist();
     return this.worktrees.sendHome(w.info, cleanup, landed, landedRepos);
   }
@@ -640,7 +638,6 @@ export class WorkerManager {
     const { info } = w;
     // Its folder was deleted meanwhile: it waits, marked lost, for someone to rebuild it or send it home.
     if (this.worktrees.checkLost(w)) {
-      clockWork(info, 'exited');
       info.status = 'exited';
       this.emitUpdate(w);
       return;
@@ -730,7 +727,6 @@ export class WorkerManager {
     }
     // One that says itself when it's up (see ProviderAdapter.bootHint) starts out 'starting'.
     if (!adapter?.bootHint) {
-      clockWork(info, 'idle');
       info.status = 'idle';
     }
     this.follow(w, proc, term, resumeSessionId);
@@ -754,7 +750,6 @@ export class WorkerManager {
     this.setTitle(w, adopted.title);
     // A hook that came in since the office started already says how it's doing.
     if (info.status === 'offline') {
-      clockWork(info, saved.status);
       info.status = saved.status;
       info.acked = saved.acked;
       info.waitingSince = saved.waitingSince;
@@ -819,7 +814,6 @@ export class WorkerManager {
         return;
       }
       info.exitCode = exitCode;
-      clockWork(info, 'exited');
       info.status = 'exited';
       const hint = info.kind === 'shell' ? ' — press R to restart' : info.sessionId ? ' — press R to resume' : '';
       const msg = `\r\n\x1b[2m[${info.name} exited with code ${exitCode}${hint}]\x1b[0m\r\n`;
@@ -846,7 +840,6 @@ export class WorkerManager {
   private startFailed(w: Worker, message: string) {
     const what = this.command(w.info);
     const msg = `\r\n\x1b[31mFailed to start ${what}: ${message}\x1b[0m\r\n`;
-    clockWork(w.info, 'exited');
     w.info.status = 'exited';
     w.info.exitCode = -1;
     w.term?.write(msg);
@@ -906,7 +899,6 @@ export class WorkerManager {
   private setStatus(w: Worker, status: WorkerStatus) {
     if (w.info.status === status) return;
     if (w.info.status === 'needs_input') w.leftNeedsInputAt = Date.now();
-    clockWork(w.info, status);
     w.info.status = status;
     // Done, idle or asleep: it's not acting anything out any more.
     if (status !== 'working' && status !== 'needs_input') w.info.action = undefined;

@@ -65,7 +65,7 @@ export function installWorkstation(ctx: Ctx) {
 
   // Straight after you sit down, while the key press that did it still lets the browser ask what to share.
   ctx.ticks.add('me', () => {
-    const seat = player.seat && ctx.inOffice() ? ctx.plan().seatingById.get(player.seat.seatId) : undefined;
+    const seat = player.seat ? ctx.plan().seatingById.get(player.seat.seatId) : undefined;
     const now = seat?.share ? seat.id : null;
     if (now === sat) return;
     sat = now;
@@ -90,7 +90,7 @@ export function installWorkstation(ctx: Ctx) {
   }
 
   ctx.ticks.add('world', () => {
-    if (!ctx.inOffice() || ctx.upTop()) return;
+    if (ctx.upTop()) return;
     const remote = voice.remoteScreens();
     const desks = new Set<string>();
     for (const v of office.furniture.all()) {

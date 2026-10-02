@@ -2,12 +2,12 @@ import { lumpy, sample } from './buffers';
 import { rand } from './dsp';
 
 // What a footstep is made of. A foot comes down in two parts, the heel and then the ball of the foot,
-// and what you hear of each is the ground: a plank knocks, concrete ticks, grass swishes, the castle's
-// flagstones clack and the hall answers. So each kind of ground has a few samples of each part, no two
-// alike, made the first time someone walks on it. steps.ts puts them together into steps.
+// and what you hear of each is the ground: a plank knocks, concrete ticks, grass swishes. So each kind
+// of ground has a few samples of each part, no two alike, made the first time someone walks on it.
+// steps.ts puts them together into steps.
 
 /** What's underfoot. */
-export type Ground = 'wood' | 'concrete' | 'grass' | 'stone';
+export type Ground = 'wood' | 'concrete' | 'grass';
 
 /** The two parts of a step on one kind of ground, a few of each. */
 export interface Footfalls {
@@ -123,27 +123,6 @@ const RECIPES: Record<Ground, Recipe> = {
       const swish = band(sr, rand(2200, 3200), 0.9);
       const blades = lumpy(sr, 0.004, 0.012);
       return (t) => thump() * hit(t, 6, 20) * 0.4 + swish() * (0.25 + blades()) * hit(t, 14, 45) * 0.4;
-    },
-  },
-  // The castle's flagstones: a hard clack, and the hall saying it back for a moment after.
-  stone: {
-    seconds: 0.5,
-    heel(sr) {
-      const tick = band(sr, rand(1700, 2300), 1.4);
-      const thud = dull(sr, 300);
-      const f = rand(520, 680);
-      const flag = [ring(f, 9), ring(f * rand(2, 2.4), 5)];
-      const hall = band(sr, rand(600, 900), 0.6, dull(sr, 2200));
-      // The blow itself is over in a tenth of a second: after that there's only the hall to work out.
-      const blow: Voice = (t) => (t > 0.1 ? 0 : tick() * hit(t, 0.2, 3) * 0.5 + thud() * hit(t, 1, 12) * 0.5 + flag[0](t) * 0.6 + flag[1](t) * 0.3);
-      return (t) => blow(t) + hall() * hit(t - 0.018, 12, 150) * 0.016;
-    },
-    toe(sr) {
-      const slap = band(sr, rand(1500, 2000), 1);
-      const thud = dull(sr, 520);
-      const hall = band(sr, rand(700, 1100), 0.6, dull(sr, 2200));
-      const blow: Voice = (t) => (t > 0.1 ? 0 : slap() * hit(t, 0.8, 7) * 0.5 + thud() * hit(t, 1.5, 9) * 0.4);
-      return (t) => blow(t) + hall() * hit(t - 0.018, 12, 130) * 0.014;
     },
   },
 };

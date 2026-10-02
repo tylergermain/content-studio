@@ -1,9 +1,10 @@
-import { FONT, H, W, banner, type Press, type ScreenGame } from './game';
+import { scoreLine, type GameFrame, type MinesFrame } from '../../../shared/cabinet';
+import { FONT, H, W, banner, best, holder, placed, setBest, type GameSound, type Press, type ScreenGame } from './game';
 
 /**
- * Minesweeper for the boss's monitor (ui.ts): the rules, what the mouse does on the board, and a
- * painter that draws the whole screen in fixed 960×540 units, so the same picture goes on the monitor
- * and on the board you click.
+ * Minesweeper (see game.ts): the rules, what the mouse does on the board, and a painter that draws the
+ * whole screen in fixed 960×540 units, so the same picture goes on the screen in the office and on
+ * the board you click.
  */
 export { H, W };
 
@@ -28,6 +29,8 @@ interface Cell {
 
 export class Minesweeper implements ScreenGame {
   readonly id = 'minesweeper';
+  office = '';
+  sound?: GameSound;
   readonly icon = '💣';
   readonly name = 'Minesweeper';
   readonly tip = 'Click to dig · right-click to flag';
@@ -35,7 +38,7 @@ export class Minesweeper implements ScreenGame {
   state: 'ready' | 'playing' | 'won' | 'lost' = 'ready';
   /** The mine that went off. */
   private boom = -1;
-  /** Time played, counted only while someone's at the monitor (see tick). */
+  /** Time played, counted only while someone's at it (see tick). */
   private ms = 0;
   /** The cell under a held-down click, drawn pushed in. */
   private pressed = -1;
@@ -53,6 +56,11 @@ export class Minesweeper implements ScreenGame {
     this.state = 'ready';
     this.boom = -1;
     this.ms = 0;
+    this.office = '';
+  }
+
+  get left(): number | null {
+    return this.state === 'playing' ? Math.floor(this.ms / 1000) : null;
   }
 
   /** Sitting down to it: a finished game stays as it ended until then. */
@@ -65,7 +73,7 @@ export class Minesweeper implements ScreenGame {
     this.hover = this.pressed = -1;
   }
 
-  /** The clock only runs while someone's at the monitor. */
+  /** The clock only runs while someone's at it. */
   update(dt: number): boolean {
     return this.tick(dt * 1000);
   }
@@ -129,6 +137,7 @@ export class Minesweeper implements ScreenGame {
     if (first.mine) {
       this.boom = i;
       this.state = 'lost';
+      this.sound?.('over');
       return;
     }
     // Empty cells open their neighbors too, out to the numbered edge.
@@ -143,6 +152,8 @@ export class Minesweeper implements ScreenGame {
     if (this.cells.every((c) => c.open || c.mine)) {
       this.state = 'won';
       for (const c of this.cells) if (c.mine) c.flag = true;
+      this.sound?.('clear', 4);
+      setBest(this.id, Math.floor(this.ms / 1000));
     }
   }
 
@@ -175,10 +186,16 @@ export class Minesweeper implements ScreenGame {
     g.textAlign = 'center';
     g.textBaseline = 'middle';
 
-    // The top bar: mines left, the face (a new game), and the clock.
+    // The top bar: mines left, the fastest anyone in the building cleared it, the face (a new game), and the clock.
     const left = MINES - this.cells.filter((c) => c.flag).length;
     readout(g, X0, `💣 ${left}`);
     readout(g, W - X0 - 150, `⏱ ${Math.min(999, Math.floor(this.ms / 1000))}`);
+    const top = best(this.id);
+    if (top) {
+      g.fillStyle = '#8d99ae';
+      g.font = `800 18px ${FONT}`;
+      g.fillText(`🏆 ${scoreLine(this.id, top)}${holder(this.id).slice(0, 15)}`, (X0 + 150 + FACE.x - FACE.r) / 2, 33);
+    }
     g.fillStyle = '#ffd166';
     g.beginPath();
     g.arc(FACE.x, FACE.y, FACE.r, 0, Math.PI * 2);
@@ -191,8 +208,27 @@ export class Minesweeper implements ScreenGame {
 
     if (this.over) {
       const won = this.state === 'won';
-      banner(g, won ? `Cleared in ${Math.floor(this.ms / 1000)}s!` : 'Boom!', 'Click the face for a new game', won ? 'rgba(42, 157, 75, 0.92)' : 'rgba(230, 57, 70, 0.92)');
+      const place = placed(this.id, this.office);
+      banner(g, won ? `Cleared in ${Math.floor(this.ms / 1000)}s!` : 'Boom!', place ? `${place}click the face for another` : 'Click the face for a new game', won ? 'rgba(42, 157, 75, 0.92)' : 'rgba(230, 57, 70, 0.92)');
     }
+  }
+
+  /** What shows of each cell, and nothing of what doesn't: where the mines are stays here until it's lost. */
+  frame(): MinesFrame {
+    const lost = this.state === 'lost';
+    const cells = this.cells.map((c, i) => (c.flag ? (lost && !c.mine ? 'x' : 'f') : c.open ? String(c.near) : lost && c.mine ? (i === this.boom ? 'b' : 'm') : 'h'));
+    return { cells: cells.join(''), seconds: Math.floor(this.ms / 1000), state: this.state };
+  }
+
+  show(frame: GameFrame) {
+    const f = frame as MinesFrame;
+    this.cells = [...f.cells].map((ch) => {
+      const open = ch >= '0' && ch <= '8';
+      return { mine: 'fmb'.includes(ch), open, flag: ch === 'f' || ch === 'x', near: open ? Number(ch) : 0 };
+    });
+    this.boom = f.cells.indexOf('b');
+    this.state = f.state;
+    this.ms = f.seconds * 1000;
   }
 
   private get over(): boolean {

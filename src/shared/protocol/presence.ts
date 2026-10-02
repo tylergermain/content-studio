@@ -7,7 +7,7 @@ import type { EmoteId } from '../emotes.js';
 import type { DrinkId } from '../rooftop.js';
 import type { Me } from './accounts.js';
 import type { FloorInfo, FloorView, ProjectsDirState } from './floors.js';
-import type { LeaveOnMergeState, MachineState, MapState, NotifyState, PromptsState, SkyState, ThemeState, UpgradeState } from './settings.js';
+import type { LeaveOnMergeState, MachineState, NotifyState, PromptsState, SkyState, ThemeState, UpgradeState } from './settings.js';
 import type { PlanLimits, UsageState } from './usage.js';
 
 /** The issue on a card someone carries around the floor (see PeerInfo.carrying). */
@@ -136,8 +136,6 @@ export type PresenceServerMsg =
       theme: ThemeState;
       /** What the office is signed in to for the boards it fills by itself (Slack, Metricool). */
       integrations: IntegrationsState;
-      /** What the building looks like inside. */
-      map: MapState;
       /** The office's prompts and the worker everyone starts on. */
       prompts: PromptsState;
       leaveOnMerge: LeaveOnMergeState;

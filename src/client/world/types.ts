@@ -53,8 +53,6 @@ export interface Interactable {
   car?: number;
   /** Put away for now (a bean bag nobody needs yet): can't be used. */
   off?: boolean;
-  /** What the hint calls it, where a map's own looks differ from the office's (the castle's ale for the coffee machine). */
-  label?: string;
 }
 
 /** A desk, a bean bag, a board agent's kiosk or a chair at the meeting table: somewhere a worker sits (or stands). */

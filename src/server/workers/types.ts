@@ -105,8 +105,8 @@ export interface Worker {
 
 export interface WorkerEvents {
   update(info: WorkerInfo): void;
-  /** It's gone (sent home), and what it was as it went. */
-  remove(workerId: string, info?: WorkerInfo): void;
+  /** It's gone (sent home). */
+  remove(workerId: string): void;
   data(workerId: string, data: string, viewers: string[]): void;
   screen(workerId: string, frame: { cols: number; rows: number; lines: Record<number, Run[]>; full: boolean; cursor: [number, number] }): void;
   toast(text: string, level: 'info' | 'warn' | 'error'): void;

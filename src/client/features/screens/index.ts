@@ -176,7 +176,7 @@ export function installScreens(ctx: Ctx) {
       leave();
       floor = store.floor;
     }
-    const here = !!floor && ctx.inOffice() && !ctx.upTop() && !document.hidden;
+    const here = !!floor && !ctx.upTop() && !document.hidden;
     // A file that stopped mid-play has sat out long enough: every screen goes by the folder again.
     if (retryAt && now >= retryAt) {
       retryAt = 0;

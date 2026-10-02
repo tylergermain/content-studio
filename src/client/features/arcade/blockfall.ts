@@ -1,8 +1,8 @@
-import type { HighScore } from '../../../shared/cabinet';
+import type { CabinetFrame, GameFrame } from '../../../shared/cabinet';
 import { Blocks, H as SCREEN_H, W as SCREEN_W, paintScreen } from '../cabinet/blocks';
-import { H, W, best, setBest, type ScreenGame } from './game';
+import { H, W, rank, setBest, table, type GameSound, type ScreenGame } from './game';
 
-/** Keys for the game, by `code`: the arcade cabinet's (see features/cabinet/ui.ts). */
+/** Keys for the game, by `code`. */
 const KEYS: Record<string, 'left' | 'right' | 'down' | 'turn' | 'back' | 'drop' | 'hold' | 'pause' | 'go'> = {
   ArrowLeft: 'left',
   KeyA: 'left',
@@ -22,23 +22,28 @@ const KEYS: Record<string, 'left' | 'right' | 'down' | 'turn' | 'back' | 'drop' 
   Enter: 'go',
 };
 
-/** The cabinet's 800×600 screen, as big as it goes on the monitor's 960×540 and centered. */
+/** Its own 800×600 screen, as big as it goes on a 960×540 one and centered. */
 const SCALE = H / SCREEN_H;
 const LEFT = (W - SCREEN_W * SCALE) / 2;
 
 /**
- * BLOCKFALL on the boss's monitor (ui.ts): the arcade cabinet's own game and its picture
- * (features/cabinet/blocks.ts), played here on your own. It isn't the cabinet's: nobody watches it
- * there, it makes no sound in the lounge, and it's off the building's high-score table, so what it
- * keeps is your best in this browser.
+ * BLOCKFALL (see game.ts): the falling-blocks engine and its picture (features/cabinet/blocks.ts),
+ * which was made for the cabinet's 4:3 tube and fills it there (`paintTube`); on the boss's monitor
+ * the same picture sits in the middle. Either way it shows the building's Blockfall table, with the
+ * game that's on picked out on it.
  */
 export class Blockfall implements ScreenGame {
   readonly id = 'blockfall';
+  office = '';
+  sound?: GameSound;
   readonly icon = '🧱';
   readonly name = 'Blockfall';
   readonly tip = '← → move · ↑ turn · ↓ faster · Space drop · C hold · P pause';
-  private blocks = new Blocks();
-  private top = best(this.id);
+  private blocks = this.fresh();
+  /** Someone else's game to show instead (see `show`). */
+  private shown: CabinetFrame | null = null;
+  /** Its game-over sound has played. */
+  private ended = false;
   /** The picture that's been drawn (see Blocks.version). */
   private drawn = -1;
 
@@ -54,21 +59,34 @@ export class Blockfall implements ScreenGame {
     return this.blocks.score;
   }
 
+  get left(): number | null {
+    const b = this.blocks;
+    return !b.over && (b.pieces || b.score) ? b.score : null;
+  }
+
   /** A new game after one that ended, or one you never got going. Any other is as you left it, paused. */
   start() {
     const b = this.blocks;
-    if (b.over || (b.state === 'paused' && !b.pieces && !b.score)) this.blocks = new Blocks();
+    if (b.over) return this.reset();
+    if (b.state !== 'paused' || b.pieces || b.score) return;
+    // Never begun: its blocks start over, but to the office it's the game it was, with nothing played.
+    this.blocks = this.fresh();
+  }
+
+  reset() {
+    this.blocks = this.fresh();
+    this.office = '';
+    this.ended = false;
   }
 
   /** Stepped away: your game waits, paused. */
   leave() {
     this.blocks.pause(true);
-    this.keep();
   }
 
   update(dt: number): boolean {
     this.blocks.update(dt);
-    if (this.blocks.over) this.keep();
+    this.finish();
     return this.blocks.version !== this.drawn;
   }
 
@@ -81,7 +99,7 @@ export class Blockfall implements ScreenGame {
       else if (k === 'right') b.release(1);
       else if (k === 'down') b.softDrop(false);
     } else if (b.over) {
-      if (k === 'go' || k === 'drop') this.blocks = new Blocks();
+      if (k === 'go' || k === 'drop') this.reset();
     } else if (b.state === 'paused') {
       if (k === 'pause' || k === 'go') b.pause(false);
     } else if (k === 'left') b.press(-1);
@@ -92,13 +110,12 @@ export class Blockfall implements ScreenGame {
     else if (k === 'drop') b.hardDrop();
     else if (k === 'hold') b.hold();
     else if (k === 'pause') b.pause(true);
-    if (this.blocks.over) this.keep();
+    this.finish();
     return true;
   }
 
   paint(g: CanvasRenderingContext2D) {
-    this.drawn = this.blocks.version;
-    // Either side of the cabinet's screen: its own backdrop carried on, scan lines and all.
+    // Either side of its own screen: the backdrop carried on, scan lines and all.
     const bg = g.createLinearGradient(0, 0, 0, H);
     bg.addColorStop(0, '#1b1d3a');
     bg.addColorStop(1, '#0b1320');
@@ -109,19 +126,39 @@ export class Blockfall implements ScreenGame {
       g.fillRect(0, y * SCALE, LEFT, 1.5 * SCALE);
       g.fillRect(W - LEFT, y * SCALE, LEFT, 1.5 * SCALE);
     }
-    // Where the cabinet has the building's table, this has the one row: your best here, this game counted.
-    const scores: HighScore[] = [{ game: 'best', name: 'Best here', color: '#ffd166', score: Math.max(this.top, this.blocks.score), lines: 0, level: 1, at: 0 }];
     g.save();
     g.translate(LEFT, 0);
     g.scale(SCALE, SCALE);
-    paintScreen(g, { frame: this.blocks.frame(), scores, t: 0, prompt: 'ENTER: NEW GAME', note: 'P or Enter to carry on' });
+    this.paintTube(g);
     g.restore();
   }
 
-  /** Your score so far is your best here, if it beats it. */
-  private keep() {
-    if (this.blocks.score <= this.top) return;
-    this.top = this.blocks.score;
-    setBest(this.id, this.top);
+  paintTube(g: CanvasRenderingContext2D, player?: string) {
+    this.drawn = this.blocks.version;
+    const place = rank(this.id, this.office);
+    const prompt = place ? `🏆 #${place} on the table! Enter: again` : 'ENTER: NEW GAME';
+    paintScreen(g, { frame: this.shown ?? this.blocks.frame(), player, scores: table(this.id), mine: this.office, prompt: this.shown ? undefined : prompt, note: this.shown ? 'Back in a moment' : 'P or Enter to carry on' });
+  }
+
+  frame(): CabinetFrame {
+    return this.blocks.frame();
+  }
+
+  show(frame: GameFrame) {
+    this.shown = frame as CabinetFrame;
+  }
+
+  private fresh(): Blocks {
+    const b = new Blocks();
+    b.onLand = (lines) => this.sound?.(lines ? 'clear' : 'land', lines);
+    return b;
+  }
+
+  /** Over: it says so once, and its score is your best here if it beats it. */
+  private finish() {
+    if (!this.blocks.over || this.ended) return;
+    this.ended = true;
+    this.sound?.('over');
+    setBest(this.id, this.blocks.score);
   }
 }

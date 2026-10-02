@@ -89,7 +89,7 @@ export function buildCabinet(): CabinetModel {
     for (const sx of [-1, 1]) group.add(mesh(cube, toon(PIECES[c]), sx * (W / 2 + 0.01), v, u, false));
   });
 
-  // The marquee: the game's name, lit from behind.
+  // The marquee, lit from behind.
   const marquee = document.createElement('canvas');
   marquee.width = 512;
   marquee.height = 160;
@@ -148,7 +148,7 @@ export function buildCabinet(): CabinetModel {
 
 declare module '../../world/types' {
   interface OfficeHandles {
-    /** The arcade cabinet in the lounge, where BLOCKFALL plays (ui.ts). */
+    /** The arcade cabinet in the lounge, where the arcade's games play (ui.ts). */
     cabinet: CabinetModel;
   }
 }
@@ -176,8 +176,8 @@ function paintMarquee(c: HTMLCanvasElement) {
   g.fillRect(0, 0, c.width, c.height);
   g.textAlign = 'center';
   g.textBaseline = 'middle';
-  g.font = '900 84px Nunito, ui-rounded, system-ui, sans-serif';
-  const letters = [...'BLOCKFALL'];
+  g.font = '900 100px Nunito, ui-rounded, system-ui, sans-serif';
+  const letters = [...'ARCADE'];
   const widths = letters.map((ch) => g.measureText(ch).width);
   let x = c.width / 2 - widths.reduce((a, b) => a + b, 0) / 2;
   letters.forEach((ch, i) => {

@@ -1,7 +1,7 @@
-import './ui.css';
 import * as THREE from 'three';
-import { h, openModal, type Modal } from '../../ui/dom';
-import { H, W, type Press, type ScreenGame } from './game';
+import { openBoard, type Board } from './board';
+import { H, W, type ScreenGame } from './game';
+import type { Link } from './link';
 
 /** How much of the view (across or down, whichever runs out first) a screen fills while you play on it. */
 const FILL = 0.8;
@@ -54,18 +54,17 @@ export class ScreenZoom {
   }
 }
 
-/** Keys no game gets: Esc closes its window, and V and M are the call's (see features/boss-desk). */
-const NOT_FOR_GAMES = new Set(['Escape', 'KeyV', 'KeyM']);
-
 /**
  * The boss's monitor, which plays the games it's handed (games.ts; what a game is, see game.ts). Pick
  * one and the camera glides up to the screen while a board you can click is laid exactly over it. The
  * camera looks straight at the screen, so that board is a plain centered box. `picture` is the same
  * game at the screen's own 960×540, kept drawn while you play, for whoever shows it somewhere else
- * (the two monitors on the boss's desk, see features/boss-desk).
+ * (the two monitors on the boss's desk, see features/boss-desk). The cabinet in the lounge plays the
+ * same games, these very ones (features/cabinet), so a game left on one is there on the other, and
+ * the office follows whichever is open through `link` for the building's high scores.
  */
 export class Arcade {
-  private modal: Modal | null = null;
+  private board: Board | null = null;
   private readonly view: ScreenZoom;
   /** The game that's open. */
   private game: ScreenGame | null = null;
@@ -74,13 +73,13 @@ export class Arcade {
   /** The game's screen as it is now. */
   readonly picture = document.createElement('canvas');
   private readonly texture = new THREE.CanvasTexture(this.picture);
-  /** The board you click while playing, drawn at the size it shows on screen so it stays crisp. */
-  private board: HTMLCanvasElement | null = null;
 
   constructor(
     screen: THREE.Mesh,
     /** The games it plays, in the order the desk's menu lists them. */
     readonly games: readonly ScreenGame[],
+    /** The office's side of whichever game is open, here or at the cabinet. */
+    readonly link: Link,
   ) {
     this.view = new ScreenZoom(screen);
     this.shown = games[0];
@@ -110,7 +109,7 @@ export class Arcade {
 
   /** Puts it down, if you're at it (you got up, or the building changed maps under you). */
   stop() {
-    this.modal?.close();
+    this.board?.close();
   }
 
   /** Opens game `id` over the monitor, with `bar` (buttons of whoever asked) in the bar under it, before its ✕ Stop playing. */
@@ -118,103 +117,45 @@ export class Arcade {
     const game = this.games.find((g) => g.id === id);
     if (!game) return;
     // One game at a time: picking another puts down the one that's open.
-    this.modal?.close();
+    this.board?.close();
     game.start();
     this.game = this.shown = game;
-    const board = h('canvas', { 'aria-label': `${game.name} board` });
-    const stop = h('button.btn', { type: 'button' }, '✕ Stop playing');
-    const box = h(
-      'div.arcade',
-      { role: 'dialog', 'aria-label': game.name },
-      h('div.arcade-screen', {}, board),
-      h('div.arcade-bar', {}, h('span', {}, `${game.icon} ${game.name}`), h('span.tip', {}, game.tip), ...bar, stop),
-    );
-
-    // The mouse on the board goes to the game, in its 960×540.
-    const mouse = (kind: Press) => (e: PointerEvent) => {
-      // A held left button keeps hearing the mouse past the board's edge, so letting go out there still counts.
-      if (kind === 'down' && e.button === 0) board.setPointerCapture(e.pointerId);
-      // Right-click flags, and so do Ctrl- and Shift-click for a trackpad.
-      const flag = e.button === 2 || (e.button === 0 && (e.ctrlKey || e.shiftKey));
-      if (game.pointer?.(kind, (e.offsetX * W) / board.clientWidth, (e.offsetY * H) / board.clientHeight, { button: e.button, flag })) this.draw();
-    };
-    board.addEventListener('pointerdown', mouse('down'));
-    board.addEventListener('pointermove', mouse('move'));
-    board.addEventListener('pointerup', mouse('up'));
-    board.addEventListener('pointerleave', mouse('leave'));
-    // No menu on right-click, and no scrolling or selecting on a click.
-    board.addEventListener('contextmenu', (e) => e.preventDefault());
-    board.addEventListener('mousedown', (e) => e.preventDefault());
-
-    // The keys go to the game first, ahead of the window and the office: the ones it takes stop here.
-    const held = new Set<string>();
-    const onKey = (e: KeyboardEvent) => {
-      if (e.type === 'keyup') {
-        if (!held.delete(e.code)) return;
-        game.key?.(e.code, false);
-      } else if (e.metaKey || e.ctrlKey || e.altKey || NOT_FOR_GAMES.has(e.code) || typing(e)) {
-        return;
-      } else if (e.repeat) {
-        // A key held down is the game's to repeat, on its own time rather than the keyboard's.
-        if (!held.has(e.code)) return;
-      } else {
-        if (!game.key?.(e.code, true)) return;
-        held.add(e.code);
-      }
-      e.preventDefault();
-      e.stopPropagation();
-      this.draw();
-    };
-    // Clicked off into another window: nothing's held any more, and the game waits for you.
-    const onBlur = () => {
-      held.clear();
-      game.leave?.();
-      this.draw();
-    };
-
-    const fit = () => {
-      const { width, height } = this.view.box();
-      box.style.width = `${width}px`;
-      box.style.height = `${height}px`;
-      board.width = Math.round(width * devicePixelRatio);
-      board.height = Math.round(height * devicePixelRatio);
-      this.draw();
-    };
-    this.board = board;
-    fit();
-    window.addEventListener('resize', fit);
-    window.addEventListener('keydown', onKey, true);
-    window.addEventListener('keyup', onKey, true);
-    window.addEventListener('blur', onBlur);
+    this.link.follow(game, true);
     // A picture that's sent on (see `picture`) only goes out when it's drawn, so a game sitting still is drawn again now and then.
     const again = setInterval(() => this.draw(), 500);
-    this.modal = openModal(box, {
-      backdropCloses: false,
+    const board = openBoard({
+      name: game.name,
       doing: `${game.icon} playing ${game.name}`,
+      bar,
+      stop: '✕ Stop playing',
+      box: () => this.view.box(),
+      units: [W, H],
+      key: (code, down) => !!game.key?.(code, down),
+      pointer: (kind, x, y, e) => !!game.pointer?.(kind, x, y, e),
+      // Clicked off into another window: the game waits for you.
+      blur: () => game.leave?.(),
+      draw: () => this.draw(),
       onClose: () => {
-        window.removeEventListener('resize', fit);
-        window.removeEventListener('keydown', onKey, true);
-        window.removeEventListener('keyup', onKey, true);
-        window.removeEventListener('blur', onBlur);
         clearInterval(again);
-        this.modal = this.board = this.game = null;
+        this.board = this.game = null;
         game.leave?.();
+        if (this.link.following === game) this.link.drop();
         this.draw();
       },
     });
-    this.modal.backdrop.classList.add('clear');
-    stop.addEventListener('click', () => this.modal?.close());
+    board.say(`${game.icon} ${game.name}`, game.tip);
+    this.board = board;
   }
 
   /** Runs the open game, and moves the camera toward the monitor while you play and back after. Call it once the player has placed the camera. */
   update(camera: THREE.PerspectiveCamera, dt: number) {
-    this.view.update(camera, dt, !!this.modal);
+    this.view.update(camera, dt, !!this.board);
     if (this.game?.update?.(dt)) this.draw();
   }
 
   /** Draws the game on the board while you play, and on `picture` either way. */
-  private draw() {
-    if (this.board) paint(this.shown, this.board);
+  draw() {
+    if (this.board) paint(this.shown, this.board.canvas);
     paint(this.shown, this.picture);
     this.texture.needsUpdate = true;
   }
@@ -227,10 +168,4 @@ function paint(game: ScreenGame, canvas: HTMLCanvasElement) {
   g.save();
   game.paint(g);
   g.restore();
-}
-
-/** Whether a key is being typed into something (a text box in a window over the game). */
-function typing(e: KeyboardEvent): boolean {
-  const el = e.target as HTMLElement | null;
-  return !!el?.closest?.('input, textarea, select, [contenteditable], .xterm');
 }

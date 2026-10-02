@@ -29,6 +29,7 @@ import type { installClimbing } from '../features/climbing';
 import type { installCoffee } from '../features/coffee';
 import type { installDog } from '../features/dog';
 import type { installEmotes } from '../features/emotes';
+import type { installGoat } from '../features/goat';
 import type { installGolf } from '../features/golf';
 import type { installGallery, installHanging } from '../features/hanging';
 import type { installHud } from '../features/hud';
@@ -50,8 +51,8 @@ import type { installWorkerViews } from '../features/workers/views';
 import type { installFocus } from '../input/focus';
 import type { installPointer } from '../input/pointer';
 import type { installArrival } from './arrival';
+import type { installFloors } from './floors';
 import type { installHintBar } from './hintbar';
-import type { installMaps } from './maps';
 import type { installPlace } from './place';
 import type { Stage } from './scene';
 import type { installTravel } from './travel';
@@ -63,7 +64,7 @@ type Made<F extends (...args: never[]) => unknown> = ReturnType<F>;
 export interface Parts {
   // ---- What the office is made of ------------------------------------------------------------------
   stage: Stage;
-  /** The building's map as it's built, and the one it's on (see core/worlds.ts). */
+  /** The office as a world, and the board agents waiting in it (see core/worlds.ts). */
   worlds: Made<typeof createWorlds>;
   net: Net;
   voice: Voice;
@@ -89,7 +90,7 @@ export interface Parts {
   you: Made<typeof installYou>;
   travel: Made<typeof installTravel>;
   arrival: Made<typeof installArrival>;
-  maps: Made<typeof installMaps>;
+  floors: Made<typeof installFloors>;
   hintbar: Made<typeof installHintBar>;
   focus: Made<typeof installFocus>;
   pointer: Made<typeof installPointer>;
@@ -102,6 +103,7 @@ export interface Parts {
   rooftop: Made<typeof installRooftop>;
   telescope: Made<typeof installTelescope>;
   dog: Made<typeof installDog>;
+  goat: Made<typeof installGoat>;
   jukebox: Made<typeof installJukebox>;
   cabinet: Made<typeof installCabinet>;
   golf: Made<typeof installGolf>;

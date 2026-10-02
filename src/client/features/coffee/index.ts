@@ -31,9 +31,9 @@ export function installCoffee(ctx: Ctx) {
 
   ctx.interactions.define('coffee', {
     reach: 3,
-    hint: (it) => {
+    hint: () => {
       const buzzed = caffeine.buzzed(performance.now() / 1000);
-      return { k: String(buzzed), parts: [hintTitle(it.label ?? '☕ Coffee machine'), key('E', buzzed ? 'Another cup' : 'Grab a cup')] };
+      return { k: String(buzzed), parts: [hintTitle('☕ Coffee machine'), key('E', buzzed ? 'Another cup' : 'Grab a cup')] };
     },
     use: onE(() => drinkCoffee()),
   });

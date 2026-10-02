@@ -54,7 +54,7 @@ export const HAZE_PARS = /* glsl */ `
 #ifdef USE_FOG
   varying vec3 vSkyFogAt;
   uniform float skyStreet;
-  // On a floor of the office (not up on the roof, nor on a map of its own), and its back office if it has one.
+  // On a floor of the office (not up on the roof), and its back office if it has one.
   uniform float skyClear;
   uniform vec4 skyClearWing;
   // Inside the building, from the office floor's slab up: not the open garage under it, nor the balcony.

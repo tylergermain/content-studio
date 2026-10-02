@@ -19,15 +19,8 @@ export function installDog(ctx: Ctx): Dog {
   noOutline(dog.root);
   // The dog walks about on its own, not on the building: it's there to aim at by itself.
   ctx.usables.add({ usable: () => dog.interactables, pickable: () => dog.root });
-  store.on('dog', () => {
-    dog.sync(store.dog, store.dogStart);
-    // The dog lives in the office: on a map of its own it stays home.
-    if (!ctx.inOffice()) dog.root.visible = false;
-  });
-  ctx.ticks.add('others', ({ dt }) => {
-    // The dog is the office's: on a map of its own it stays at home, quiet.
-    if (ctx.inOffice()) dog.update(dt);
-  });
+  store.on('dog', () => dog.sync(store.dog, store.dogStart));
+  ctx.ticks.add('others', ({ dt }) => dog.update(dt));
   ctx.interactions.define('dog', {
     reach: 3.2,
     hint: () => {

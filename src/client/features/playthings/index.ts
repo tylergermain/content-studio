@@ -63,8 +63,8 @@ export function installPlaythings(ctx: Ctx, deps: PlaythingsDeps) {
   const byKind = new Map<FurnitureKind, PieceView[]>();
   ctx.ticks.add('moved', (f) => {
     for (const list of byKind.values()) list.length = 0;
-    // The furniture is the office floor's: none of it up on the roof, or on a map of its own.
-    if (ctx.inOffice() && !ctx.upTop()) {
+    // The furniture is the office floor's: none of it up on the roof.
+    if (!ctx.upTop()) {
       for (const v of ctx.office.furniture.all()) {
         if (v.away || !toys[v.piece.kind]?.tick) continue;
         let list = byKind.get(v.piece.kind);

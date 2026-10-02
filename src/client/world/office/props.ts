@@ -4,8 +4,8 @@ import { palette, piece } from '../models';
 import { PALETTE } from './materials';
 
 // The office's furnishings: the potted plants, the desks' knick-knacks and the lounge's furniture (all
-// modelled in Blender), the pendant lamps and the framed boards on the walls. The lab (lab/props.ts), the
-// holidays and the castle use some of them too.
+// modelled in Blender), the pendant lamps and the framed boards on the walls. The lab (lab/props.ts) and
+// the holidays use some of them too.
 
 // The potted plants are modelled in Blender (blender/scripts/build_plants.py): each plant is a painted
 // copy of one species in plants.glb (see piece()). A species is its pot, named after it, with everything that

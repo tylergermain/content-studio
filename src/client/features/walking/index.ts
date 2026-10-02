@@ -18,7 +18,7 @@ const NEAR_ENOUGH = 1.6;
 /** Registers the walk's own tick ('steer'), and takes the player's path ends. */
 export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worlds' | 'travel' | 'cars' | 'seating' | 'climbing'>) {
   const { player } = ctx;
-  const { plan, inOffice, officeWing } = parts.worlds;
+  const { plan, officeWing } = parts.worlds;
   /** Who you're on your way to (clicked in the sidebar), and when to look again at where they've got to. */
   let walkingTo: { id: string; replanAt: number } | null = null;
 
@@ -36,7 +36,7 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     if (store.onMyFloor(p)) toast(`🚶 Walking over to ${p.name}`);
     else {
       toast(`🛗 Taking the elevator to ${p.name}, on the ${store.floors.find((f) => f.id === p.floor)?.name ?? 'other'} floor`);
-      parts.travel.ride(p.floor!, true);
+      parts.travel.ride(p.floor!);
     }
   }
 
@@ -77,8 +77,8 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     if (Math.hypot(at.x - player.pos.x, at.z - player.pos.z) < NEAR_ENOUGH && Math.abs(at.y - player.pos.y) < 1) return arrivedAt(at);
     if (now < walkingTo.replanAt) return;
     walkingTo.replanAt = now + 800;
-    // Round the office's rooms and up its stairs; on a map of its own, round what's in the way on its floor.
-    player.walkPath(inOffice() ? wayTo(player.pos, at, officeWing()) : ctx.world().nav.route([player.pos.x, player.pos.z], [at.x, at.z]).slice(1).map(([x, z]) => ({ x, z })));
+    // Round the office's rooms and up its stairs.
+    player.walkPath(wayTo(player.pos, at, officeWing()));
   }
 
   ctx.ticks.add('steer', ({ now }) => walkTick(now));
@@ -116,8 +116,8 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     errand = { at, what, face, then };
     toast(`🚶 Walking over to ${what}`);
     const to = { x: at.x, y: at.y ?? 0, z: at.z };
-    // As walkTick does: round the office's rooms (and its back office), or round what's in the way on a map of its own.
-    player.walkPath(inOffice() ? wayTo(player.pos, to, officeWing()) : ctx.world().nav.route([player.pos.x, player.pos.z], [to.x, to.z]).slice(1).map(([x, z]) => ({ x, z })));
+    // As walkTick does: round the office's rooms (and its back office).
+    player.walkPath(wayTo(player.pos, to, officeWing()));
   }
 
   function errandEnd(why: 'arrived' | 'cancelled' | 'stuck') {
