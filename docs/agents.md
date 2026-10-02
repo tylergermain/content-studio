@@ -1,5 +1,9 @@
 # Choosing an agent
 
+Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for new workers, queue tasks, meetings, and the office default. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` and trusts the office hooks. Pi uses its normal unrestricted tools with `--approve` for project trust. These defaults apply to fresh and resumed launches. Restart existing workers to apply them.
+
+Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.
+
 Back to the [README](../README.md).
 
 Every new worker starts on the office's **Default worker**: a provider, model and effort an admin picks in ⚙️ Settings → **🤖 Workers** (the `--agent` with its own default model until someone does). The hire, ask, queue, issue and meeting windows show it on one line; click **✏️ Edit** there to pick **Claude Code**, **OpenCode**, **Codex**, **Grok**, **Muse**, **DeepSeek Harness**, **Pi** or **Cursor**, a model and an effort for just that worker or task, and **↺ Use the default** to go back. Board agents and tasks the Queue agent adds, which nobody picks for, start on the default too. Existing workers keep their provider when prompted or resumed, and queued tasks keep their choice when retried or restored after a restart.

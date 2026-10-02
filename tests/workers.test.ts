@@ -482,7 +482,7 @@ test('an explicit Claude model/effort overrides --agent-args and persists across
   const first = await waitFor(() => f.read(), (records) => records.some((r) => r.kind === 'claude' && !r.args.includes('--output-format')));
   const firstInvocation = first.find((r) => r.kind === 'claude' && !r.args.includes('--output-format'))!;
   // The per-worker choice is appended after --agent-args, so it wins even though "opus" also appears.
-  assert.deepEqual(firstInvocation.args.slice(firstInvocation.args.indexOf('--model')), ['--model', 'opus', '--model', 'haiku', '--effort', 'high', '--', 'haiku task']);
+  assert.deepEqual(firstInvocation.args.slice(firstInvocation.args.indexOf('--model')), ['--model', 'opus', '--dangerously-skip-permissions', '--model', 'haiku', '--effort', 'high', '--', 'haiku task']);
 
   assert.equal(workers.handleHook(worker.id, firstInvocation.env.hookToken!, 'SessionStart', { session_id: 'claude-model-1' }), true);
   await waitFor(() => workers.get(worker.id)?.status, (status) => status === 'exited');
@@ -522,7 +522,7 @@ test('a worker hired on Fable launches with --model fable and keeps it across a 
   if (typeof worker === 'string') return;
   const records = await waitFor(() => f.read(), (rs) => rs.some((r) => r.kind === 'claude' && !r.args.includes('--output-format')));
   const launch = records.find((r) => r.kind === 'claude' && !r.args.includes('--output-format'))!;
-  assert.deepEqual(launch.args.slice(launch.args.indexOf('--model')), ['--model', 'opus', '--model', 'fable', '--', 'fable task']);
+  assert.deepEqual(launch.args.slice(launch.args.indexOf('--model')), ['--model', 'opus', '--dangerously-skip-permissions', '--model', 'fable', '--', 'fable task']);
 
   workers.shutdown();
   const restored = manager(f, f.claude, [], ['--model', 'opus']);
@@ -616,7 +616,7 @@ test('OpenCode usage snapshots replace totals, persist across restart, and never
 });
 
 
-test('Codex workers preserve native approvals, follow authenticated root hooks, and resume their provider session', async (t) => {
+test('Codex workers bypass approvals, follow authenticated root hooks, and resume their provider session', async (t) => {
   const f = fixture();
   isolateProviderEnvironment(f, t);
   const oldLog = process.env.FAKE_AGENT_LOG;
@@ -636,7 +636,9 @@ test('Codex workers preserve native approvals, follow authenticated root hooks, 
   assert.ok(first.args.some((a) => a.startsWith('mcp_servers.agent-office.args=') && a.includes('office-workers.js')));
   assert.ok(first.args.includes('mcp_servers.agent-office.env_vars=["AGENT_OFFICE_HOOK_URL","AGENT_OFFICE_WORKER_ID","AGENT_OFFICE_HOOK_TOKEN"]'));
   assert.deepEqual(first.args.slice(-2), ['--', '- fix the login']);
-  assert.equal(first.args.some(a => /bypass|--yolo|--claude-only|--settings/.test(a)), false);
+  assert.ok(first.args.includes('--dangerously-bypass-approvals-and-sandbox'));
+  assert.ok(first.args.includes('--dangerously-bypass-hook-trust'));
+  assert.equal(first.args.some(a => /--yolo|--claude-only|--settings/.test(a)), false);
   assert.equal(first.args.filter(a => a.startsWith('hooks.')).length, 7);
   assert.equal(calls.some(r => r.kind === 'claude'), false);
   const hook = (event: string, extra = {}) => workers.handleCodexHook(worker.id, token, event, { session_id: 'codex-root', ...extra });

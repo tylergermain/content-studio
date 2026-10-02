@@ -271,10 +271,10 @@ test('in a git project the output is committed on the meeting branch, which outl
 test('Pi meetings retain the chosen model and thinking level for every seat', (t) => {
   const f = fixture({ officeDefault: { provider: 'claude', model: 'sonnet' } });
   t.after(() => f.close());
-  assert.equal(f.start({ provider: 'pi', model: 'openai/gpt-4.1', effort: 'high' }), undefined);
-  assert.deepEqual(f.workers.map((w) => [w.provider, w.model, w.effort]), Array(3).fill(['pi', 'openai/gpt-4.1', 'high']));
+  assert.equal(f.start({ provider: 'pi', model: 'studio-local/qwen3.8-flash-next', effort: 'high' }), undefined);
+  assert.deepEqual(f.workers.map((w) => [w.provider, w.model, w.effort]), Array(3).fill(['pi', 'studio-local/qwen3.8-flash-next', 'high']));
   const meeting = f.room.state().current!;
-  assert.deepEqual([meeting.provider, meeting.model, meeting.effort], ['pi', 'openai/gpt-4.1', 'high']);
+  assert.deepEqual([meeting.provider, meeting.model, meeting.effort], ['pi', 'studio-local/qwen3.8-flash-next', 'high']);
 });
 
 test('Cursor meetings retain the chosen model for every seat, and leave out an effort it has no flag for', (t) => {

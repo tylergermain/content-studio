@@ -1,3 +1,4 @@
+import { studioPermissionArgs } from './studio-launch.js';
 // Codex: its native lifecycle hooks (see ../codex.ts), set on its command line, report on
 // /hooks/codex; its usage is read from the root session's rollout (see codex-usage.ts).
 import { homedir } from 'node:os';
@@ -92,7 +93,7 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
   prepare: ({ dataDir, mcpScript }) => ({ hook: writeCodexHook(dataDir), mcpScript }),
   launch({ h, args, prompt, resumeSessionId, setup }) {
     // Resumed too: Codex resumes on whatever its config says now, not on the model the session ran on.
-    args = codexModelArgs(args, h.info.model, h.info.effort);
+    args = codexModelArgs(studioPermissionArgs('codex', args), h.info.model, h.info.effort);
     args.push(...codexHookArgs(setup.hook), ...(setup.mcpScript ? codexMcpArgs(setup.mcpScript) : []), '--no-alt-screen');
     if (resumeSessionId) args.push('resume', resumeSessionId);
     if (prompt) args.push('--', prompt);

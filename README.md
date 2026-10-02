@@ -1,5 +1,9 @@
 # Content Studio
 
+Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for new workers, queue tasks, meetings, and the office default. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` and trusts the office hooks. Pi uses its normal unrestricted tools with `--approve` for project trust. These defaults apply to fresh and resumed launches. Restart existing workers to apply them.
+
+Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.
+
 Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a visual office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
 
 Open **Menu → Office builder**, or press **B**, on an office floor as an admin. Drag desks on the floor plan, rotate them, change their signs, and expand the back office. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
