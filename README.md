@@ -404,3 +404,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 [MIT](LICENSE)
 
 Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
+
+Worker chat adapts to smaller windows with Updates and Content preview views, keeping the composer accessible without scrolling through the preview.
