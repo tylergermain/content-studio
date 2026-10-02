@@ -5,7 +5,6 @@
  * says about where you are: the project in the corner and the tab's title, the upgrade banner, and the
  * sign-ins a newcomer is greeted with.
  */
-import { OFFICE_PLAN } from '../../shared/maps';
 import { SLAB, inElevator } from '../../shared/layout';
 import { ROOF, ROOF_NAME } from '../../shared/rooftop';
 import { renderTitle } from '../shared/title';
@@ -26,7 +25,7 @@ import type { CoreState } from './ctx';
 import { builtFloors, pastTheWing } from './floors';
 import type { Parts } from './parts';
 
-export type ArrivalParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'maps' | 'views' | 'cards' | 'hoops' | 'bar' | 'golf' | 'bargames' | 'cars' | 'focus'>;
+export type ArrivalParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'views' | 'cards' | 'hoops' | 'bar' | 'golf' | 'bargames' | 'cars' | 'focus'>;
 
 /**
  * Registers arriving's messages and the routers (see the order below), and what follows the upgrade,
@@ -34,7 +33,6 @@ export type ArrivalParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'maps' | 
  */
 export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
   const { net, voice, player } = ctx;
-  const { inOffice, plan } = parts.worlds;
   const { placeAt, placeInCar } = parts.place;
 
   /** Whether the next welcome is this page's first (it puts you back where you were last time). */
@@ -70,7 +68,7 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
   ctx.messages.onAny(routeElevatorMessage);
   ctx.messages.onAny((msg) => routeWhiteboardMessage(msg, net));
   ctx.messages.on('welcome', (msg) => {
-    const { travel, maps } = parts;
+    const { travel } = parts;
     // A few pings, to line this page's clock up with the office's for the jukebox.
     for (let i = 0; i < 5; i++) setTimeout(() => net.send({ t: 'ping', at: performance.now() }), 200 + i * 500);
     const mine = store.peers.get(store.you);
@@ -79,13 +77,8 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
       // Where the office put you: back in the spot you left (if there's still room there), or in the elevator car.
       travel.setPlace();
       travel.syncStack();
-      // Back to where you were, if that was on this map (and not in the elevator: that's arriving).
-      const saved = lastSpot();
-      const sameMap = !!saved && (saved.map ?? OFFICE_PLAN.id) === plan().id;
-      // A hall of its own has nothing outside it to come back to (and its walls may have moved since).
-      const b = plan().bounds;
-      const inRoom = inOffice() || (mine.x > b.minX + 0.3 && mine.x < b.maxX - 0.3 && mine.z > b.minZ + 0.3 && mine.z < b.maxZ - 0.3);
-      if (sameMap && inRoom && !(inOffice() && (inElevator(mine.x, mine.z) || pastTheWing(mine, parts.worlds.officeWing()))) && player.fits(mine.x, mine.z, mine.y)) {
+      // Back to where you were (not in the elevator: that's arriving).
+      if (lastSpot() && !inElevator(mine.x, mine.z) && !pastTheWing(mine, parts.worlds.officeWing()) && player.fits(mine.x, mine.z, mine.y)) {
         placeAt(mine);
         travel.arrive('back');
       } else {
@@ -101,7 +94,6 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
       travel.arrive();
       floorWentWhileAway(wasOn);
     } else if (!store.floor) travel.arrive();
-    maps.offTheRoof();
     if (voice.inVoice || voice.sharing) net.send({ t: 'voice', voice: voice.inVoice, muted: voice.muted, sharing: voice.sharing });
     if (player.seat) net.send({ t: 'sit', seat: player.seat.key });
     const carrying = core.carrying;
@@ -142,15 +134,6 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
     if (parts.hoops.holding()) toast('🏀 The ball stayed behind, back under the other floor’s hoop');
     parts.hoops.ballNews(false);
     travel.arrive();
-    // Down off a roof that isn't there any more, or the map changed on the way: where you come in on this map.
-    const { pending } = travel;
-    if (pending.offRoof || pending.placeOnArrival) {
-      pending.offRoof = false;
-      pending.placeOnArrival = false;
-      placeInCar();
-      travel.lift()?.setOpen(true);
-    }
-    parts.maps.offTheRoof();
   });
   ctx.messages.on('signins', () => {
     // Someone who just joined starts here: their workers need their own Claude sign-in first.

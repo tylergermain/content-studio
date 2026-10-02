@@ -119,7 +119,7 @@ export function installClimbing(ctx: Ctx, deps: ClimbingDeps) {
   ctx.ticks.add('moved', () => {
     const player = ctx.player;
     // Walked into a pole's hole: you grab the pole on your way down it.
-    const hole = ctx.inOffice() && office.stack.polesGoDown() ? office.stack.poles().find((s) => Math.hypot(player.pos.x - s.x, player.pos.z - s.z) < POLE.hole - 0.15) : undefined;
+    const hole = office.stack.polesGoDown() ? office.stack.poles().find((s) => Math.hypot(player.pos.x - s.x, player.pos.z - s.z) < POLE.hole - 0.15) : undefined;
     if (hole && !climber.active && !ctx.trip() && !player.seat && player.enabled && player.pos.y > -1.35 && player.pos.y < 0.6) climber.slide(hole);
   });
 

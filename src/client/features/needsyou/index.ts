@@ -17,7 +17,7 @@ import { Beacon } from './world';
 /** How close (m) the beacon's light is gone altogether, and how far off it's at its brightest. */
 const NEAR = 3;
 const FAR = 6.5;
-/** How far under the floor a worker on its feet is put, so its feet rest on it (as FEET in world/court.ts). */
+/** How far under the floor a worker on its feet is put, so its feet rest on it (as FEET in features/workers/leaving.ts). */
 const FEET = 0.07;
 
 /** Follows the workers for the banner, the flash and the alarm, and registers the beacons' tick ('others', after the workers' own). */
@@ -89,7 +89,7 @@ export function installNeedsYou(ctx: Ctx, parts: Pick<Parts, 'views' | 'waiting'
       b.root.visible = !!root && inView(root, scene);
       if (!root || !b.root.visible) continue;
       root.getWorldPosition(at);
-      // In its seat, the floor is the one its desk stands on; up and about (the castle), the one under its feet.
+      // In its seat, the floor is the one its desk stands on; walking in to a meeting, the one under its feet.
       const desk = ctx.world().desks.get(v.deskId);
       const floor = desk && root.parent === desk.seatAnchor ? desk.group.getWorldPosition(ground).y : at.y + FEET;
       const d = Math.hypot(at.x - player.pos.x, at.z - player.pos.z);

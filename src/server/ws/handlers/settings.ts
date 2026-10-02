@@ -1,35 +1,16 @@
-// ⚙️ Settings: team notifications, the worker limit, upgrades, the holiday theme, the building's map,
-// the office's prompts and default worker, and whether merged workers go home by themselves.
+// ⚙️ Settings: team notifications, the worker limit, upgrades, the holiday theme, the office's prompts
+// and default worker, and whether merged workers go home by themselves.
 import path from 'node:path';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { MAX_WORKER_LIMIT, parseWorkerLimit } from '../../machine.js';
-import { OFFICE_MAP } from '../../../shared/maps/index.js';
 import { isThemePick } from '../../../shared/theme.js';
 import { PROMPTS, PROMPT_MAX, isPromptId } from '../../../shared/prompts.js';
 import type { SettingsClientMsg } from '../../../shared/protocol.js';
-import type { Ctx } from '../../office/context.js';
 import { str } from '../../office/input.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
 /** The floor's Services board: its own workers' web servers. */
 export const servicesView: ViewPieces['services'] = (ctx, floor) => ctx.servicesState(floor);
-
-/**
- * Tells everyone about the maps, after a pick or a read of the folder. When the map everyone's on
- * changed (`was` before), everyone's off their seats (each browser forgets them too, see the
- * client's 'map'), and hears what it is now: `who` picked it, or a map of your own broke or came back.
- */
-export const mapNews = (ctx: Ctx, was: string, who?: string) => {
-  const { maps } = ctx;
-  const now = maps.pick();
-  if (now !== was) for (const other of ctx.clients.values()) delete other.peer.seat;
-  ctx.broadcast({ t: 'map', state: maps.state() });
-  if (now === was) return;
-  const plan = maps.plan();
-  // Without a pick, a map of your own broke (back to the office) or was fixed (back to it).
-  const why = now === OFFICE_MAP ? `: the map "${was}" won't load (see ⚙️ Settings)` : ': it loads again';
-  ctx.toastAll(who ? `${who} changed the building's map to ${plan.icon} ${plan.name}` : `The building's map is ${plan.icon} ${plan.name} now${why}`);
-};
 
 export const settingsHandlers = {
   'notify.webhook'(ctx, c, msg) {
@@ -77,18 +58,6 @@ export const settingsHandlers = {
           ? `${who} took the holiday decorations down`
           : `📅 ${who} set the decorations to follow the calendar${now ? " (it's Christmas 🎄 season)" : ''}`,
     );
-  },
-  'map.set'(ctx, c, msg) {
-    const who = c.peer.name;
-    // Someone opened the list, or picked a map: either way the folder of maps of your own is read again first.
-    const was = ctx.maps.pick();
-    const reloaded = ctx.maps.reload();
-    if (msg.map === undefined || !ctx.maps.set(str(msg.map, 64), who)) {
-      if (reloaded) mapNews(ctx, was);
-      if (msg.map !== undefined) ctx.warn(c, 'There’s no map by that name, or it won’t load: see ⚙️ Settings');
-      return;
-    }
-    mapNews(ctx, was, who);
   },
   'leaveOnMerge.set'(ctx, c, msg) {
     const who = c.peer.name;

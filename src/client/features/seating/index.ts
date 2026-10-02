@@ -1,5 +1,5 @@
 /**
- * Sitting down: on a chair, a stool, the couch, the throne. Sitting there already, E gets you up, or
+ * Sitting down: on a chair, a stool, the couch. Sitting there already, E gets you up, or
  * does what the seat's for (the TV from the couch, the bar's menu, and at the boss's desk whatever
  * features/boss-desk says: the desk's menu from the boss's chair, the call from a guest's).
  */

@@ -26,7 +26,7 @@ export function startRoomTone(a: AudioCore) {
   swell.start();
 }
 
-/** The kitchen's fridge, humming away (not in a castle). */
+/** The kitchen's fridge, humming away. */
 export class Fridge {
   private fridge: { gain: GainNode; on: boolean; next: number } | null = null;
 
@@ -57,13 +57,6 @@ export class Fridge {
   tickFridge(now: number) {
     const f = this.fridge;
     if (!f || now < f.next) return;
-    // No fridge in a castle: it goes quiet, and doesn't clunk.
-    if (this.a.hall) {
-      f.on = false;
-      f.gain.gain.setTargetAtTime(0, now, 0.3);
-      f.next = now + 20;
-      return;
-    }
     f.on = !f.on;
     f.gain.gain.setTargetAtTime(f.on ? 0.06 : 0, now, f.on ? 0.6 : 0.3);
     f.next = now + (f.on ? rand(25, 50) : rand(20, 45));

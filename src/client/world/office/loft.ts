@@ -225,7 +225,7 @@ export function buildLoft(looks: Looks): Loft {
 
 declare module '../types' {
   interface OfficeHandles {
-    /** The monitor on the boss's desk upstairs, where Minesweeper plays (features/arcade/ui.ts). */
+    /** The monitor on the boss's desk upstairs, where the arcade's games play (features/arcade/ui.ts). */
     bossScreen: THREE.Mesh;
   }
 }

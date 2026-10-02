@@ -22,9 +22,9 @@ import { Dj, hiccup, pour } from '../features/bar/sound';
 import { carDoor, crash, honk, Motors, type Engine } from '../features/cars/sound';
 import { bonk, hatch, poleLanding, rung, slide, twirl } from '../features/climbing/sound';
 import { coffee } from '../features/coffee/sound';
-import { AudioCore, type Hall, type Listener } from './core';
+import { AudioCore, type Listener } from './core';
 import { bark, yip } from '../features/dog/sound';
-import { cellDoor, thud } from '../features/workers/sound';
+import { bleat } from '../features/goat/sound';
 import { golf, type GolfSound } from '../features/golf/sound';
 import { gong } from '../features/gong/sound';
 import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
@@ -123,11 +123,6 @@ export class OfficeSound {
     this.a.update(l);
   }
 
-  /** On a map of its own, `hall` (see Hall); null back in the office. */
-  setHall(hall: Hall | null) {
-    this.a.hall = hall;
-  }
-
   /** Up on the roof (true), or inside on a floor: the office's hum gives way to the wind and the city. */
   setOutdoors(on: boolean) {
     this.a.setOutdoors(on);
@@ -167,7 +162,7 @@ export class OfficeSound {
     this.feet.stepAt({ x, y, z }, pace);
   }
 
-  // ---- The ladder, the fire poles and the dungeon (features/climbing, features/workers) ------------
+  // ---- The ladder and the fire poles (features/climbing) ------------------------------------------
 
   rung(soft = false) {
     rung(this.a, soft);
@@ -175,14 +170,6 @@ export class OfficeSound {
 
   hatch(at: Pos, open: boolean) {
     hatch(this.a, at, open);
-  }
-
-  cellDoor(at: Pos, open: boolean) {
-    cellDoor(this.a, at, open);
-  }
-
-  thud(at: Pos) {
-    thud(this.a, at);
   }
 
   bonk() {
@@ -254,6 +241,10 @@ export class OfficeSound {
 
   yip(x: number, z: number) {
     yip(this.a, x, z);
+  }
+
+  bleat(x: number, z: number) {
+    bleat(this.a, x, z);
   }
 
   thunder(delay: number, loud: number) {

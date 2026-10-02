@@ -257,7 +257,7 @@ body.telescope-active #hud { visibility: hidden; }
    features/arcade/ui.ts) under Node, couldn't import a stylesheet. They can now (tests/support/css.mjs
    hands them an empty one), so these can move next to their modules, minding the order they'd load
    in (see the end of styles/base.css). */
-/* Minesweeper on the boss's monitor (features/arcade/ui.ts): the office stays in view around the game, which sits right over the screen. */
+/* A game on the boss's monitor or the cabinet (features/arcade/board.ts): the office stays in view around the game, which sits right over the screen. */
 .backdrop.clear { background: none; padding: 0; animation: none; }
 /* The game would cut through the HUD's panels, so they step aside while you play. */
 #app:has(.backdrop.clear) :is(.topbar, .side, .chat) { visibility: hidden; }
@@ -268,6 +268,5 @@ body.telescope-active #hud { visibility: hidden; }
 .arcade-bar .tip { color: var(--muted); font-size: 12px; }
 /* Its ✕ hangs off the screen's top right corner rather than over the game. */
 .arcade > .close.corner { top: 0; right: auto; left: calc(100% + 10px); }
-/* The arcade cabinet in the lounge (features/cabinet/ui.ts) plays on the keyboard, and says so over the game when a worker of yours needs input. */
-.arcade.cabinet canvas { cursor: default; }
+/* The arcade cabinet in the lounge (features/cabinet/ui.ts) says so over the game when a worker of yours needs input. */
 .cabinet-call { position: absolute; bottom: calc(100% + 10px); left: 50%; translate: -50% 0; display: flex; align-items: center; gap: 10px; white-space: nowrap; padding: 6px 6px 6px 14px; background: var(--warn); color: var(--ink); border-radius: var(--r-lg); box-shadow: var(--shadow-3); font-weight: 600; font-size: 15px; animation: pop .24s var(--ease); }

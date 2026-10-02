@@ -10,7 +10,9 @@ Open **Menu → Office builder**, or press **U**, on an office floor as an admin
 
 The catalog also has what a studio needs: walls, glass and wood slat panels to divide a floor into rooms, a long table, a podcast desk, softboxes, a camera and a backdrop, more plants, video screens that loop the videos in a floor's `.agent-office/media` folder or play the newest videos from the YouTube channels the floor watches (through YouTube's own player), a stock ticker and a market board for live prices, and things to play with (a trampoline, a punching bag, ping-pong, foosball, a prize wheel). Each floor chooses whether it has the mezzanine and whether its balcony has one driving tee or two. A floor can be a folder rather than a repository, with wall boards and kiosk agents of its own (*Newsroom*, a Slack feed, Metricool).
 
-Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, and the back office. Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
+The building has one goat, Marc, on its bottom floor beside that floor's dog: he grazes on the plants, nibbles the rugs and gets the zoomies, and **E** pets him, after which he follows you about for a minute. The lounge's arcade cabinet and the boss's monitor play the same four games (Minesweeper, Blockfall, 2048 and Snake) against one high-score table per game for the whole building. See [Features](docs/features.md).
+
+Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, the back office, and which floor Marc lives on (he follows only an admin into the elevator). Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
 
 The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
 
@@ -60,9 +62,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Together.** Voice, chat, screen sharing on the lounge TV, a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
 - **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
-- **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
-
-There's a lot more (a rooftop bar, an office dog, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
+There's a lot more (a rooftop bar, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
 
 ## Requirements
 
@@ -403,7 +403,6 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Features](docs/features.md): everything in the office, room by room
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
-- [Maps](docs/maps.md): the castle, and making a map of your own
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself
 - [AWS reference](docs/aws.md): Tailscale, service tunnels, upgrades, and everything `deploy/aws.sh` does
 - [Railway reference](docs/railway.md): what `deploy/railway.sh` sets up, and what the volume keeps

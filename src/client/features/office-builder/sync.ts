@@ -79,7 +79,7 @@ export function createLayoutSync(ctx: Ctx) {
    * goes, you're down on the floor.
    */
   function settle() {
-    if (!ctx.inOffice() || ctx.upTop()) return;
+    if (ctx.upTop()) return;
     const flat = !office.room.get().loft;
     const fell = loftWent && flat;
     loftWent = false;

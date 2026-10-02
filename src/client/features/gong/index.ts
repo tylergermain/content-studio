@@ -10,7 +10,6 @@ import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store, workerForPull } from '../../state';
 import type { Stage, Worker } from '../../world/character';
 import type { Area } from '../../world/confetti';
-import type { Court } from '../../world/court';
 import type { DeskView } from '../../world/types';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
@@ -25,9 +24,7 @@ export interface GongDeps {
   burstOver(deskId: string, n: number): void;
   /** The workers on this floor, as they're drawn at their desks. */
   workerViews: ReadonlyMap<string, { deskId: string; model: Worker }>;
-  /** On a castle-style map, its workers walking between their seats and the line for the throne (see Court). */
-  court(): Court | null;
-  /** The board agents waiting by their boards on this map. */
+  /** The board agents waiting by their boards. */
   idleAgents(): readonly { model: Worker; view: DeskView }[];
 }
 
@@ -62,13 +59,10 @@ export function installGong(ctx: Ctx, deps: GongDeps) {
 
   /** A pull request merged: every worker awake on the floor gets up on its desk and dances. */
   function danceParty() {
-    const court = deps.court();
     for (const [id, v] of deps.workerViews) {
       const desk = ctx.world().desks.get(v.deskId);
       if (!desk || isAsleep(store.workers.get(id)?.status ?? 'offline')) continue;
-      // Up and about, away from its desk: a jump for joy where it stands.
-      if (court?.away(id)) v.model.cheer(4);
-      else v.model.dance(stageOf(desk, v.model));
+      v.model.dance(stageOf(desk, v.model));
     }
     // The board agents still waiting to be asked, too.
     for (const a of deps.idleAgents()) if (a.view.vacancy.visible) a.model.dance(stageOf(a.view, a.model));

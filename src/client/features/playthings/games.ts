@@ -243,7 +243,7 @@ export function pingPong(ctx: Ctx): Toy {
     const r = rally;
     if (!r) return;
     const p = ctx.player;
-    if (ctx.trip() || p.seat || ctx.upTop() || !ctx.inOffice() || !r.view.group.parent || r.view.away || p.holding(...WALK)) return stop();
+    if (ctx.trip() || p.seat || ctx.upTop() || !r.view.group.parent || r.view.away || p.holding(...WALK)) return stop();
     const top = kindDef(r.view.piece.kind).top;
     r.swung += dt;
     if (r.serve > 0) {

@@ -190,7 +190,7 @@ export function installBossDesk(ctx: Ctx, deps: BossDeskDeps): { seat(seatId: st
   }
 
   ctx.ticks.add('me', () => {
-    const there = ctx.inOffice() && !ctx.upTop() && hasBossDesk(ctx.office.room.get());
+    const there = !ctx.upTop() && hasBossDesk(ctx.office.room.get());
     at = there ? deskPeople(everyone()) : { boss: null, guests: [] };
     const key = callKey(at.guests);
     if (key !== guests) {

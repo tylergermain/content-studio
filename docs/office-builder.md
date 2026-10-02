@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-Open **Menu → Office builder**, or press **U**, on an office floor. Building is for admins: the menu item and the key are only there for them, and the office refuses a layout saved by anyone else (see [Who can build](#who-can-build)). The castle and other custom maps keep their own layouts.
+Open **Menu → Office builder**, or press **U**, on an office floor. Building is for admins: the menu item and the key are only there for them, and the office refuses a layout saved by anyone else (see [Who can build](#who-can-build)).
 
 The camera goes up over the room with the ceiling off and the walls cut away, and you arrange the floor itself: pick something up, drag it across the floor, and let go. What you do is a draft that only you see until you **Save layout**; closing the builder (✕ or Esc) puts the room back as it's saved, after asking if there are changes to lose.
 
@@ -102,7 +102,7 @@ Nothing needs reloading. The office looks in the folder when you arrive on the f
 - Portrait reels, square video, and anything that would lose more than about 30% to cropping are shown whole in the middle, with a blurred, dimmed copy filling the rest. Nothing is stretched.
 - Screens are silent on the floor. Look at one (or stand in front of it in third person): the hint shows the file's name, and **E** opens it in a window with sound and the browser's controls, starting from where the screen was. ✕ or Esc closes it and puts you back in mouse-look.
 
-Each browser plays its own copy; playback isn't synchronised between people. A screen is paused while it's out of view, while you're on the roof or another map, and while the tab is hidden. Its video is released when the screen is taken away or you leave the floor.
+Each browser plays its own copy; playback isn't synchronised between people. A screen is paused while it's out of view, while you're on the roof, and while the tab is hidden. Its video is released when the screen is taken away or you leave the floor.
 
 ### Channels to watch
 

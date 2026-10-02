@@ -6,6 +6,7 @@ import type { DogState } from '../dog.js';
 import type { Piece } from '../furniture.js';
 import type { DeskLayout } from '../office-builder.js';
 import type { FloorPlan, RoomOptions } from '../floorplan.js';
+import type { GoatState } from './goat.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
@@ -18,7 +19,7 @@ import type { MeetingState } from './meetings.js';
 import type { PeerInfo } from './presence.js';
 import type { QueueState } from './queue.js';
 import type { ServicesState } from './settings.js';
-import type { JailState, WorkerInfo } from './workers.js';
+import type { WorkerInfo } from './workers.js';
 
 export interface ProjectInfo {
   name: string;
@@ -114,6 +115,8 @@ export interface FloorView {
   services: ServicesState;
   /** The floor's dog; null in a building with no floors yet. */
   dog: DogState | null;
+  /** Marc, the building's goat, while he's on this floor; null on every other. */
+  goat: GoatState | null;
   /** What the lounge jukebox is playing. */
   jukebox: JukeboxState;
   /** Who's at the arcade cabinet, what's on its screen, and the building's high scores. */
@@ -126,8 +129,6 @@ export interface FloorView {
   ball: BallState;
   /** The cars in the garage (see CARS in shared/garage.ts): where each one is, and who's in it. */
   cars: CarState[];
-  /** Workers sent home and locked up in the dungeon, on a map that has one. */
-  jail: JailState;
   /** What this floor's wall boards and kiosks are for, when it has made them its own, and what's posted on the boards. */
   studio: StudioState;
   /** The prices on this floor's ticker (none, when it has no ticker). */

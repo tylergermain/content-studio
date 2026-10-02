@@ -72,7 +72,7 @@ export function deskScreens(ctx: Ctx, at: () => { boss: DeskPerson | null }): { 
 
   ctx.ticks.add('world', () => {
     // Off the floor, or on one without the desk: nothing's kept playing on monitors nobody can see (the card stays on them).
-    const there = ctx.inOffice() && !ctx.upTop() && hasBossDesk(office.room.get());
+    const there = !ctx.upTop() && hasBossDesk(office.room.get());
     const now = there ? stream() : null;
     if (live?.stream !== now) {
       if (live) {

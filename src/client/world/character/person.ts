@@ -113,10 +113,6 @@ export class Person {
   /** Dressed up for a holiday (see setCostume): a Santa hat. */
   private costume: Theme | null = null;
   private hat: THREE.Object3D[] = [];
-  /** A hand on someone's shoulder, marching them along (see holdOn). */
-  private gripping = false;
-  /** Something they're saying (see say), and for how many more seconds. */
-  private speech: { sprite: THREE.Sprite; left: number } | null = null;
 
   constructor(
     private name: string,
@@ -323,26 +319,6 @@ export class Person {
     o.traverse((m) => ((m as THREE.Mesh).castShadow = true));
     // Forward is +z, so the character's right arm is the one on -x (see reach).
     (on === 'head' ? this.head : on === 'hand' ? this.armL : on === 'offhand' ? this.armR : this.body).add(o);
-  }
-
-  /** Keeps a hand out in front, on the shoulder of someone they're marching along (or lets go). */
-  holdOn(on: boolean) {
-    this.gripping = on;
-  }
-
-  /** Says something in a bubble over their head for `seconds` (the one before goes). */
-  say(text: string, seconds = 3.5) {
-    this.hush();
-    this.speech = { sprite: textSprite(text, { bg: '#fffaf3', size: 34 }), left: seconds };
-    this.speech.sprite.position.y = this.bubbleY;
-    this.root.add(this.speech.sprite);
-  }
-
-  private hush() {
-    if (!this.speech) return;
-    this.root.remove(this.speech.sprite);
-    disposeSprite(this.speech.sprite);
-    this.speech = null;
   }
 
   /** A mug of coffee in the left hand, or not. */
@@ -646,15 +622,6 @@ export class Person {
       this.armL.rotation.x = THREE.MathUtils.lerp(this.armL.rotation.x, -1.65, reach);
       this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.22, reach);
       if (this.reachT >= REACH_TIME) this.reachT = -1;
-    }
-    if (this.gripping && !this.book && !this.card.held && !this.ball) {
-      // The right arm out and a little down, onto the shoulder of whoever's in front.
-      this.armL.rotation.x = THREE.MathUtils.lerp(this.armL.rotation.x, -1.15, Math.min(1, dt * 10));
-      this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.3, Math.min(1, dt * 10));
-    }
-    if (this.speech) {
-      this.speech.left -= dt;
-      if (this.speech.left <= 0) this.hush();
     }
     // Lean into the reach a little.
     this.body.rotation.x = reach * 0.12;

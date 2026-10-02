@@ -15,7 +15,6 @@ import { Sky } from '../sky.js';
 import { Themes } from '../theme.js';
 import { Feeds } from '../feeds.js';
 import { Watch } from '../watch.js';
-import { Maps } from '../maps.js';
 import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ServiceInfo, ServicesState } from '../../shared/protocol.js';
@@ -47,8 +46,6 @@ export function createServices(ctx: Ctx): BuildingServices {
     studio: (floor) => ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() }),
   });
   watch.start();
-  // What the building looks like inside: the office, the castle, or a map of your own (⚙️ Settings).
-  const maps = new Maps(cfg.dataDir);
   // The prompts the office writes for workers by itself, and the worker everyone starts on (⚙️ Settings).
   const configured = configuredProvider(cfg.agentCmd);
   const prompts = new OfficePrompts(cfg.dataDir, { list: agentProviders(configured), configured }, (state) => ctx.broadcast({ t: 'prompts', state }));
@@ -141,7 +138,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, feeds, watch, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, feeds, watch, themes, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

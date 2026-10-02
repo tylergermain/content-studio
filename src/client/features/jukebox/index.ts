@@ -21,10 +21,9 @@ export interface JukeboxDeps {
 /** The jukebox on your floor, the office's own: what's on, and E to put a song on. */
 export function installJukebox(ctx: Ctx, deps: JukeboxDeps) {
   // The jukebox on your floor: everyone there hears it from the same bar, and its lights say what's on.
-  // It's the office's: on a map of its own there's none to hear.
   function playJukebox() {
     const j = store.jukebox;
-    ctx.sound.setJukebox(j.on && ctx.inOffice() ? { track: j.track, url: j.url, startedAt: j.startedAt, since: j.since } : null);
+    ctx.sound.setJukebox(j.on ? { track: j.track, url: j.url, startedAt: j.startedAt, since: j.since } : null);
     ctx.office.jukebox.show(j.on, trackTitle(j));
   }
   store.on('jukebox', playJukebox);

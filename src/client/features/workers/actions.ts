@@ -41,8 +41,8 @@ export type WorkerActionsParts = Pick<Parts, 'worlds' | 'seating' | 'walking' | 
 
 /** Registers the worktree answer (worker.worktree), and defines what's done at a desk and at a board agent. */
 export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerActionsParts) {
-  const { player, net, me, settings } = ctx;
-  const { plan, inOffice } = parts.worlds;
+  const { player, net, settings } = ctx;
+  const { plan } = parts.worlds;
   const openWorkerTerminal = (id: string) => parts.waiting.openWorkerTerminal(id);
   const openWorkerChanges = (id: string, repo?: string) => parts.waiting.openWorkerChanges(id, repo);
 
@@ -62,7 +62,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return best ?? firstFreeSeat() ?? null;
   }
 
-  /** The first seat nobody's at, in the map's order: the desks (as far as the floor's built out), then the overflow seats. */
+  /** The first seat nobody's at, in the plan's order: the desks (as far as the floor's built out), then the overflow seats. */
   function firstFreeSeat(): string | undefined {
     return [...plan().desks, ...plan().overflow].find((d) => seatBuilt(d.id) && !store.workerAtDesk(d.id))?.id;
   }
@@ -77,8 +77,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return true;
   }
 
-  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: number, repos?: string[], via?: 'herald') {
-    net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined, via });
+  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: number, repos?: string[]) {
+    net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined });
     // The moment notifications start to matter: ask once (it has to come from a key press or click).
     if (settings.notify && notifyPermission() === 'default' && !askedToNotify) {
       askedToNotify = true;
@@ -302,40 +302,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     ctx.activities.stop('driver', 'desk');
     ctx.activities.stopAll('desk');
     parts.walking.stopWalkingTo();
-    // In line for the throne: in front of it, where it stands.
-    const w = store.workerAtDesk(desk.id);
-    const court = parts.worlds.court();
-    const inLine = w && court ? court.spotOf(w.id) : -1;
-    if (inLine >= 0) {
-      // At the front: up on the throne, if it's free, where E is for them.
-      const throne = inLine === 0 && plan().throne ? seating.freePlace(plan().throne!) : null;
-      if (throne) {
-        player.pos.set(throne.x, throne.y, throne.z);
-        player.sit(throne);
-        me.sit(throne.hips);
-        net.send({ t: 'sit', seat: throne.key });
-        player.camYaw = throne.rotY - Math.PI;
-        player.lookPitch = -0.2;
-        return;
-      }
-      // Else beside it in line, turned to it.
-      const at = plan().lineup[inLine];
-      const x = at.x + Math.cos(at.rotY) * 1.3;
-      const z = at.z - Math.sin(at.rotY) * 1.3;
-      player.pos.set(x, parts.worlds.groundHere(x, z, 1.5), z);
-      player.vy = 0;
-      player.facing = Math.atan2(at.x - x, at.z - z);
-      player.camYaw = player.facing - Math.PI;
-      player.lookPitch = -0.2;
-      return;
-    }
-    let spot = deskSeat(desk, desk.station ? -1.6 : desk.beanbag ? 1.6 : 2.4);
-    // On a map of its own, the office's distances can land in a pillar: the nearest open floor to it.
-    const world = ctx.world();
-    if (!inOffice() && (!player.fits(spot.x, spot.z, 0) || !world.nav.walkable(spot.x, spot.z))) {
-      const [x, z] = world.nav.nearestWalkable([spot.x, spot.z]);
-      spot = { x, z };
-    }
+    const spot = deskSeat(desk, desk.station ? -1.6 : desk.beanbag ? 1.6 : 2.4);
     player.pos.set(spot.x, 0, spot.z);
     player.vy = 0;
     player.facing = Math.atan2(desk.x - spot.x, desk.z - spot.z);

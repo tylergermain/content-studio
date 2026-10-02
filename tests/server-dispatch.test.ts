@@ -92,11 +92,11 @@ class Browser {
     this.inbox = [];
   }
 
-  /** The types of the next `n` messages, in the order they came, leaving out the elevator's list and the dog, who goes about its day. */
+  /** The types of the next `n` messages, in the order they came, leaving out the elevator's list, and the dog and the goat, who go about their day. */
   async next(n: number, ms = 5000): Promise<string[]> {
     const until = Date.now() + ms;
     for (;;) {
-      const got = this.inbox.filter((m) => m.t !== 'floors' && m.t !== 'dog');
+      const got = this.inbox.filter((m) => m.t !== 'floors' && m.t !== 'dog' && m.t !== 'goat');
       if (got.length >= n) {
         this.inbox = [];
         return got.slice(0, n).map((m) => m.t);
@@ -146,6 +146,14 @@ before(async () => {
   const claude = path.join(bin, 'claude');
   writeFileSync(claude, '#!/bin/sh\nexit 0\n');
   chmodSync(claude, 0o755);
+
+  // What an office from before there was only the office kept: a map picked for the building, one of
+  // its own to pick, and who was locked up under it. None of it is read any more.
+  const kept = path.join(project, '.agent-office');
+  mkdirSync(path.join(kept, 'maps'), { recursive: true });
+  writeFileSync(path.join(kept, 'map.json'), JSON.stringify({ pick: 'keep', by: 'Ada', at: 1 }));
+  writeFileSync(path.join(kept, 'maps', 'keep.json'), '{ "id": "keep", not json');
+  writeFileSync(path.join(kept, 'jail.json'), JSON.stringify({ prisoners: [{ id: 'w1', name: 'Pixel', color: '#ef476f', at: 1 }], bones: 2 }));
 
   for (const k of Object.keys(process.env)) if (k.startsWith('AGENT_OFFICE_')) delete process.env[k];
   const port = await freePort();
@@ -267,7 +275,9 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-20), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch']);
+  assert.deepEqual(Object.keys(welcome).slice(-20), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'cars', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch']);
+  // It's the office, whatever map the building was on once.
+  assert.ok(!('map' in welcome) && !('jail' in welcome));
 
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');
@@ -394,8 +404,8 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'theme.set', pick: 'off' });
   assert.equal((await a.take('theme')).state.pick, 'off');
   assert.equal(await told('Eve took'), 'Eve took the holiday decorations down');
-  a.send({ t: 'map.set', map: 'nowhere' });
-  await warned('There’s no map by that name, or it won’t load: see ⚙️ Settings');
+  // A page from before the Map setting went can still ask for one: nothing comes of it.
+  a.send({ t: 'map.set', map: 'keep' });
   a.send({ t: 'machine.limit', limit: 0 });
   await warned('The worker limit is a whole number from 1 to 500');
   a.send({ t: 'machine.limit', limit: 3 });

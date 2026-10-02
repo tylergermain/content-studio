@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import type { Theme } from '../../../shared/protocol';
-import { GRIME, beardColor, elfBoot, elfHat, elfWorker, type Beard, type PeasantGarb } from '../costumes';
+import { elfBoot, elfHat, elfWorker } from '../costumes';
 import type { WorkerRig } from './rig';
 
-// Dressing a worker up: for a holiday, and for how worn out it's getting.
+// Dressing a worker up for a holiday.
 
 /**
  * Dresses a worker up for a holiday (an elf for Christmas), or in just its own skin, `color` (null).
@@ -21,24 +21,4 @@ export function dressUp(rig: WorkerRig, theme: Theme | null, color: string, outf
     wear(rig.body, elfWorker(rig.skin));
     for (const f of rig.feet) wear(f, elfBoot());
   }
-}
-
-/** Its beard, `age` (0 to 1) of the way grown out: longer and greyer, with a mustache, brows and bags. */
-export function growBeard(w: Beard, age: number) {
-  w.group.visible = age > 0.02;
-  beardColor(age, w.hair.color);
-  w.chin.scale.set(1.2 * (0.45 + 0.55 * Math.min(1, age * 3)), 0.75 * (0.45 + 0.55 * Math.min(1, age * 3)), 0.45);
-  w.hang.visible = age > 0.08;
-  // It grows from a short beard under the chin down to the floor; the smock bulges, so it leans out a little as it grows.
-  w.hang.scale.set(0.7 + 0.3 * Math.min(1, age * 2), 0.08 + 0.5 * age, 1);
-  w.hang.rotation.x = 0.06 - 0.12 * age;
-  w.mustache.visible = age > 0.05;
-  w.brows.visible = age > 0.45;
-  w.bags.visible = age > 0.6;
-}
-
-/** Its peasant's clothes, `age` of the way worn out: grubbier, and patched. */
-export function wearGarb(garb: PeasantGarb, age: number) {
-  garb.cloth.color.copy(garb.clean).lerp(GRIME, 0.5 * age);
-  for (const p of garb.patches) p.part.visible = age >= p.at;
 }

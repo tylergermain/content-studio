@@ -1,7 +1,8 @@
-import { CLEAR_POINTS, GAME, WELL_COLS, WELL_ROWS, levelFor, scoreText, type CabinetFrame, type HighScore, type PlayState } from '../../../shared/cabinet';
+import { CLEAR_POINTS, WELL_COLS, WELL_ROWS, levelFor, scoreText, type CabinetFrame, type HighScore, type PlayState } from '../../../shared/cabinet';
 
 /**
- * BLOCKFALL, the game on the arcade cabinet (ui.ts): falling blocks with the usual rotation
+ * BLOCKFALL, the arcade cabinet's first game (features/arcade/blockfall.ts is the game the arcade's
+ * hosts play; this is its engine and its picture): falling blocks with the usual rotation
  * and wall kicks, a bag of all seven pieces at a time, hold, a ghost where the piece will land, and a
  * painter that draws the whole screen in fixed 800×600 units from a CabinetFrame, so the player's
  * screen, the cabinet in the office and everyone watching show the same picture.
@@ -304,8 +305,8 @@ export class Blocks {
 
 /** Everything the screen shows. */
 export interface ScreenView {
-  /** The game on it, or null for the high scores with nobody playing. */
-  frame: CabinetFrame | null;
+  /** The game on it. */
+  frame: CabinetFrame;
   /** Who's playing. */
   player?: string;
   scores: readonly HighScore[];
@@ -313,10 +314,8 @@ export interface ScreenView {
   mine?: string;
   /** Said over a paused game: why it's paused. */
   note?: string;
-  /** What to press, under a game that's over (or over the high scores). */
+  /** What to press, under a game that's over. */
   prompt?: string;
-  /** Seconds, for the blinking. */
-  t: number;
 }
 
 const FONT = "Nunito, ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
@@ -336,8 +335,7 @@ export function paintScreen(g: CanvasRenderingContext2D, v: ScreenView) {
   g.fillStyle = bg;
   g.fillRect(0, 0, W, H);
   g.textBaseline = 'middle';
-  if (v.frame) paintGame(g, v.frame, v);
-  else paintAttract(g, v);
+  paintGame(g, v.frame, v);
   // Scan lines, like the tube it would have had.
   g.fillStyle = 'rgba(0, 0, 0, 0.12)';
   for (let y = 0; y < H; y += 4) g.fillRect(0, y, W, 1.5);
@@ -400,36 +398,6 @@ function paintGame(g: CanvasRenderingContext2D, f: CabinetFrame, v: ScreenView) 
     banner(g, 'PAUSED', v.note ?? 'P to carry on', '#4f86f7');
   } else if (f.state === 'over') {
     banner(g, 'GAME OVER', v.prompt ?? scoreText(f.score), '#e63946');
-  }
-}
-
-/** Nobody's playing: the title, the high scores and a blinking "press E". */
-function paintAttract(g: CanvasRenderingContext2D, v: ScreenView) {
-  g.textAlign = 'center';
-  g.font = `900 76px ${FONT}`;
-  // Each letter in a piece's color, glowing.
-  const letters = [...GAME];
-  const widths = letters.map((ch) => g.measureText(ch).width);
-  let x = W / 2 - widths.reduce((a, b) => a + b, 0) / 2;
-  letters.forEach((ch, i) => {
-    g.fillStyle = COLORS[(i % 7) + 1];
-    g.shadowColor = g.fillStyle;
-    g.shadowBlur = 18;
-    g.fillText(ch, x + widths[i] / 2, 74);
-    x += widths[i];
-  });
-  g.shadowBlur = 0;
-  label(g, '🏆 HIGH SCORES', W / 2, 142);
-  if (v.scores.length) table(g, v.scores, W / 2 - 250, 500, 182, 35, 24, v.mine);
-  else {
-    g.fillStyle = DIM;
-    g.font = `800 22px ${FONT}`;
-    g.fillText('No scores yet. Be the first!', W / 2, 300);
-  }
-  if (Math.floor(v.t * 1.6) % 2 === 0) {
-    g.fillStyle = '#ffd166';
-    g.font = `900 30px ${FONT}`;
-    g.fillText(v.prompt ?? 'PRESS E TO PLAY', W / 2, 562);
   }
 }
 

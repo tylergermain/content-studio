@@ -20,7 +20,7 @@ export type PointerParts = Pick<Parts, 'worlds' | 'rooftop' | 'place' | 'you' | 
 /** Listens for the mouse over the canvas, registers the aim tick ('aim'), and takes the player's clicks. */
 export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   const { player, camera, canvas, office } = ctx;
-  const { inOffice, plan } = parts.worlds;
+  const { plan } = parts.worlds;
   const reach = () => parts.you.reach();
 
   let target: Interactable | null = null;
@@ -55,7 +55,7 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   function usable(): (readonly Interactable[])[] {
     const roof = parts.rooftop.roof();
     if (core.upTop && roof) return [roof.interactables];
-    return inOffice() ? [office.interactables, ...ctx.usables.lists()] : [ctx.world().interactables, parts.worlds.court()?.interactables ?? []];
+    return [office.interactables, ...ctx.usables.lists()];
   }
 
   /** `note` is the issue note you're pointing at on the issues board, if any (see aimedNote). */
@@ -87,9 +87,8 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   function aimedAt(ndc: THREE.Vector2, slack = 0): { it: Interactable; near: boolean; hit: THREE.Intersection } | null {
     raycaster.setFromCamera(ndc, camera);
     eye.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
-    // (Workers standing in line in the castle carry their spot's interactable: see Court.)
     const roof = parts.rooftop.roof();
-    for (const hit of raycaster.intersectObjects(core.upTop && roof ? roof.pickables : inOffice() ? [office.group, ...ctx.usables.pickables()] : ctx.world().pickables, true)) {
+    for (const hit of raycaster.intersectObjects(core.upTop && roof ? roof.pickables : [office.group, ...ctx.usables.pickables()], true)) {
       let it: Interactable | undefined;
       let shown = true;
       for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
@@ -102,17 +101,6 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
       return { it, near: hit.point.distanceTo(eye) <= ctx.interactions.reach(it.kind) + slack, hit };
     }
     return null;
-  }
-
-  /**
-   * On the throne, E is for whoever's first in line (or, with nobody waiting, the herald beside you):
-   * what you'd be facing, sat there. Null when you're not on the throne.
-   */
-  function throneTarget(): Interactable | null {
-    const id = plan().throne?.id;
-    if (!id || player.seat?.seatId !== id) return null;
-    const first = parts.worlds.court()?.interactables.find((it) => !it.off);
-    return first ?? ctx.world().herald?.interactable ?? null;
   }
 
   /** The issue whose note on the issues board an aim lands on, or null (bare cork, the frame, anything else). */
@@ -135,10 +123,10 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
     if (modalOpen() || parts.telescope.active || ctx.activities.busy()) target = null;
     else if (firstPerson) {
       const aim = aimedAt(CROSSHAIR);
-      target = aim?.near ? aim.it : (throneTarget() ?? seating.mySeat() ?? (inOffice() ? hoops.ballAtFeet() : null));
+      target = aim?.near ? aim.it : (seating.mySeat() ?? hoops.ballAtFeet());
       if (aim?.near) aimedNote = noteUnder(aim);
     } else {
-      target = throneTarget() ?? seating.mySeat() ?? pickTarget();
+      target = seating.mySeat() ?? pickTarget();
       // By the issues board, the mouse points at the note you'd take.
       if (target?.kind === 'issues' && pointer) {
         const aim = aimedAt(pointer, 2.5);
