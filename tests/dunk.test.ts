@@ -6,6 +6,7 @@ import { HOOP, launch, simulate, throwOk, backboard, type BallHit } from '../src
 test('dunk eligibility requires a jump within reach of the actual rim', () => {
   const near = { x: HOOP.rim.x + 1, y: 0.9, z: HOOP.rim.z };
   assert.ok(canDunk(near, false));
+  assert.ok(canDunk({ ...near, y: 0.25 }, false), 'a quick second Space works during ascent');
   assert.equal(canDunk(near, true), false);
   assert.equal(canDunk({ ...near, y: 0.1 }, false), false);
   assert.equal(canDunk({ ...near, x: HOOP.rim.x + 2 }, false), false);

@@ -439,4 +439,4 @@ Look at an agent and press **Q** for an in-world live voice conversation. They t
 
 Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and content previews, with the raw Terminal available from that workspace.
 
-With the basketball in hand, jump near the hoop and press **F** when the **Dunk!** hint appears to slam it through the net.
+With the basketball in hand, jump near the hoop and press **Space again** when the **Dunk!** hint appears to slam it through the net.

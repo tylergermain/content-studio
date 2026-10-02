@@ -61,7 +61,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
 
   // With the ball in your hands, E winds up a shot (let go to shoot) and Q drops it.
   ctx.keys.add('activity', (e) => {
-    if (e.code === 'KeyF' && dunkReady()) {
+    if (e.code === 'Space' && dunkReady()) {
       e.preventDefault();
       if (!e.repeat) dunk();
       return true;
@@ -136,7 +136,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     else ctx.me.shoot();
   }
 
-  /** F near the rim while airborne: slam it down using the ordinary synchronized throw. */
+  /** A second Space near the rim while airborne: slam it down using the ordinary synchronized throw. */
   function dunk() {
     if (!dunkReady()) return;
     windFrom = 0;
@@ -269,7 +269,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
         h('span.title', {}, '🏀 Ball in hand'),
         streak > 1 ? aside(`🔥 ${streak} in a row`) : '',
         windFrom ? aside('let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
-        dunkReady() ? key('F', 'Dunk!') : aside('Jump near the rim, then F to dunk'),
+        dunkReady() ? key('Space', 'Dunk!') : aside('Jump near the rim, then Space again to dunk'),
         key('Q', 'Drop it'),
       ],
     };
