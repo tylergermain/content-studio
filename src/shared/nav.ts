@@ -4,6 +4,7 @@
 // An office floor built out into the back office (see WING) has more of it to get round: the office's
 // helpers take how many rows it's built out (`wing`), and each level gets a grid of its own.
 
+import { deskRect } from './office-builder.js';
 import { BALCONY, BALCONY_DOOR, BEANBAGS, BOOKSHELF, CABINET, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, GONG, JUKEBOX, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, PARACHUTE, POLE, POLES, ROAD, STAIRS, STATIONS, WHITEBOARD, WING, builtDesks, plantsAt, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 
@@ -42,14 +43,15 @@ export function deskPoint(d: DeskDef, t: number, s: number): Pt {
 }
 
 /** What's in the way on the office floor, built out `wing` rows. The lounge, kitchen and plants are where world/office/room.ts (and world/kitchen.ts) put them. */
-function obstacles(wing: number): Obstacles {
+function obstacles(wing: number, desks = builtDesks(wing)): Obstacles {
   const rects: Rect[] = [];
   const circles: Circle[] = [];
   const hw = DESK_SIZE.width / 2;
   const hd = DESK_SIZE.depth / 2;
-  for (const d of builtDesks(wing)) {
+  for (const d of desks) {
     // Desks face ±z, so their tops are axis-aligned.
-    rects.push([d.x - hw, d.x + hw, d.z - hd, d.z + hd]);
+    const b = deskRect(d);
+    rects.push([b.minX, b.maxX, b.minZ, b.maxZ]);
     const [cx, cz] = deskPoint(d, 0, 0.9);
     circles.push([cx, cz, 0.35]); // the chair
   }
@@ -309,12 +311,14 @@ export const pathLength = (pts: Pt[]) => pts.reduce((n, p, i) => (i ? n + Math.h
 
 /** The office floor downstairs (no stairs, no loft, no elevator), built out `wing` rows, made the first time it's needed. */
 const OFFICE_NAVS: NavGrid[] = [];
-export function officeNav(wing = 0): NavGrid {
+export function clearOfficeNav() { OFFICE_NAVS.length = 0; }
+export function officeNav(wing = 0, desks?: DeskDef[]): NavGrid {
   const level = wingLevel(wing);
   // Through where the north wall was, into the back office: between its walls, short of its back one.
   const on: Floorplan = (x, z, m) =>
     (x > FLOOR.minX + m && x < FLOOR.maxX - m && z > FLOOR.minZ + m && z < FLOOR.maxZ - m) ||
     (level > 0 && x > WING.minX + m && x < WING.maxX - m && z > wingMinZ(level) + m && z < FLOOR.maxZ - m);
+  if (desks) return new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level, desks), on);
   return (OFFICE_NAVS[level] ??= new NavGrid({ ...FLOOR, minZ: wingMinZ(level) }, obstacles(level), on));
 }
 

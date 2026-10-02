@@ -48,4 +48,4 @@ export const planHandlers = {
     planChanged(ctx, floor);
     ctx.toastFloor(floor, `🧱 ${who} walled the back office back up, and ${r.map((id) => DESK_BY_ID.get(id)?.label).join(' and ')} went with it`);
   },
-} satisfies HandlerMap<PlanClientMsg>;
+} satisfies HandlerMap<Exclude<PlanClientMsg, {t: 'floor.layout'}>>;

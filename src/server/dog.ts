@@ -2,7 +2,9 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { DESK_BY_ID, FLOOR, KIOSK, type DeskDef } from '../shared/layout.js';
 import { cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBreed, type DogState } from '../shared/dog.js';
-import { deskPoint, nearestWalkable, route, walkable, type Pt } from '../shared/nav.js';
+import { deskPoint, officeNav, type Pt } from '../shared/nav.js';
+import { layoutDesks, type DeskLayout } from '../shared/office-builder.js';
+import { builtDesks } from '../shared/layout.js';
 import type { PeerInfo, WorkerInfo } from '../shared/protocol.js';
 
 // ---- Its day ------------------------------------------------------------------------------------
@@ -42,6 +44,7 @@ export interface DogEnv {
   send(dog: DogState): void;
   /** How many rows the floor's back office is built out, for getting round its desks too (see WING). */
   wing?(): number;
+  layout?(): DeskLayout;
 }
 
 type Leg = Omit<DogState, 'name' | 'coat' | 'breed' | 'elapsed'> & { start: number };
@@ -195,12 +198,12 @@ export class Dog {
     const pts: Pt[] = [from];
     let start = from;
     // Still under the desk (or on its way in), not just somewhere on the way there.
-    if (this.exit && !walkable(from[0], from[1], this.wing)) {
+    if (this.exit && !this.navigation().walkable(from[0], from[1])) {
       pts.push(this.exit);
       start = this.exit;
     }
     this.exit = undefined;
-    pts.push(...route(start, to, this.wing).slice(1));
+    pts.push(...this.navigation().route(start, to).slice(1));
     if (last) pts.push(last);
     this.go(pts, speed, act, extra);
     return legSeconds(this.leg) * 1000;
@@ -269,7 +272,7 @@ export class Dog {
     let spot: Pt = at;
     for (let i = 0; i < 30; i++) {
       const p: Pt = [rand(FLOOR.minX + 1, FLOOR.maxX - 1), rand(FLOOR.minZ + 1, FLOOR.maxZ - 1)];
-      if (walkable(p[0], p[1], this.wing) && dist(p, at) > 4) {
+      if (this.navigation().walkable(p[0], p[1]) && dist(p, at) > 4) {
         spot = p;
         break;
       }
@@ -279,12 +282,27 @@ export class Dog {
   }
 
   /** Curls up under a busy worker's desk, at its feet. */
+  private navKey = '';
+  private navGrid?: ReturnType<typeof officeNav>;
+  private navigation() {
+    const layout = this.env.layout?.() ?? {};
+    const key = JSON.stringify([this.wing, layout]);
+    if (key !== this.navKey || !this.navGrid) {
+      this.navKey = key;
+      this.navGrid = officeNav(this.wing, [...layoutDesks(layout), ...builtDesks(this.wing).filter(d => d.wing)]);
+    }
+    return this.navGrid;
+  }
+  private desk(id: string): DeskDef {
+    return layoutDesks(this.env.layout?.()).find(d => d.id === id) ?? DESK_BY_ID.get(id)!;
+  }
+
   private nap(w: WorkerInfo) {
-    const desk = DESK_BY_ID.get(w.deskId)!;
+    const desk = this.desk(w.deskId);
     this.mode = 'nap';
     let side = this.sideOf(desk);
     // A bean bag has no desk to get under, so it curls up beside it, on whichever side has room.
-    if (desk.beanbag && !walkable(...deskPoint(desk, side * 1.05, 0.1), this.wing)) side = -side;
+    if (desk.beanbag && !this.navigation().walkable(...deskPoint(desk, side * 1.05, 0.1))) side = -side;
     const approach = desk.beanbag ? deskPoint(desk, side * 1.3, 1.2) : deskPoint(desk, side * 0.8, 1.3);
     const under = desk.beanbag ? deskPoint(desk, side * 1.05, 0.1) : deskPoint(desk, side * 0.45, 0.15);
     // Head out toward the chair.
@@ -309,7 +327,7 @@ export class Dog {
       return this.think();
     }
     const person: Pt = [p.x, p.z];
-    const behind = nearestWalkable([p.x - Math.sin(p.rotY) * 1.1, p.z - Math.cos(p.rotY) * 1.1], this.wing);
+    const behind = this.navigation().nearestWalkable([p.x - Math.sin(p.rotY) * 1.1, p.z - Math.cos(p.rotY) * 1.1]);
     const end = this.leg.path[this.leg.path.length - 1];
     const along = this.leg.act === 'sit' && this.leg.following === p.id;
     // Someone standing still who just turns around doesn't need it circling round behind them.
@@ -324,7 +342,7 @@ export class Dog {
 
   /** Runs to the desk of a worker that needs input, and barks at it. */
   private barkAt(w: WorkerInfo) {
-    const desk = DESK_BY_ID.get(w.deskId)!;
+    const desk = this.desk(w.deskId);
     const already = this.mode === 'bark' && this.leg.workerId === w.id;
     this.mode = 'bark';
     this.follow = undefined;

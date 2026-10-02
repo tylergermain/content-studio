@@ -1,5 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
+import { validateLayout, type DeskLayout } from '../shared/office-builder.js';
 import { canLabel, cleanLabel, cleanPlan, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
 import { DESK_BY_ID, WING } from '../shared/layout.js';
 
@@ -17,7 +18,7 @@ export class FloorPlanStore {
   }
 
   state(): FloorPlan {
-    return { wing: this.plan.wing, labels: { ...this.plan.labels } };
+    return { ...this.plan, labels: { ...this.plan.labels }, ...(this.plan.desks ? { desks: structuredClone(this.plan.desks) } : {}) };
   }
 
   get wing(): number {
@@ -58,6 +59,21 @@ export class FloorPlanStore {
     this.plan.wing--;
     this.save();
     return desks.map((d) => d.id);
+  }
+
+  layout(raw: unknown, revision: number, taken: (id: string) => boolean): string | undefined {
+    if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reopen the builder to load it';
+    const desks = validateLayout(raw);
+    if (typeof desks === 'string') return desks;
+    const before = this.plan.desks ?? {};
+    const moved = new Set([...Object.keys(before), ...Object.keys(desks)]);
+    for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
+    const next = { ...this.plan, desks: desks as DeskLayout, layoutRevision: revision + 1 };
+    try {
+      writeFileSync(this.file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 });
+      renameSync(this.file + '.tmp', this.file);
+      this.plan = next;
+    } catch { return 'The layout could not be saved to disk. Your current office is unchanged'; }
   }
 
   private load(): FloorPlan {

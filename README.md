@@ -1,3 +1,13 @@
+# Content Studio
+
+Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a visual office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
+
+Open **Menu → Office builder**, or press **B**, on an office floor as an admin. Drag desks on the floor plan, rotate them, change their signs, and expand the back office. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
+
+The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
+
+---
+
 > [!WARNING]
 > **Work in progress.** Agent Office is built for one person's workflow — mine — and it changes fast as I iterate on it.
 > Expect breaking changes between releases: keys that move, screens that get redrawn, features that come and go

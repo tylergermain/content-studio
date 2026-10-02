@@ -1,6 +1,7 @@
 // A floor's own layout on top of the office everyone shares: the signs hung over its desks, and how
 // far its back office is built out (see WING in layout.ts). Saved by server/floorplan.ts.
 
+import { validateLayout, type DeskLayout } from './office-builder.js';
 import { DESKS, WING, WING_DESKS, wingLevel } from './layout.js';
 
 /** A sign hanging from the ceiling over a desk, naming what it's for ("Operations", "Code cleanup"). */
@@ -13,6 +14,8 @@ export interface DeskLabel {
 }
 
 export interface FloorPlan {
+  desks?: DeskLayout;
+  layoutRevision?: number;
   /** How many rows the back office is built out (0 is just the room), up to WING.rows. */
   wing: number;
   /** Signs by desk id. */
@@ -75,7 +78,8 @@ export function cleanPlan(raw: unknown): FloorPlan {
       labels[id] = { text, color: signColor(s.color), by: typeof s.by === 'string' ? s.by : '?', at: typeof s.at === 'number' ? s.at : 0 };
     }
   }
-  return { wing: wingLevel(r.wing), labels };
+  const desks = validateLayout(r.desks);
+  return { wing: wingLevel(r.wing), labels, ...(typeof desks === "object" ? { desks, layoutRevision: Number.isSafeInteger(r.layoutRevision) && Number(r.layoutRevision) >= 0 ? Number(r.layoutRevision) : 0 } : {}) };
 }
 
 /** The desks a row of the back office brings: `row` from 1. */

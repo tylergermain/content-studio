@@ -16,11 +16,12 @@ export const SIGN = { width: 1.9, height: 0.62, depth: 0.04, y: 3.35, cords: 1.3
 
 const PX = 1024;
 
-/** Each desk's partner, back to back with it across the pair. */
-const PARTNER = new Map<string, string>();
-for (const d of [...DESKS, ...WING_DESKS]) {
-  const p = [...DESKS, ...WING_DESKS].find((e) => e !== d && Math.abs(e.x - d.x) < 0.01 && Math.abs(Math.abs(e.z - d.z) - DESK_SIZE.depth) < 0.01 && Math.abs(Math.cos(e.rotY) + Math.cos(d.rotY)) < 0.01);
-  if (p) PARTNER.set(d.id, p.id);
+/** The current partner across a back-to-back pair, after a layout edit. */
+function partner(id: string): string | undefined {
+  const desks = [...DESKS, ...WING_DESKS];
+  const d = desks.find(d => d.id === id);
+  if (!d) return;
+  return desks.find(e => e !== d && Math.hypot(e.x - d.x + Math.sin(d.rotY) * DESK_SIZE.depth, e.z - d.z + Math.cos(d.rotY) * DESK_SIZE.depth) < 0.02 && Math.abs(Math.cos(e.rotY - d.rotY) + 1) < 0.01)?.id;
 }
 const FONT = (size: number) => `800 ${size}px Nunito, ui-rounded, system-ui, sans-serif`;
 
@@ -143,7 +144,7 @@ export function buildDeskSigns(): DeskSigns {
   };
   /** Whether the sign over `id` says it on its back too: its partner across the pair has no sign of its own there. */
   const twoSided = (id: string, labels: Record<string, DeskLabel>, built: (desk: DeskDef) => boolean) => {
-    const other = PARTNER.get(id);
+    const other = partner(id);
     const desk = other ? DESK_BY_ID.get(other) : undefined;
     return !!desk && built(desk) && !labels[desk.id];
   };

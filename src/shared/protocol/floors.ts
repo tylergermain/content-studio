@@ -3,6 +3,7 @@
 import type { CabinetView } from '../cabinet.js';
 import type { Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
+import type { DeskLayout } from '../office-builder.js';
 import type { FloorPlan } from '../floorplan.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
@@ -149,7 +150,8 @@ export type PlanClientMsg =
   | { t: 'desk.label'; deskId: string; text: string; color?: string }
   /** Knock the back office out another row, with two more desks; or wall its last row back up. */
   | { t: 'floor.expand' }
-  | { t: 'floor.shrink' };
+  | { t: 'floor.shrink' }
+  | { t: 'floor.layout'; desks: DeskLayout; revision: number };
 
 export type FloorServerMsg =
   /** You arrived on another floor: everything on it, replacing the last one's, and where everyone is now. */
