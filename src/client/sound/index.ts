@@ -144,6 +144,10 @@ export class OfficeSound {
   }
 
   /** One of your own footsteps, with your feet at `feet`: `pace` is 0 at a walk, 1 at a run. */
+  setFootsteps(enabled: boolean) {
+    this.feet.enabled = enabled;
+  }
+
   step(feet: Pos, pace = 0) {
     this.feet.step(feet, pace);
   }
