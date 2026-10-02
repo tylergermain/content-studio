@@ -77,8 +77,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     return true;
   }
 
-  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: number, repos?: string[], via?: 'herald') {
-    net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined, via });
+  function hire(deskId: string, prompt?: string, worktree = false, provider?: AgentProvider, model?: string, effort?: AgentEffort, issue?: number, repos?: string[], via?: 'herald', specialist?: string) {
+    net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, repos: repos?.length ? repos : undefined, via, specialist });
     // The moment notifications start to matter: ask once (it has to come from a key press or click).
     if (settings.notify && notifyPermission() === 'default' && !askedToNotify) {
       askedToNotify = true;
@@ -102,9 +102,10 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
         warning: pressureNote(store.machine),
         submitLabel: 'Hire & start',
         providerOption: true,
+      specialistOption: true,
         worktreeOption: !!store.project?.branch,
         repoOptions: repoChoices(),
-        onSubmit: (text, o) => hire(deskId, text, o.worktree, o.provider, o.model, o.effort, undefined, o.repos),
+        onSubmit: (text, o) => hire(deskId, text, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, undefined, o.specialist),
       });
     } else if (w.lost) {
       fixLostWorktree(w);
@@ -138,9 +139,10 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       submitLabel: 'Hire & start',
       allowEmpty: true,
       providerOption: true,
+      specialistOption: true,
       worktreeOption: !!store.project?.branch,
       repoOptions: repoChoices(),
-      onSubmit: (text, o) => hire(deskId, text || undefined, o.worktree, o.provider, o.model, o.effort, undefined, o.repos),
+      onSubmit: (text, o) => hire(deskId, text || undefined, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, undefined, o.specialist),
     });
   }
 

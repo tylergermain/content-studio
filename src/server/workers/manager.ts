@@ -1,3 +1,5 @@
+import { prepareSpecialist, specialistFolder } from '../specialists/profiles.js';
+import { specialistLaunch } from '../specialists/launch.js';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, WorkerKind, WorkerRepo, WorkerStatus } from '../../shared/protocol.js';
@@ -219,8 +221,7 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald'): WorkerInfo | string {
-    // Nobody picked (a board agent, say): the office's default worker, model and effort included.
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald', specialist?: string): WorkerInfo | string {
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
     const modelError = validateWorkerModel(kind, selectedProvider, model);
@@ -247,9 +248,11 @@ export class WorkerManager {
     if (owner && signIn && this.runAs && !this.runAs.claudeReady(owner)) return this.runAs.why(signIn);
     const full = this.capacity?.full();
     if (full) return full;
+    let profile;
+    try { if (specialist) { if(kind !== 'agent' || worktree || meeting || seat.station || repos.length) return 'Specialists use their folder on the main floor'; profile = prepareSpecialist(this.dir,specialist,selectedProvider); } } catch(e) { return e instanceof Error ? e.message : 'Could not prepare specialist'; }
     const used = new Set([...this.workers.values()].map((w) => w.info.name.replace(/ 🐚$/, '')));
     const agent = seat.station && STATION_AGENT[seat.station];
-    const name = agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
+    const name = profile ? `${profile.name}${used.has(profile.name) ? ' '+(this.workers.size+1) : ''}` : agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
     const id = randomBytes(6).toString('hex');
     let wt: WorkerInfo['worktree'] = meeting?.worktree;
     let others: WorkerRepo[] | undefined;
@@ -270,6 +273,7 @@ export class WorkerManager {
       id,
       kind,
       provider: selectedProvider,
+      specialist,
       model: takesModel(selectedProvider) ? model : undefined,
       effort: takesEffort(selectedProvider) ? effort : undefined,
       deskId,
@@ -631,8 +635,6 @@ export class WorkerManager {
     else this.host.stop();
   }
 
-  // ---------------------------------------------------------------------------
-
   private launch(w: Worker, prompt: string | undefined, resumeSessionId: string | undefined) {
     const { info } = w;
     // Its folder was deleted meanwhile: it waits, marked lost, for someone to rebuild it or send it home.
@@ -663,8 +665,8 @@ export class WorkerManager {
     const command = this.command(info);
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
     const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured ? [...this.agentArgs] : [];
-    // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
     const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
+    try { Object.assign(plan,specialistLaunch(plan,info,this.dir)); } catch(e) { this.startFailed(w,e instanceof Error?e.message:'Invalid specialist tools'); return; }
     const { args } = plan;
     if (plan.rotateToken) w.hookToken = randomBytes(16).toString('hex');
     const env = childEnv();
@@ -854,18 +856,16 @@ export class WorkerManager {
     this.emitUpdate(w);
   }
 
-  /** What a worker's terminal runs: the shell, the configured agent command, or another provider's CLI. */
   private command(info: WorkerInfo): string {
     return info.kind === 'shell' ? defaultShell() : providerCommand(info.provider ?? this.defaultProvider, this.agentCmd);
   }
 
-  /** Where a worker works: its worktree, a workspace for a worker across repositories, or the project itself. */
   private cwd(info: WorkerInfo): string {
+    if(info.specialist) return specialistFolder(this.dir,info.specialist);
     const rel = workspaceOf(info);
     return rel ? path.join(this.dir, rel) : this.dir;
   }
 
-  /** Hooks fire in bursts (every tool call); one read a moment later covers the whole burst. */
   private scheduleScan(w: Worker) {
     if (w.scanTimer) return;
     w.scanTimer = setTimeout(() => {
@@ -874,7 +874,6 @@ export class WorkerManager {
     }, 300);
   }
 
-  /** Picks up what the session logged since last time and books the difference. */
   private scanUsage(w: Worker) {
     const usage = w.info.kind === 'agent' ? providerAdapter(w.info.provider)?.usage : undefined;
     if (usage?.scan) {

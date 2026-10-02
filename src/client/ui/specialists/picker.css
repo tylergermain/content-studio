@@ -1,0 +1,7 @@
+.specialist-picker { margin-top:14px; min-width:0; }
+.specialist-picker label { display:grid; gap:6px; font-weight:700; }
+.specialist-picker select,.specialist-picker input,.specialist-picker textarea { width:100%; min-width:0; box-sizing:border-box; }
+.specialist-picker summary { cursor:pointer; font-weight:700; padding:8px 0; }
+.specialist-editor { display:grid; gap:10px; }
+.specialist-buttons { display:flex; gap:8px; flex-wrap:wrap; }
+.specialist-picker .setting-note { margin:7px 0; overflow-wrap:anywhere; }

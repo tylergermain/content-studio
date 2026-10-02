@@ -17,7 +17,7 @@ const artifacts = new Map<string,{at:number;files:ChatArtifact[]}>();
 const starts = new Map<string,number>();
 async function snapshot(floor: Floor, id: string, dataDir: string, admin: boolean): Promise<ChatSnapshot | undefined> {
   const w = floor.workers.sessionContext(id); if (!w || w.info.kind !== 'agent') return;
-  const cwd = floor.workers.owners().find(o => o.workerId === id)?.cwd ?? floor.dir;
+  const cwd = w.info.specialist ? floor.dir : floor.workers.owners().find(o => o.workerId === id)?.cwd ?? floor.dir;
   const ownData = path.join(floor.dir,'.agent-office');
   const messages = await conversation(w,ownData);
   let files = artifacts.get(cwd);
@@ -47,7 +47,7 @@ export const workerChatRoutes = {
         return data ? send(res,200,data) : send(res,400,{error:'Chat is available for agent workers'});
       }
       if (p === '/api/worker-chat/file' && req.method === 'GET') {
-        const cwd = floor.workers.owners().find(o => o.workerId===id)?.cwd ?? floor.dir;
+        const cwd = floor.workers.get(id)?.specialist ? floor.dir : floor.workers.owners().find(o => o.workerId===id)?.cwd ?? floor.dir;
         const file = url.searchParams.get('path') ?? ''; const resolved = await artifactPath(cwd,file);
         if (!resolved) return send(res,404,{error:'No preview is available for this file'});
         const fd = await open(resolved,constants.O_RDONLY | constants.O_NOFOLLOW);
