@@ -132,6 +132,7 @@ export function readHomeRequest(body: unknown): HomeRequest | string {
 
 /** A request to hire a worker, read from its JSON body. */
 export interface HireRequest {
+  specialist?: string;
   prompt: string;
   provider?: AgentProvider;
   model?: string;
@@ -150,6 +151,7 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   if (b.provider !== undefined && (!isAgentProvider(b.provider) || !providers.includes(b.provider))) return `provider is one of ${providers.join(', ')}`;
   if (b.model !== undefined && (typeof b.model !== 'string' || !b.model.trim() || b.model.length > 200)) return 'model is a model name';
   if (b.effort !== undefined && !isAgentEffort(b.effort)) return 'effort is one of low, medium, high, xhigh, max';
+  if (b.specialist !== undefined && (typeof b.specialist !== 'string' || !/^[a-z][a-z0-9-]{0,47}$/.test(b.specialist))) return 'specialist is a saved role ID';
   if (b.worktree !== undefined && typeof b.worktree !== 'boolean') return 'worktree is true or false';
   // Board kiosks and the meeting table seat their own: see station.prompt and meetings.ts.
   const seat = typeof b.desk === 'string' ? DESK_BY_ID.get(b.desk) : undefined;
@@ -157,6 +159,7 @@ export function readHireRequest(body: unknown, providers: AgentProvider[]): Hire
   if (b.issue !== undefined && !(Number.isSafeInteger(b.issue) && (b.issue as number) > 0)) return 'issue is an issue number';
   return {
     prompt,
+    ...(typeof b.specialist === 'string' ? { specialist: b.specialist } : {}),
     ...(b.provider !== undefined ? { provider: b.provider as AgentProvider } : {}),
     ...(typeof b.model === 'string' ? { model: b.model.trim() } : {}),
     ...(b.effort !== undefined ? { effort: b.effort as AgentEffort } : {}),

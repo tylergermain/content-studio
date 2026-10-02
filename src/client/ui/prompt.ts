@@ -91,6 +91,7 @@ export function openPrompt(opts: PromptOptions) {
       ta.focus();
       return;
     }
+    if (specialist && !specialist.valid()) return;
     if (provider && !provider.valid()) return;
     modal.close();
     if (opts.worktreeOption) {

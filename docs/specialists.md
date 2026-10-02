@@ -1,6 +1,6 @@
 # Specialist agents
 
-At an empty desk, choose **Hire**, then select **Video Editor**, **Researcher**, **Designer**, or a saved custom specialist. Choose Claude Code, Codex, or Pi (local) independently of the role. An optional task starts the session immediately. General workers keep their existing behavior.
+At an empty desk, choose **Hire**, then select **Video Editor**, **Researcher**, **Designer**, or a saved custom specialist. Choose Claude Code, Codex, or Pi (local) independently of the role. An optional task starts the session immediately. General workers remain available to admins. Human employee accounts can hire only roles allowed by the org chart.
 
 An admin can expand **Manage specialists** to edit the selected role or create a new one with a name, folder ID, and instructions. Saving creates these files under the floor's project:
 
@@ -39,3 +39,7 @@ The local configuration is excluded by `/agents/*/mcp.local.json` in the floor's
 Pi reads the role instructions and uses its installed tools and extensions. Pi has no built-in MCP client, so a role with additional MCP servers is rejected for Pi until an adapter is implemented. This version does not automatically install adapters.
 
 The Video Editor role supplies editing instructions, not a new video editing engine. It uses installed skills, editing applications, CLI tools and configured MCP services. It preserves original production assets and needs the relevant tools available on the Studio.
+
+## Employee hiring
+
+Human member accounts see only specialists below their assigned org-chart position. Admins manage reporting relationships under **Org chart** in the office menu. See [employee permissions and delegation](org-chart.md). General workers remain available to admins, while employees need an assigned position with specialist roles underneath it.

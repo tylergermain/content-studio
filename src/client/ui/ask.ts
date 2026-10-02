@@ -1,4 +1,5 @@
 import './ask.css';
+import { specialistPicker } from './specialists/picker';
 import type { AgentEffort, AgentProvider, WorkerStatus } from '../../shared/protocol';
 import { h, openModal, STATUS_LABEL } from './dom';
 import { store } from '../state';
@@ -33,7 +34,7 @@ export interface AskOptions {
   /** Other floors' projects a new worker in its own worktree can work in too (see WorkerInfo.repos). */
   repoOptions?: { id: string; name: string }[];
   /** `to` is a worker id, or null for a new worker. */
-  onSubmit(prompt: string, to: string | null, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[]): void;
+  onSubmit(prompt: string, to: string | null, worktree: boolean, provider?: AgentProvider, model?: string, effort?: AgentEffort, repos?: string[], specialist?: string): void;
 }
 
 // Shared with the hire prompt, so the choice sticks either way.
@@ -52,6 +53,7 @@ export function openAsk(opts: AskOptions) {
   const wtRow = h('label.ask-wt', { for: 'ask-wt', title: 'Isolate the new worker on its own branch so parallel workers never collide' }, wtBox, '🌿 Work in its own git worktree & branch');
   const repos = repoPicker(opts.worktreeOption ? opts.repoOptions : undefined, wtBox);
   const provider: ProviderPicker | null = opts.providerOption ? providerPicker(store.project, 'ask-provider') : null;
+  const specialist = opts.newDesk ? specialistPicker(selected=>{wtBox.disabled=selected;if(selected){wtBox.checked=false;wtBox.dispatchEvent(new Event('change'));}if(repos.element)repos.element.style.display=selected?'none':'';}) : null;
   const submit = h('button.btn.primary', { type: 'submit' });
 
   const choices = h('div.seg.ask-to');
@@ -60,6 +62,7 @@ export function openAsk(opts: AskOptions) {
     for (const b of choices.children) b.classList.toggle('on', (b as HTMLElement).dataset.to === (id ?? ''));
     wtRow.classList.toggle('hidden', !!id || !opts.worktreeOption);
     repos.element?.classList.toggle('hidden', !!id);
+    specialist?.element.classList.toggle('hidden',!!id);
     provider?.element.classList.toggle('hidden', !!id);
     submit.textContent = id ? 'Send ✨' : 'Hire & start';
   };
@@ -82,6 +85,7 @@ export function openAsk(opts: AskOptions) {
       h('label', { style: 'margin-top:14px' }, 'Prompt'),
       dictateField(ta),
       provider?.element ?? null,
+      specialist?.element ?? null,
       wtRow,
       repos.element,
     ),
@@ -98,6 +102,7 @@ export function openAsk(opts: AskOptions) {
       ta.focus();
       return;
     }
+    if (!to && specialist && !specialist.valid()) return;
     if (!to && provider && !provider.valid()) return;
     modal.close();
     if (!to && opts.worktreeOption) {
@@ -115,6 +120,7 @@ export function openAsk(opts: AskOptions) {
       !to ? provider?.model() : undefined,
       !to ? provider?.effort() : undefined,
       !to && opts.worktreeOption && wtBox.checked ? repos.value() : undefined,
+      !to ? specialist?.value() : undefined,
     );
   };
   form.addEventListener('submit', (e) => {

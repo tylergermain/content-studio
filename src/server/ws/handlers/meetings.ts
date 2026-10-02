@@ -12,6 +12,7 @@ export const meetingHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (!floor) return;
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Employees must hire an allowed specialist at a desk; automatic general-agent hiring is admin-only');
     if (msg.provider !== undefined && (!isAgentProvider(msg.provider) || !floor.project.agentProviders.includes(msg.provider))) {
       ctx.warn(c, 'Unknown agent provider');
       return;
@@ -34,11 +35,13 @@ export const meetingHandlers = {
     ctx.withSignIn(c, ctx.claudeFor(request.provider ?? floor.workers.officeDefault.provider), () => ctx.withFreshBase(c, floor, () => ctx.warn(c, floor.meetings.start(request, who, c.accountId))));
   },
   'meeting.stop'(ctx, c) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Meeting controls are admin-only');
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.meetings.stop(who));
   },
   'meeting.clear'(ctx, c) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Meeting controls are admin-only');
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.meetings.clear(who));
