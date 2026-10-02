@@ -1,3 +1,4 @@
+import { spotifyPanel } from '../../ui/spotify';
 import './ui.css';
 import { JUKEBOX_TUNES, STREAM, checkStreamUrl, trackTitle, tuneById } from '../../../shared/jukebox';
 import type { Net } from '../../net';
@@ -6,6 +7,7 @@ import { h, openModal, toast } from '../../ui/dom';
 
 /** The jukebox: what's on, the tunes to pick from, skip and stop, and a box for a stream. */
 export function openJukebox(net: Net, openVolume: () => void) {
+  const spotify = spotifyPanel(() => net.send({ t: 'jukebox.stop' }));
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const now = h('div.jb-now');
   const list = h('ul.svc-list');
@@ -19,6 +21,7 @@ export function openJukebox(net: Net, openVolume: () => void) {
     h(
       'div.body',
       {},
+      spotify.element,
       now,
       h('label', { style: 'margin-top:16px' }, 'Put on a tune'),
       list,
@@ -83,7 +86,7 @@ export function openJukebox(net: Net, openVolume: () => void) {
     if (e.key === 'Enter') play();
   });
 
-  const modal = openModal(el, { doing: '🎵 at the jukebox', onClose: store.on('jukebox', render) });
+  const modal = openModal(el, { doing: '🎵 at the jukebox', onClose: (() => { const off = store.on('jukebox', render); return () => { off(); spotify.dispose(); }; })() });
   close.addEventListener('click', () => modal.close());
   volume.addEventListener('click', () => {
     modal.close();

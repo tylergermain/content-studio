@@ -404,3 +404,4 @@ Every change to the app that lands on `main` is published as a GitHub release by
 [MIT](LICENSE)
 
 Footsteps and jump landings are muted by default. Enable them under Settings → Sound & voice → Footsteps; the choice is saved in your browser.
+Spotify Connect controls are available to admins in the jukebox. Configure a Spotify developer app and connect your account there; playback uses your chosen Spotify device and requires Premium. See [Spotify setup](docs/spotify.md).
