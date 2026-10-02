@@ -1,9 +1,13 @@
 import { createHash, randomBytes } from 'node:crypto';
-import { chmodSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 interface Saved { clientId: string; redirect: string; access?: string; refresh?: string; expires?: number }
 const pending = new Map<string, { dir: string; verifier: string; at: number }>();
+export function accountDir(root: string, id: string) {
+  const dir = path.join(root, 'spotify-accounts', createHash('sha256').update(id).digest('hex'));
+  mkdirSync(dir, { recursive: true, mode: 0o700 }); return dir;
+}
 export function load(dir: string): Saved {
   try { return JSON.parse(readFileSync(path.join(dir, 'spotify.json'), 'utf8')); } catch { return { clientId: '', redirect: '' }; }
 }
@@ -37,8 +41,8 @@ async function token(dir: string, params: Record<string, string>) {
 }
 export async function callback(dir: string, state: string, code: string) {
   const p = pending.get(state); pending.delete(state);
-  if (!p || p.dir !== dir || Date.now() - p.at > 600000 || !code || code.length > 2048) throw new Error('This Spotify connection link expired. Start again from the jukebox.');
-  return token(dir, { grant_type: 'authorization_code', code, redirect_uri: load(dir).redirect, code_verifier: p.verifier });
+  if (!p || !(p.dir === dir || p.dir.startsWith(path.join(dir, 'spotify-accounts') + path.sep)) || Date.now() - p.at > 600000 || !code || code.length > 2048) throw new Error('This Spotify connection link expired. Start again from the jukebox.');
+  return token(p.dir, { grant_type: 'authorization_code', code, redirect_uri: load(p.dir).redirect, code_verifier: p.verifier });
 }
 const refreshing = new Map<string, Promise<string>>();
 async function access(dir: string) {

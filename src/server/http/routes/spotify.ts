@@ -1,4 +1,4 @@
-import { api, authorize, callback, configure, disconnect, load } from '../../spotify/account.js';
+import { accountDir, api, authorize, callback, configure, disconnect, load } from '../../spotify/account.js';
 import type { Route } from '../router.js';
 import { readBody, sameOrigin, send } from '../util.js';
 export const spotifyRoutes = {
@@ -11,9 +11,11 @@ export const spotifyRoutes = {
   } },
   account: { prefix: '/api/spotify', auth: 'session', async handle(ctx, { req, res, path, session }) {
     const admin = ctx.meOf(session.account?.id).admin;
-    if (!admin) return send(res, 403, { error: 'Only an office admin can use this Spotify account' });
     if (req.method === 'POST' && !sameOrigin(req, ctx.cfg)) return send(res, 403, { error: 'Forbidden' });
-    const dir = ctx.cfg.dataDir;
+    const root = ctx.cfg.dataDir;
+    const dir = accountDir(root, session.account?.id ?? 'shared-admin');
+    const config = load(root);
+    if (config.clientId) configure(dir, config.clientId, config.redirect);
     try {
       if (path === '/api/spotify' && req.method === 'GET') {
         const s = load(dir); if (!s.refresh) return send(res, 200, { configured: !!s.clientId, connected: false });
@@ -22,7 +24,7 @@ export const spotifyRoutes = {
       }
       if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
       const b = JSON.parse(await readBody(req, 4096));
-      if (path === '/api/spotify/config') { configure(dir, String(b.clientId ?? ''), String(b.redirect ?? '')); return send(res, 200, { ok: true }); }
+      if (path === '/api/spotify/config') { if (!admin) return send(res, 403, { error: 'Only an admin can configure the Spotify app' }); configure(root, String(b.clientId ?? ''), String(b.redirect ?? '')); return send(res, 200, { ok: true }); }
       if (path === '/api/spotify/connect') return send(res, 200, { url: authorize(dir) });
       if (path === '/api/spotify/disconnect') { disconnect(dir); return send(res, 200, { ok: true }); }
       if (path !== '/api/spotify/playback') return send(res, 404, { error: 'Not found' });
