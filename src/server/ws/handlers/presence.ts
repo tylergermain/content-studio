@@ -6,9 +6,26 @@ import { sanitizeLook } from '../../../shared/avatar.js';
 import { isEmote } from '../../../shared/emotes.js';
 import { ROOF, isDrink } from '../../../shared/rooftop.js';
 import { isBarGame } from '../../../shared/bargames.js';
-import { throttle } from '../../office/client.js';
+import { roomOf } from '../../../shared/floorplan.js';
+import { cleanBay, teeBays } from '../../../shared/tees.js';
+import { throttle, type Client } from '../../office/client.js';
+import type { Ctx } from '../../office/context.js';
 import { COLOR_RE, issueNumber, num, str } from '../../office/input.js';
 import type { HandlerMap } from './types.js';
+
+/**
+ * Whether `key` names a place to sit where `c` is: on the roof, on a map of its own, or on an office
+ * floor, where the lounge's seats (and any others) are that floor's furniture (see the office builder).
+ */
+function seatThere(ctx: Ctx, c: Client, key: string): boolean {
+  const plan = ctx.maps.plan();
+  const onRoof = c.peer.floor === ROOF;
+  const floor = ctx.floorOf(c);
+  if (plan.style !== 'office' || onRoof || !floor) return !!seatHereOn(plan, key, onRoof);
+  const m = /^([\w-]+):(\d+)$/.exec(key);
+  const seat = m ? floor.plan.seat(m[1]) : undefined;
+  return !!seat && !seat.roof && Number(m![2]) < seat.places.length;
+}
 
 export const presenceHandlers = {
   move(ctx, c, msg) {
@@ -37,12 +54,16 @@ export const presenceHandlers = {
       return;
     }
     if (typeof msg.golf === 'boolean') {
-      // The tee's on an office floor's balcony; there's none up on the roof.
+      // The tees are on an office floor's balcony; there's none up on the roof. A floor with two has a
+      // second bay: anywhere else, it's the first they're at.
       const golf = msg.golf && c.peer.floor !== ROOF;
-      if (golf === !!c.peer.golfing) return;
+      const bay = golf ? cleanBay(msg.bay, teeBays(roomOf(ctx.floorOf(c)?.plan.state()).tees)) : 0;
+      if (golf === !!c.peer.golfing && bay === (c.peer.golfing ? (c.peer.golfBay ?? 0) : 0)) return;
       if (golf) c.peer.golfing = true;
       else delete c.peer.golfing;
-      ctx.broadcast({ t: 'peer.act', id: c.id, golf }, c.id, true);
+      if (bay) c.peer.golfBay = bay;
+      else delete c.peer.golfBay;
+      ctx.broadcast({ t: 'peer.act', id: c.id, golf, ...(bay ? { bay } : {}) }, c.id, true);
       return;
     }
     if (msg.throwing !== undefined) {
@@ -64,7 +85,7 @@ export const presenceHandlers = {
     // Everyone sees them sit down (or get up), and anyone who comes in later finds them sitting.
     // Only on a seat where they are: the roof's up on the roof, the office's on a floor.
     const key = str(msg.seat, 40);
-    const seat = seatHereOn(ctx.maps.plan(), key, c.peer.floor === ROOF) ? key : undefined;
+    const seat = seatThere(ctx, c, key) ? key : undefined;
     if (seat === c.peer.seat) return;
     // Somebody on the floor got there first (two people arriving at an empty throne at once).
     // (Not yourself, on a connection that hasn't timed out yet after a reconnect.)

@@ -7,6 +7,7 @@ import { DROP_MAX_BYTES } from '../../../shared/drops.js';
 import type { Ctx } from '../../office/context.js';
 import { repoOf, str } from '../../office/input.js';
 import { readBody, readBytes, sameOrigin, send } from '../util.js';
+import { listMedia, sendMedia } from '../../media.js';
 import type { Route } from '../router.js';
 
 // Which floor a request is about: its boards and its workers.
@@ -31,6 +32,18 @@ export const fileRoutes = {
         'cross-origin-resource-policy': 'same-origin',
       });
       res.end(r.body);
+    },
+  },
+  media: {
+    method: 'GET',
+    path: '/api/media',
+    auth: 'session',
+    handle(ctx, { req, res, url }) {
+      // A floor's own pictures and videos, for its walls and its screens (see media.ts).
+      const floor = floorParam(ctx, url);
+      if (!floor) return send(res, 404, { error: 'No such floor' });
+      if (url.searchParams.has('list')) return send(res, 200, { media: listMedia(floor.dir) });
+      sendMedia(req, res, floor.dir, url.searchParams.get('name'));
     },
   },
   whiteboardFile: {

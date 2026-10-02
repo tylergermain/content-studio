@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { GONG } from '../../../shared/layout';
+import { GONG_AT } from '../../sound/places';
 import { mesh, roundedBox, textPlane, toon, toonUnique } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -156,5 +157,7 @@ declare module '../../world/types' {
 export const gong: Fixture<'gong'> = (site) => {
   const built = buildGong();
   site.wall('north', GONG.x, (GONG.height + 0.3) / 2, GONG.width + 1.2, GONG.height + 0.3);
+  // The office builder stands it wherever the floor wants it, and it rings from there.
+  site.get('furniture').adopt('gong', { group: built.group, collider: built.colliders[0], use: built.interactable, moved: (p) => p && Object.assign(GONG_AT, { x: p.x, z: p.z }) });
   return { group: built.group, colliders: built.colliders, interactables: [built.interactable], update: (_t, dt) => built.update(dt), handle: { gong: built } };
 };

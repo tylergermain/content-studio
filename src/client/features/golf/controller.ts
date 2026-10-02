@@ -3,9 +3,10 @@ import { BALCONY, GOLF_HOLE } from '../../../shared/layout';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import { IMPACT, type Person } from '../../world/character';
-import { AIM_MAX, LOFT_MAX, LOFT_MIN, PIN_DISTANCE, PIN_YAW, TEE_BALL, stance, type Flight, type Shot } from './world';
+import { pinDistance, pinYaw, stance, teeBall } from './tee';
+import { AIM_MAX, LOFT_MAX, LOFT_MIN, type Flight, type Shot } from './world';
 
-// Teeing off from the balcony (E at the tee): you stand over the ball with a club, and the camera
+// Teeing off from the balcony (E at a tee): you stand over that bay's ball with a club, and the camera
 // goes down low behind the ball, looking down the line at the hole. The mouse (or A and D) aims, W
 // and S pick the loft, and holding Space takes the club back while the power meter runs up and down:
 // let go to hit it. The camera follows the ball out to wherever it stops, then comes back to the tee
@@ -40,10 +41,10 @@ const TEE_UP_MAX = 6;
 export type GolfStage = 'aim' | 'charge' | 'swing' | 'watch';
 
 export interface GolfHooks {
-  /** You're at the tee with a club, or put it back: everyone else sees it. */
-  holding(on: boolean): void;
-  /** You hit it: off it goes, here and for everyone else. */
-  hit(shot: Shot): void;
+  /** You're at bay `bay`'s tee with a club, or put it back: everyone else sees it. */
+  holding(on: boolean, bay: number): void;
+  /** You hit it off bay `bay`: off it goes, here and for everyone else. */
+  hit(shot: Shot, bay: number): void;
   /** Your ball on its way, or where it stopped (`still` seconds ago), for the camera to follow. */
   ball(): { at: THREE.Vector3; flight: Flight; still: number } | null;
   /** How far down the street is from this floor (see streetBelow). */
@@ -63,8 +64,10 @@ const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class Golfer {
   private stage: GolfStage | null = null;
+  /** Which bay you're on (see TEES in shared/tees.ts), or were on last. */
+  bay = 0;
   /** Which way you aim (a heading: 0 is south, +z, and it turns toward +x), and the loft you've picked. */
-  aim = PIN_YAW;
+  aim = pinYaw(0);
   loft = LOFT_START;
   /** When the power meter started running (performance.now()), while Space is held down. */
   private chargeAt = 0;
@@ -83,6 +86,7 @@ export class Golfer {
   private readonly rest: HTMLElement;
   private readonly mark: HTMLElement;
   private readonly info: HTMLElement;
+  private readonly title: HTMLElement;
   private shown = '';
 
   constructor(
@@ -94,7 +98,8 @@ export class Golfer {
     this.rest = h('span.golf-rest');
     this.mark = h('span.golf-last');
     this.info = h('div.golf-info');
-    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, h('div.golf-title', {}, `⛳ Hole 1 · ${Math.round(PIN_DISTANCE)} m · Par 1`), h('div.golf-meter', {}, this.rest, this.mark), this.info);
+    this.title = h('div.golf-title');
+    this.panel = h('div.golf.panel.hidden', { id: 'golf', 'aria-label': 'Golf' }, this.title, h('div.golf-meter', {}, this.rest, this.mark), this.info);
     $('hud').append(this.panel);
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
@@ -118,11 +123,13 @@ export class Golfer {
     return p > 1 ? 2 - p : p;
   }
 
-  /** Up to the tee with a club, over the ball, aiming at the pin. */
-  start(): void {
+  /** Up to bay `bay`'s tee with a club, over the ball, aiming at the pin. */
+  start(bay = 0): void {
     if (this.stage) return;
     this.stage = 'aim';
-    this.aim = PIN_YAW;
+    this.bay = bay;
+    this.aim = pinYaw(bay);
+    this.title.textContent = `⛳ Hole 1 · ${Math.round(pinDistance(bay))} m · Par 1`;
     const p = this.player;
     p.rig = () => this.stand();
     this.stand();
@@ -130,7 +137,7 @@ export class Golfer {
     this.camPos.copy(this.camera.position);
     this.camQuat.copy(this.camera.quaternion);
     this.me.setGolf(true);
-    this.hooks.holding(true);
+    this.hooks.holding(true, bay);
     this.panel.classList.remove('hidden');
     this.shown = '';
   }
@@ -146,7 +153,7 @@ export class Golfer {
     // In third person, the camera goes round behind you, looking along the balcony.
     if (p.view === 'third') p.camYaw = p.facing + Math.PI;
     this.me.setGolf(false);
-    this.hooks.holding(false);
+    this.hooks.holding(false, this.bay);
     this.panel.classList.add('hidden');
     this.hooks.done();
   }
@@ -170,7 +177,7 @@ export class Golfer {
       this.swingT += dt;
       if (this.swingT >= IMPACT && this.shot) {
         this.hitAt = performance.now();
-        this.hooks.hit(this.shot);
+        this.hooks.hit(this.shot, this.bay);
         this.shot = null;
         this.stage = 'watch';
       }
@@ -185,7 +192,7 @@ export class Golfer {
 
   /** Where you stand for the aim you've got: square to the line, over the ball. */
   private stand() {
-    const s = stance(this.aim);
+    const s = stance(this.aim, this.bay);
     const p = this.player;
     p.pos.set(s.x, 0, s.z);
     p.facing = s.facing;
@@ -225,6 +232,8 @@ export class Golfer {
   }
 
   private placeCamera(dt: number) {
+    const tee = teeBall(this.bay);
+    const toPin = pinYaw(this.bay);
     const b = this.stage === 'watch' ? this.hooks.ball() : null;
     // A ball that never left the balcony is watched from the tee.
     const chase = b && b.flight.lie !== 'deck' ? b : null;
@@ -234,7 +243,7 @@ export class Golfer {
       const holed = chase.flight.holed;
       target.set((chase.at.x + GOLF_HOLE.x) / 2, street + (holed ? 1.4 : 0.4), (chase.at.z + GOLF_HOLE.z) / 2);
       const back = Math.min(22, (holed ? 8 : 5) + chase.flight.fromPin * 0.9);
-      want.set(target.x - Math.sin(PIN_YAW) * back, street + 2 + back * 0.35, target.z - Math.cos(PIN_YAW) * back);
+      want.set(target.x - Math.sin(toPin) * back, street + 2 + back * 0.35, target.z - Math.cos(toPin) * back);
     } else if (chase) {
       // Behind the ball the way it was hit, a little above it, looking at it.
       const { yaw } = chase.flight.shot;
@@ -245,14 +254,14 @@ export class Golfer {
       // From higher up the building, higher: enough to see down past the balcony's edge to the green.
       const sin = Math.sin(this.aim);
       const cos = Math.cos(this.aim);
-      const depth = TEE_BALL.y - this.hooks.street();
-      const edge = (BALCONY.maxZ - TEE_BALL.z + cos * TEE_BACK) / Math.max(0.3, cos);
-      const reach = PIN_DISTANCE + TEE_BACK;
+      const depth = tee.y - this.hooks.street();
+      const edge = (BALCONY.maxZ - tee.z + cos * TEE_BACK) / Math.max(0.3, cos);
+      const reach = pinDistance(this.bay) + TEE_BACK;
       const up = THREE.MathUtils.clamp((edge * depth) / (reach - edge) + 0.5, TEE_UP, TEE_UP_MAX);
-      want.set(TEE_BALL.x - sin * TEE_BACK - cos * TEE_SIDE, TEE_BALL.y + up, TEE_BALL.z - cos * TEE_BACK + sin * TEE_SIDE);
+      want.set(tee.x - sin * TEE_BACK - cos * TEE_SIDE, tee.y + up, tee.z - cos * TEE_BACK + sin * TEE_SIDE);
       const down = (y: number, d: number) => Math.atan2(y - want.y, d);
       // Between the two, a little nearer the hole: the panel at the top covers more than the hint at the bottom.
-      const pitch = THREE.MathUtils.lerp(down(TEE_BALL.y, TEE_BACK), down(this.hooks.street(), PIN_DISTANCE + TEE_BACK), 0.56);
+      const pitch = THREE.MathUtils.lerp(down(tee.y, TEE_BACK), down(this.hooks.street(), reach), 0.56);
       target.set(want.x + sin * Math.cos(pitch), want.y + Math.sin(pitch), want.z + cos * Math.cos(pitch));
     }
     const k = 1 - Math.exp(-dt * (chase ? 5 : 7));
@@ -270,7 +279,7 @@ export class Golfer {
     this.rest.style.width = `${(1 - Math.max(0, power)) * 100}%`;
     this.mark.style.left = `${this.lastPower * 100}%`;
     this.mark.classList.toggle('hidden', this.lastPower < 0);
-    const off = THREE.MathUtils.radToDeg(this.aim - PIN_YAW);
+    const off = THREE.MathUtils.radToDeg(this.aim - pinYaw(this.bay));
     const aim = Math.abs(off) < 0.5 ? 'at the pin' : `${Math.abs(off).toFixed(0)}° ${off > 0 ? 'left' : 'right'}`;
     const text = `Loft ${THREE.MathUtils.radToDeg(this.loft).toFixed(0)}° · Aim ${aim}`;
     if (text === this.shown) return;

@@ -23,13 +23,15 @@ export function installMaps(ctx: Ctx, core: CoreState, parts: MapsParts) {
   /** Which of the floor palettes the walls are painted in now. */
   let painted = -1;
   function paintFloor() {
-    const p = store.currentFloor()?.palette ?? 0;
+    // The office builder can paint a floor's room over its own color (FloorPlan.look).
+    const p = store.floorPlan.look ?? store.currentFloor()?.palette ?? 0;
     if (p === painted) return;
     painted = p;
     ctx.world().setLook(floorPalette(p));
   }
   // A brand-new floor can arrive before the elevator's list says what color it is.
   store.on('floors', paintFloor);
+  store.on('floorPlan', paintFloor);
 
   /**
    * The building changed maps (or you arrived and it's not the office): the old world goes, the new

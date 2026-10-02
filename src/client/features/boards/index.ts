@@ -5,7 +5,7 @@
  */
 import type * as THREE from 'three';
 import type { GhIssue } from '../../../shared/protocol';
-import type { Ctx } from '../../core/context';
+import type { Ctx, Hint } from '../../core/context';
 import { aside, boardHint, hintTitle, key, onE } from '../../core/hint';
 import { store, type Topic } from '../../state';
 import { openBoard } from '../../ui/boards';
@@ -38,6 +38,8 @@ export interface BoardsDeps {
   boardActions(): BoardActions;
   /** The task queue's window. */
   showQueue(): void;
+  /** A floor's own board where the issues or the pull request board hangs, when it has one there (see features/studio). */
+  bulletin(board: 'issues' | 'pulls'): { texture: THREE.Texture; hint(): Hint; open(): void } | null;
 }
 
 export function installBoards(ctx: Ctx, deps: BoardsDeps) {
@@ -103,11 +105,15 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   ctx.interactions.define('issues', {
     reach: 9,
     hint: () => {
+      const own = deps.bulletin('issues');
+      if (own) return own.hint();
       const aimedNote = deps.aimedNote();
       if (aimedNote) return { k: String(aimedNote.number), parts: [hintTitle(clip(`📌 #${aimedNote.number} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
       return issuesTex.hasNotes ? { k: 'notes', parts: [hintTitle('📌 Issues board'), key('E', 'Open'), aside('or point at a note to take it')] } : boardHint('📌 Issues board');
     },
     use: (_it, key, note) => {
+      const own = deps.bulletin('issues');
+      if (own) return key === 'E' ? own.open() : undefined;
       // A note on the issues board: E takes it straight off the cork, O opens it to read first.
       if (note && key === 'E') return deps.pickUp(note);
       if (note && key === 'O') return openIssue(note, ctx.net, deps.boardActions());
@@ -116,8 +122,8 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   });
   ctx.interactions.define('pulls', {
     reach: 9,
-    hint: () => boardHint('🔀 Pull request board'),
-    use: onE(() => openBoard('pulls', ctx.net, deps.boardActions())),
+    hint: () => deps.bulletin('pulls')?.hint() ?? boardHint('🔀 Pull request board'),
+    use: onE(() => (deps.bulletin('pulls') ?? { open: () => openBoard('pulls', ctx.net, deps.boardActions()) }).open()),
   });
   ctx.interactions.define('services', {
     reach: 9,
@@ -142,8 +148,9 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   mountBoard(office.meetingSign, meetingSignTex.texture, () => meetingSignTex.render(store.meeting), ['meeting']);
   /** Puts every board's texture up on `w`'s boards. */
   function dressBoards(w: World) {
-    showOn(w.boardMeshes.issues, issuesTex.texture);
-    showOn(w.boardMeshes.pulls, pullsTex.texture);
+    // A floor's own board hangs in place of the GitHub one (see features/studio).
+    showOn(w.boardMeshes.issues, deps.bulletin('issues')?.texture ?? issuesTex.texture);
+    showOn(w.boardMeshes.pulls, deps.bulletin('pulls')?.texture ?? pullsTex.texture);
     showOn(w.boardMeshes.services, servicesTex.texture);
     showOn(w.boardMeshes.queue, queueTex.texture);
     if (w.meetingBoard) showOn(w.meetingBoard, meetingBoardTex.texture);

@@ -20,6 +20,7 @@ import type { Building, FloorDef } from '../building.js';
 import type { Floor } from '../floor.js';
 import type { Sky } from '../sky.js';
 import type { Themes } from '../theme.js';
+import type { Feeds } from '../feeds.js';
 import type { Maps } from '../maps.js';
 import type { OfficePrompts } from '../prompts.js';
 import type { LeaveOnMerge } from '../leave-on-merge.js';
@@ -57,6 +58,8 @@ export interface Core {
 /** Made once the hook server listens, before any floor opens (office/services.ts). */
 export interface BuildingServices {
   sky: Sky;
+  /** What the office reads from outside for the floors' boards and tickers (see feeds.ts). */
+  feeds: Feeds;
   themes: Themes;
   maps: Maps;
   prompts: OfficePrompts;

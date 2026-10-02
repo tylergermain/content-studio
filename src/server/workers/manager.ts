@@ -231,7 +231,7 @@ export class WorkerManager {
     const seat = DESK_BY_ID.get(deskId);
     if (!seat) return 'Unknown desk';
     if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
-    if (this.deskOccupied(deskId)) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
+    if (this.deskOccupied(deskId)) return seat.station ? `The ${this.prompts?.stationName?.(seat.station) ?? STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
@@ -251,7 +251,7 @@ export class WorkerManager {
     let profile;
     try { if (specialist) { if(kind !== 'agent' || worktree || meeting || seat.station || repos.length) return 'Specialists use their folder on the main floor'; profile = prepareSpecialist(this.dir,specialist,selectedProvider); } } catch(e) { return e instanceof Error ? e.message : 'Could not prepare specialist'; }
     const used = new Set([...this.workers.values()].map((w) => w.info.name.replace(/ 🐚$/, '')));
-    const agent = seat.station && STATION_AGENT[seat.station];
+    const agent = seat.station && { ...STATION_AGENT[seat.station], name: this.prompts?.stationName?.(seat.station) ?? STATION_AGENT[seat.station].name };
     const name = profile ? `${profile.name}${used.has(profile.name) ? ' '+(this.workers.size+1) : ''}` : agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
     const id = randomBytes(6).toString('hex');
     let wt: WorkerInfo['worktree'] = meeting?.worktree;

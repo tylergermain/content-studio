@@ -1,4 +1,4 @@
-import { JUKEBOX } from '../../../shared/layout';
+import { JUKEBOX_AT } from '../../sound/places';
 import { STREAM } from '../../../shared/jukebox';
 import type { AudioCore } from '../../sound/core';
 import { biquad, rms } from '../../sound/dsp';
@@ -23,6 +23,8 @@ const MUSIC_ROLLOFF = 0.45;
 export class Jukebox {
   // From the cabinet, through a filter that muffles it from across the room, to your own volume.
   private musicIn!: PannerNode;
+  /** Where the music comes from now (see JUKEBOX_AT). */
+  private at = { ...JUKEBOX_AT };
   private musicTone!: BiquadFilterNode;
   private musicCutoff = 16000;
   /** Your music volume, which the DJ on the roof plays through too. */
@@ -44,7 +46,8 @@ export class Jukebox {
   /** Once there's audio: the jukebox's part of the graph. */
   connect(ctx: AudioContext) {
     // The jukebox skips the master (it has its own volume) and keeps playing while the tab is hidden.
-    this.musicIn = this.a.panner(JUKEBOX, MUSIC_REF, MUSIC_ROLLOFF);
+    this.musicIn = this.a.panner(JUKEBOX_AT, MUSIC_REF, MUSIC_ROLLOFF);
+    this.at = { ...JUKEBOX_AT };
     this.musicTone = biquad(ctx, 'lowpass', 16000, 0.5);
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0;
@@ -153,6 +156,12 @@ export class Jukebox {
 
   /** Muffles the jukebox the further you are from it. */
   hearJukebox(now: number) {
+    // The office builder moved it (or this floor has it somewhere else): the music comes from where it is.
+    if (this.at.x !== JUKEBOX_AT.x || this.at.z !== JUKEBOX_AT.z) {
+      this.at = { ...JUKEBOX_AT };
+      this.musicIn.positionX.value = this.at.x;
+      this.musicIn.positionZ.value = this.at.z;
+    }
     const d = this.jukeboxDistance();
     const cutoff = d < 18 ? 16000 : Math.max(5000, 16000 * (18 / d) ** 0.8);
     if (Math.abs(cutoff - this.musicCutoff) > this.musicCutoff * 0.02) {
@@ -171,7 +180,7 @@ export class Jukebox {
 
   private jukeboxDistance(): number {
     const l = this.a.listener;
-    return Math.hypot(l.x - JUKEBOX.x, l.y - JUKEBOX.y, l.z - JUKEBOX.z);
+    return Math.hypot(l.x - JUKEBOX_AT.x, l.y - JUKEBOX_AT.y, l.z - JUKEBOX_AT.z);
   }
 
 }

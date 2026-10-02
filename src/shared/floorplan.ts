@@ -1,6 +1,9 @@
-// A floor's own layout on top of the office everyone shares: the signs hung over its desks, and how
-// far its back office is built out (see WING in layout.ts). Saved by server/floorplan.ts.
+// A floor's own layout on top of the office everyone shares: the signs hung over its desks, how far
+// its back office is built out (see WING in layout.ts), and where its desks and furniture stand once
+// someone's rearranged them (see shared/office-builder.ts). Saved by server/floorplan.ts.
 
+import { FLOOR_PALETTES } from './floors.js';
+import type { Piece } from './furniture.js';
 import { validateLayout, type DeskLayout } from './office-builder.js';
 import { DESKS, WING, WING_DESKS, wingLevel } from './layout.js';
 
@@ -14,12 +17,44 @@ export interface DeskLabel {
 }
 
 export interface FloorPlan {
+  /** Where the room's desks stand, once they've been moved (see the office builder). */
   desks?: DeskLayout;
+  /** Everything else on the floor, once it's been rearranged: none is the office's as it comes (DEFAULT_FURNITURE). */
+  furniture?: Piece[];
+  /** Which of FLOOR_PALETTES the room's painted in, when the builder picked one over the floor's own. */
+  look?: number;
+  /** What this floor has of the room's own fittings, where that isn't what the office comes with (see RoomOptions). */
+  room?: RoomOptions;
+  /** Goes up each time the layout's saved, so a builder working from an older one is told. */
   layoutRevision?: number;
   /** How many rows the back office is built out (0 is just the room), up to WING.rows. */
   wing: number;
   /** Signs by desk id. */
   labels: Record<string, DeskLabel>;
+}
+
+/**
+ * The room's own fittings a floor can have its own way, set in the office builder with the layout:
+ * how many driving tees are out on the balcony, and whether the mezzanine (the boss's loft, with the
+ * stairs up to it) is there at all. A floor's plan only keeps what differs from ROOM_DEFAULTS.
+ */
+export interface RoomOptions {
+  /** Driving tees side by side on the balcony: 1, or 2 for teeing off together. */
+  tees?: number;
+  /** The mezzanine in the south-east corner and its stairs: false for a floor that's all one level. */
+  loft?: boolean;
+}
+export const ROOM_DEFAULTS: Required<RoomOptions> = { tees: 1, loft: true };
+
+/** Room options from somewhere they can't be trusted: only what's valid and isn't the default. */
+export function cleanRoom(raw: unknown): RoomOptions {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
+  return { ...(r.tees === 2 ? { tees: 2 } : {}), ...(r.loft === false ? { loft: false } : {}) };
+}
+
+/** A floor's room as it is: its own options over the office's. */
+export function roomOf(plan: { room?: RoomOptions } | undefined): Required<RoomOptions> {
+  return { ...ROOM_DEFAULTS, ...cleanRoom(plan?.room) };
 }
 
 export const EMPTY_PLAN: FloorPlan = { wing: 0, labels: {} };
@@ -78,8 +113,25 @@ export function cleanPlan(raw: unknown): FloorPlan {
       labels[id] = { text, color: signColor(s.color), by: typeof s.by === 'string' ? s.by : '?', at: typeof s.at === 'number' ? s.at : 0 };
     }
   }
-  const desks = validateLayout(r.desks);
-  return { wing: wingLevel(r.wing), labels, ...(typeof desks === "object" ? { desks, layoutRevision: Number.isSafeInteger(r.layoutRevision) && Number(r.layoutRevision) >= 0 ? Number(r.layoutRevision) : 0 } : {}) };
+  // A layout that no longer fits the office (it was saved by an older one) is dropped whole: the office as it comes.
+  // (Checked against the room it was saved with: a floor that's all one level may have furniture where the stairs were.)
+  const room = cleanRoom(r.room);
+  const layout = r.desks === undefined && r.furniture === undefined ? undefined : validateLayout(r.desks, r.furniture, room);
+  const look = cleanLook(r.look);
+  return {
+    wing: wingLevel(r.wing),
+    labels,
+    ...(look !== undefined ? { look } : {}),
+    ...(Object.keys(room).length ? { room } : {}),
+    ...(typeof layout === 'object'
+      ? { desks: layout.desks, ...(r.furniture !== undefined ? { furniture: layout.furniture } : {}), layoutRevision: Number.isSafeInteger(r.layoutRevision) && Number(r.layoutRevision) >= 0 ? Number(r.layoutRevision) : 0 }
+      : {}),
+  };
+}
+
+/** Which of FLOOR_PALETTES `look` names, or undefined when it's none of them (the floor's own paint). */
+export function cleanLook(look: unknown): number | undefined {
+  return Number.isInteger(look) && (look as number) >= 0 && (look as number) < FLOOR_PALETTES.length ? (look as number) : undefined;
 }
 
 /** The desks a row of the back office brings: `row` from 1. */

@@ -98,7 +98,7 @@ export function installClimbing(ctx: Ctx, deps: ClimbingDeps) {
   /** E at the ladder: onto it, facing the wall. */
   function grabLadder() {
     if (ctx.trip() || climber.active) return;
-    if (!floorThere(1) && !floorThere(-1)) return toast('No other floors yet — add a project in the elevator', 'warn');
+    if (!floorThere(1) && !floorThere(-1)) return toast(store.me.admin ? 'No other floors yet — add a project in the elevator' : 'No other floors yet — an admin adds them in the elevator', 'warn');
     if (ctx.player.seat) deps.standUp();
     ctx.activities.stopAll('start');
     deps.stopWalking();

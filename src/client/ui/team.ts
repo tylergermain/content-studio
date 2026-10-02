@@ -116,7 +116,7 @@ export function openTeam(net: Net) {
     body.replaceChildren();
     if (!t) return body.append(h('p.empty', {}, 'Loading…'));
     footer.classList.toggle('hidden', !!t.unavailable);
-    if (t.unavailable) return body.append(h('p', { style: 'margin:0;font-weight:700' }, t.unavailable));
+    if (t.unavailable) return body.append(h('p', { style: 'margin:0' }, t.unavailable));
     if (t.tailnet) return renderTailnet(t);
 
     body.append(

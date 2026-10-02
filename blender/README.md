@@ -9,6 +9,11 @@ changing its script and running it again.
 | --- | --- |
 | `scripts/aokit.py` | The kit every script uses: shapes, one smooth skin, painted patches, rigs and clips, export, review renders |
 | `scripts/build_<name>.py` | One model (or a small set), exported as `src/client/models/<name>.glb` |
+| `scripts/furnkit.py` | The kit the studio's furniture packs share, over `aokit.py`: shapes in the office's own axes (`at()`, `spin()`, `block`, `slab`, `rod`, `tube`, `fillet`, `turned`, `ball`, `sweep`), a `Piece` with a material slot per material, and a review sheet per piece |
+| `scripts/build_rooms.py` | `rooms.glb`: the walls a floor is divided with (`wall`, `wall_short`, `glass_wall`, `glass_short`, `wood_wall`, `wood_short`) |
+| `scripts/build_studio.py` | `studio.glb`: `long_table`, `podcast_desk`, `screen`, `ticker`, `softbox`, `camera`, `backdrop`, `lounge_chair`, `stool`, `credenza`, `neon` |
+| `scripts/build_greenery.py` | `greenery.glb`: `fiddle_leaf`, `palm`, `bird_of_paradise`, `pothos`, `planter`, each with its `<name>_leaves` hung under it as in `plants.glb`. It borrows its leaf helpers from `build_plants.py`, so a change to those changes both packs |
+| `scripts/build_play.py` | `play.glb`: the things to play with, each a root named for its kind with the parts that move hung under it, their origins at their pivots (`PLAY_PARTS` in `world/office/furniture-play.ts` lists the names) |
 | `scripts/build_dog.py`, `scripts/dog_breeds.py` | The office dog in every breed (the presets are in `dog_breeds.py`), each exported as `src/client/models/dog-<breed>.glb` with the same bones, sockets, materials and clips |
 
 A helper only one model needs lives in that model's script. One that several need can join the kit, as a new
@@ -24,7 +29,9 @@ blender --background --factory-startup --python blender/scripts/build_dog.py -- 
 ```
 
 `-- --shots` also writes review renders (Workbench, outlined) to your temp folder's `ao-shots/` and prints
-where. Several scripts can run headless at once; each is its own Blender.
+where. Several scripts can run headless at once; each is its own Blender. The furniture packs built with
+`furnkit.py` also take `-- --shots=<piece>,<piece>` to write only those pieces' review sheets, which is much
+quicker when one piece is being worked on.
 
 Through the Blender MCP bridge instead, a script can be run and looked at live in the open Blender. There is
 one Blender and one scene, and every build script clears it first, so only one session at a time should
@@ -57,7 +64,12 @@ These are what the office's code counts on. A model that breaks one looks wrong 
 8. **Smooth, not faceted.** Shapes that should read as one soft form melt together with `aokit.fuse`
    (a voxel remesh, smoothing, then even quads), and coloured patches on them are cut in with
    `aokit.paint` along smooth edges. Hard-edged things (cabinets, counters, cars' panels) stay as
-   bevelled boxes and outlines, shaded flat or smooth as suits them.
+   bevelled boxes and outlines, shaded flat or smooth as suits them. Hard furniture built with
+   `furnkit.Piece` is shaded smooth with its normals weighted by face area (`finish(weighted=True)`): big
+   flat faces stay flat up to their rounded edges, and the office's outline, which is drawn along the
+   normals, runs unbroken round them. Leaves keep their own shading (`weighted=False`). `Piece.add` finds a
+   shape's new faces by comparing against the faces that were there before, not by index: some bmesh
+   operators delete as they build, so new faces are not always last.
 
 ## Checking it
 

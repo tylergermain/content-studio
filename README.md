@@ -6,9 +6,13 @@ Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for ne
 
 Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.
 
-Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a visual office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
+Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a 3D office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
 
-Open **Menu → Office builder**, or press **B**, on an office floor as an admin. Drag desks on the floor plan, rotate them, change their signs, and expand the back office. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
+Open **Menu → Office builder**, or press **U**, on an office floor as an admin. The camera goes up over the room and you drag the desks and the furniture about on the floor itself: turn them, paint them, add sofas, tables, plants, rugs, dividers and signs from the catalog, repaint the room, and move the whiteboard, the jukebox and the rest of what the office comes with. **Team desks** are desks for people: sit down at one and your screen goes up on its monitor. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
+
+The catalog also has what a studio needs: walls, glass and wood slat panels to divide a floor into rooms, a long table, a podcast desk, softboxes, a camera and a backdrop, more plants, video screens that loop the videos in a floor's `.agent-office/media` folder, a stock ticker and a market board for live prices, and things to play with (a trampoline, a punching bag, ping-pong, foosball, a prize wheel). Each floor chooses whether it has the mezzanine and whether its balcony has one driving tee or two. A floor can be a folder rather than a repository, with wall boards and kiosk agents of its own (*Newsroom*, a Slack feed, Metricool).
+
+Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, and the back office. Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
 
 The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
 
@@ -339,7 +343,19 @@ deploy/dokploy.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 
 **Their own Claude and GitHub.** With accounts, everyone's workers run on their own Claude plan, and the office acts on GitHub as them: comments, merges, labels, pushes and pull requests show up under their name. The first time someone comes in, **🔐 Your sign-ins** opens (it's in the **☰** menu too). *Sign in with Claude* gives them Claude's sign-in page and takes back the code it shows. *Sign in with GitHub* shows a one-time code for github.com/login/device. They can paste a token from `claude setup-token`, or a GitHub token, instead. A 🐚 shell they open at a desk runs as them, so `claude auth login` and `gh auth login` typed there work too. Admins can use the office machine's own sign-ins instead. Each account's sign-ins live in `.agent-office/homes/<account>/`, and revoking the account deletes them. The boards are read with the machine's own `gh`, so that account needs read access to the repos. Running it just for yourself, with no accounts, none of this applies.
 
-**3. Turn off the shared password.** Until you do, anyone who knows the office password can get in, as an admin. Once everyone has an account, switch it off in **🔑 Accounts** (signed in with your own admin account), or `agent-office accounts password off`.
+**3. Turn off the shared password.** Until you do, anyone who knows the office password gets in as an admin, whether or not they have an account: the shared password has no role of its own, so it counts as one. Once you and the other admins have joined with your own accounts, switch it off in **🔑 Accounts** (signed in with your own admin account), or run `agent-office accounts password off`. It refuses until at least one admin account exists, and everyone who came in on the shared password is signed out within seconds.
+
+**Admins and members.** Members hire workers, use the boards, hang signs and pictures, and ride the elevator. Managing the building is the admins': adding a project as a floor (from GitHub or from a folder), stopping a clone, renaming, moving or removing a floor, moving the workspace folder, the office builder, a floor's board setup, and building the back office out or walling it up. A member's elevator shows only the floors, the roof and the garage.
+
+```bash
+agent-office accounts invite tyler --admin   # an admin: prints a single-use /join#… link, valid 7 days
+agent-office accounts invite gavin --admin
+agent-office accounts invite sam             # a member (the default)
+agent-office accounts password off           # once the admins have joined
+agent-office accounts role sam admin         # or back to member
+```
+
+From a checkout without the command installed, the same is `npx tsx src/server/cli.ts accounts …`. It looks for the office in the current directory, then in `~/agent-office`; pass `--dir <dir>` for one somewhere else.
 
 **Removing someone.** Revoke their account in **🔑 Accounts** (or `agent-office accounts revoke <name>`), and on a server also remove them in **👥 Invite teammates** (on AWS, `deploy/aws.sh uninvite <name>`; on Railway, `deploy/railway.sh uninvite <name>`; on Fly.io, `deploy/fly.sh uninvite <name>`; on Dokploy, `deploy/dokploy.sh uninvite <name>`) to take away their SSH keys and drop open tunnels (other teammates just reconnect). If the shared password is still on, change it with `deploy/aws.sh reset-password` (or `deploy/railway.sh reset-password`, `deploy/fly.sh reset-password` or `deploy/dokploy.sh reset-password`).
 
@@ -350,7 +366,7 @@ deploy/dokploy.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 | W A S D | Walk (hold Shift to run) |
 | Space | Jump |
 | Mouse drag / wheel | Orbit / zoom the camera |
-| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator |
+| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator, watch a video screen, use something to play with |
 | P | Give a task to a new worker, or to the one at this desk |
 | C | See a worker's changes: diff, commit, open a PR |
 | N | Go to the next worker that's waiting on you |

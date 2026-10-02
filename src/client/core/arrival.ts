@@ -108,7 +108,7 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
     if (carrying) net.send({ t: 'carry', issue: carrying.issue, title: carrying.title });
     const shownDrink = parts.bar.shownDrink();
     if (shownDrink) net.send({ t: 'act', drink: shownDrink });
-    if (parts.golf.golf.active) net.send({ t: 'act', golf: true });
+    if (parts.golf.golf.active) net.send({ t: 'act', golf: true, bay: parts.golf.golf.bay });
     const { thrower } = parts.bargames;
     if (thrower.playing) net.send({ t: 'act', throwing: thrower.playing });
     // The office let go of the ball for you while you were away, and of your seat in a car.
@@ -187,7 +187,7 @@ export function installArrival(ctx: Ctx, core: CoreState, parts: ArrivalParts) {
     }
     if (!p) {
       $('project-name').textContent = '🏢 Agent Office';
-      $('project-meta').textContent = store.floors.length ? '🛗 Take the elevator to a floor' : '🛗 No floors yet — add a project in the elevator';
+      $('project-meta').textContent = store.floors.length ? '🛗 Take the elevator to a floor' : store.me.admin ? '🛗 No floors yet — add a project in the elevator' : '🛗 No floors yet — an admin adds the first one';
       // Where to go next, so it shows even with the floor details turned off.
       $('project-meta').classList.add('lobby');
       ctx.world().setProjectName(store.floors.length ? 'Pick a floor' : 'Lobby');

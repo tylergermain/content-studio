@@ -66,7 +66,9 @@ export function toggleFloorMenu(anchor: HTMLElement, opts: FloorMenuOptions): vo
   const render = () => {
     const floors = store.floors;
     const here = floors.findIndex((f) => f.id === store.floor);
-    const add = h('button.floor-item.add', { type: 'button', role: 'menuitem', title: 'The elevator: add another project as a floor' }, h('span.floor-no', {}, '🛗'), h('span.floor-text', {}, h('span.floor-name', {}, 'Elevator'), h('span.floor-sub', {}, 'Add a project…')));
+    // Adding a project is an admin's job (see elevator.ts): for everyone else the elevator is the way to the garage.
+    const admin = store.me.admin;
+    const add = h('button.floor-item.add', { type: 'button', role: 'menuitem', title: admin ? 'The elevator: add another project as a floor' : 'The elevator: every floor, the roof and the garage' }, h('span.floor-no', {}, '🛗'), h('span.floor-text', {}, h('span.floor-name', {}, 'Elevator'), h('span.floor-sub', {}, admin ? 'Add a project…' : 'The roof and the garage…')));
     add.addEventListener('click', () => {
       close();
       opts.elevator();

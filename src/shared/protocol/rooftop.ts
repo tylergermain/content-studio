@@ -22,8 +22,8 @@ export type RooftopClientMsg =
   | { t: 'horn' };
 
 export type RooftopServerMsg =
-  /** Someone on your floor hit a golf ball off the tee (see the client's 'golf'). */
-  | { t: 'golf'; id: string; yaw: number; loft: number; power: number }
+  /** Someone on your floor hit a golf ball off the tee (see the client's 'golf'): bay `bay`'s, where they're at the second one (PeerInfo.golfBay). */
+  | { t: 'golf'; id: string; yaw: number; loft: number; power: number; bay?: number }
   /** Someone up on the roof threw a dart or an axe (see the client's 'toss'). */
   | { t: 'toss'; id: string; game: BarGame; u: number; v: number; stick: boolean; n: number }
   /**

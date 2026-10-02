@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { BARK_EVERY_S, BARK_FOR_S, DOG_COATS, dogAt, dogBreed, legSeconds, type DogAct, type DogBreed, type DogState } from '../../../shared/dog';
 import type { Theme } from '../../../shared/protocol';
-import { dogAntlers, dogBatWings, dogRedNose, dogScarf, dogWitchHat } from '../../world/costumes';
+import { dogAntlers, dogRedNose, dogScarf } from '../../world/costumes';
 import { loadModel, type Model } from '../../world/models';
 import type { Interactable } from '../../world/types';
 import { disposeSprite, textSprite, toon, toonUnique } from '../../world/toon';
@@ -112,9 +112,8 @@ interface Rig {
   /** Bones the clips hold still and the code moves (see animate), with how they sit at rest. */
   jaw: { bone: THREE.Object3D; rest: THREE.Quaternion };
   eyes: { bone: THREE.Object3D; rest: THREE.Vector3 }[];
-  /** Where costumes go: on its head, on its back, on its nose and round its collar. */
+  /** Where costumes go: on its head, on its nose and round its collar. */
   head: THREE.Object3D;
-  back: THREE.Object3D;
   noseTip: THREE.Object3D;
   neck: THREE.Object3D;
   /** How big its collar is next to the pup's, for the scarf. */
@@ -171,10 +170,9 @@ export class Dog {
   private woofT = 9;
   private t = 0;
   private placed = false;
-  /** Dressed up for a holiday (see setCostume): what it's wearing, its bat wings, and Rudolph's nose. */
+  /** Dressed up for a holiday (see setCostume): what it's wearing, and Rudolph's nose. */
   private costume: Theme | null = null;
   private outfit: THREE.Object3D[] = [];
-  private wings: THREE.Object3D[] = [];
   private rudolph: THREE.MeshToonMaterial | null = null;
 
   constructor(
@@ -202,9 +200,8 @@ export class Dog {
   }
 
   /**
-   * Dresses it up for a holiday: bat wings and a little witch's hat for Halloween, reindeer antlers, a
-   * glowing red nose and a scarf for Christmas. Null takes it all off. Asked before the model is in, it
-   * puts them on once it is.
+   * Dresses it up for a holiday: reindeer antlers, a glowing red nose and a scarf for Christmas. Null
+   * takes it all off. Asked before the model is in, it puts them on once it is.
    */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
@@ -389,7 +386,6 @@ export class Dog {
       jaw: { bone: jaw, rest: jawRest },
       eyes,
       head: part('socket_head'),
-      back: part('socket_back'),
       noseTip: part('socket_nose'),
       neck: part('socket_neck'),
       collar: collar / PUP_COLLAR_WIDTH,
@@ -423,11 +419,9 @@ export class Dog {
       o.removeFromParent();
       o.traverse((m) => (m as THREE.Mesh).geometry?.dispose());
     }
-    // The wings' and the red nose's materials are the costume's own; the rest are shared toon ones.
-    for (const w of this.wings) w.traverse((m) => ((m as THREE.Mesh).material as THREE.Material | undefined)?.dispose());
+    // The red nose's material is the costume's own; the rest are shared toon ones.
     this.rudolph?.dispose();
     this.outfit = [];
-    this.wings = [];
     this.rudolph = null;
     const rig = this.rig;
     if (!rig) return;
@@ -437,12 +431,7 @@ export class Dog {
       parent.add(o);
       this.outfit.push(o);
     };
-    if (theme === 'halloween') {
-      const bat = dogBatWings();
-      wear(rig.back, bat.group);
-      this.wings = bat.wings;
-      wear(rig.head, dogWitchHat());
-    } else if (theme === 'christmas') {
+    if (theme === 'christmas') {
       wear(rig.head, dogAntlers());
       // Round its own collar, as big as that is.
       const scarf = dogScarf();
@@ -513,13 +502,7 @@ export class Dog {
       for (const e of rig.eyes) e.bone.scale.copy(e.rest).setY(e.rest.y * Math.max(0.12, blink));
     }
 
-    // Bat wings flap (fast when it runs or is happy, folded while it naps); Rudolph's nose glows.
-    const flap = act === 'nap' ? 0 : moving || act === 'wag' || act === 'bark' ? 1 : 0.35;
-    this.wings.forEach((w, i) => {
-      const sx = i ? 1 : -1;
-      w.rotation.z = sx * (0.75 + (act === 'nap' ? -0.6 : Math.sin(t * (6 + 10 * flap)) * 0.45 * flap));
-      w.rotation.y = sx * 0.25;
-    });
+    // Rudolph's nose glows.
     if (this.rudolph) this.rudolph.emissiveIntensity = 0.7 + Math.sin(t * 3) * 0.3;
 
     // Bubbles: 💤 while it naps, gone when it's up.

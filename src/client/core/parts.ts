@@ -37,6 +37,7 @@ import type { installNeedsYou } from '../features/needsyou';
 import type { installPeers } from '../features/peers';
 import type { installRooftop } from '../features/rooftop';
 import type { installSeating } from '../features/seating';
+import type { installStudio } from '../features/studio';
 import type { installSmoke } from '../features/smoke';
 import type { installTelescope } from '../features/telescope';
 import type { installTv } from '../features/tv';
@@ -121,6 +122,7 @@ export interface Parts {
   hoops: Made<typeof installBasketball>;
   cards: Made<typeof installCarrying>;
   seating: Made<typeof installSeating>;
+  studio: Made<typeof installStudio>;
   emotes: Made<typeof installEmotes>;
   talk: Made<typeof installVoice>;
   hud: Made<typeof installHud>;

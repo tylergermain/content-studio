@@ -55,7 +55,7 @@ function paintGrowSign(c: HTMLCanvasElement, level: number) {
   g.font = '800 88px Nunito, ui-rounded, system-ui, sans-serif';
   g.fillText(full ? '🏢 As big as it gets' : '🚧 Room to grow', w / 2, h * 0.4);
   g.font = '700 46px Nunito, ui-rounded, system-ui, sans-serif';
-  g.fillText(full ? 'The back office is built all the way out' : level ? 'Press E to go back another row: 2 more desks' : 'Press E to knock through: 2 more desks', w / 2, h * 0.68);
+  g.fillText(full ? 'The back office is built all the way out' : level ? 'Admins press E for another row: 2 more desks' : 'Admins press E to knock through: 2 more desks', w / 2, h * 0.68);
 }
 
 /**
@@ -221,7 +221,7 @@ declare module '../types' {
   interface OfficeHandles {
     /** The back office through the north wall, as far as this floor's built out (see WING). */
     wing: WingView;
-    /** Builds the back office out `level` rows, or walls it up: the plants in the way go too. */
+    /** Builds the back office out `level` rows, or walls it up. The furniture in the way is put away by whoever arranges it (see furnish.ts). */
     setWing(level: number): void;
   }
 }
@@ -230,16 +230,6 @@ declare module '../types' {
 export const wing: Fixture<'wing' | 'setWing'> = (site) => {
   const built = buildWing(site.group, site.colliders, site.interactables, site.desks, site.looks, site.looks.trim, site.planks, site.get('stack').ceiling, site.get('night'));
   site.wall('north', (WING.minX + FLOOR.maxX) / 2, WALL_HEIGHT / 2, FLOOR.maxX - WING.minX, WALL_HEIGHT);
-  const setWing = (level: number) => {
-    built.set(level);
-    for (const p of site.inTheWay) {
-      const out = built.level === 0;
-      if (p.group.visible === out) continue;
-      p.group.visible = out;
-      const i = site.colliders.indexOf(p.collider);
-      if (out && i < 0) site.colliders.push(p.collider);
-      else if (!out && i >= 0) site.colliders.splice(i, 1);
-    }
-  };
+  const setWing = (level: number) => built.set(level);
   return { handle: { wing: built, setWing } };
 };

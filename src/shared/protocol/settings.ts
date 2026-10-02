@@ -130,7 +130,7 @@ export interface SkyState {
 }
 
 /** A holiday the whole building dresses up for (see shared/theme.ts). */
-export type Theme = 'halloween' | 'christmas';
+export type Theme = 'christmas';
 /** What someone picked in ⚙️ Settings: a holiday, none, or whichever the calendar says. */
 export type ThemePick = Theme | 'auto' | 'off';
 

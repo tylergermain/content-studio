@@ -116,7 +116,7 @@ export function installSeating(ctx: Ctx, deps: SeatingDeps) {
         return { k: `${seat.id}|sitting|${tv}`, parts: [hintTitle(seat.label), aside('sitting'), ...(use ? [key('E', use), key('W A S D', 'Get up')] : [key('E', 'Get up')])] };
       }
       const full = !freePlace(seat);
-      return { k: `${seat.id}|${full}`, parts: [hintTitle(seat.label), seat.game ? aside('💣 Minesweeper on the monitor') : '', full ? aside('no room') : key('E', 'Sit down')] };
+      return { k: `${seat.id}|${full}`, parts: [hintTitle(seat.label), seat.game ? aside('💣 Minesweeper on the monitor') : seat.share ? aside('🖥️ shares your screen') : '', full ? aside('no room') : key('E', 'Sit down')] };
     },
     use: onE((it) => {
       if (it.seatId) useSeat(it.seatId);

@@ -38,6 +38,7 @@ export const routes: readonly Route[] = [
   specialistRoute,
   orgChartRoute,
   fileRoutes.image,
+  fileRoutes.media,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,
   fileRoutes.changedFile,

@@ -45,6 +45,8 @@ export interface Interactable {
   deskId?: string;
   decorId?: string;
   seatId?: string;
+  /** Which piece of the floor's furniture (see shared/furniture.ts), for something of it you use. */
+  pieceId?: string;
   /** Which of POLES, for a fire pole. */
   pole?: number;
   /** Which of CARS (shared/garage.ts), for a car. */
@@ -70,6 +72,9 @@ export interface DeskView {
   vacancy: THREE.Group;
   /** How high the vacancy marker floats. */
   vacancyY: number;
+  /** What you bump into of it and what you use it by, for a desk the office builder can move (see features/office-builder). */
+  collider?: Collider;
+  interact?: Interactable;
 }
 
 /**

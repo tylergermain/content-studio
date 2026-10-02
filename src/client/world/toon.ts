@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { GLASS_FONT, GLASS_INK, GLASS_MUTED, glassInk, glassMargin, glassRing, glassTone, paintGlass } from './glass';
 
 let gradient: THREE.DataTexture | null = null;
 
@@ -68,19 +69,32 @@ export function roundedBox(w: number, h: number, d: number, r = 0.06): THREE.Buf
 type TextOpts = { color?: string; bg?: string; size?: number; border?: string };
 const TEXT_SCALE = 0.0055;
 
-/** A pill-shaped text label drawn to a texture; `w`/`h` are the canvas size in pixels. */
-function textTexture(text: string, opts: TextOpts) {
+/**
+ * A text label drawn to a texture; `w`/`h` are the canvas size in pixels. A sign that's part of the
+ * world (textPlane) is a painted pill with an ink outline; a label that floats over someone
+ * (textSprite) is `glass`, like the interface: see world/glass.ts.
+ */
+function textTexture(text: string, opts: TextOpts, glass = false) {
   const size = opts.size ?? 48;
   const canvas = document.createElement('canvas');
   const ctx = canvas.getContext('2d')!;
-  const font = `800 ${size}px Nunito, ui-rounded, system-ui, sans-serif`;
+  const font = glass ? `600 ${size}px ${GLASS_FONT}` : `800 ${size}px Nunito, ui-rounded, system-ui, sans-serif`;
   ctx.font = font;
-  const w = Math.ceil(ctx.measureText(text).width) + size;
-  const h = Math.ceil(size * 1.6);
+  // One of the interface's pixels, at this label's size, and the room its shadow needs all round
+  // (the same on every side, so the label stays centered where it was).
+  const u = size / 34;
+  const m = glass && opts.bg ? glassMargin(u) : 0;
+  const w = Math.ceil(ctx.measureText(text).width) + size + 2 * m;
+  const h = Math.ceil(size * 1.6) + 2 * m;
   canvas.width = w;
   canvas.height = h;
   ctx.font = font;
-  if (opts.bg) {
+  const tone = glass && opts.bg ? glassTone(opts.bg) : null;
+  if (tone) {
+    ctx.beginPath();
+    ctx.roundRect(m + 3, m + 3, w - 2 * m - 6, h - 2 * m - 6, size * 0.56);
+    paintGlass(ctx, tone, m, h - m, u, glassRing(opts.border));
+  } else if (opts.bg) {
     ctx.fillStyle = opts.bg;
     const r = h / 2;
     ctx.beginPath();
@@ -90,19 +104,19 @@ function textTexture(text: string, opts: TextOpts) {
     ctx.strokeStyle = opts.border ?? '#2b2d42';
     ctx.stroke();
   }
-  ctx.fillStyle = opts.color ?? '#2b2d42';
+  ctx.fillStyle = glass ? glassInk(opts.color, tone) : (opts.color ?? '#2b2d42');
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText(text, w / 2, h / 2 + size * 0.05);
+  ctx.fillText(text, w / 2, h / 2 + size * (glass ? 0.02 : 0.05));
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.anisotropy = 4;
   return { tex, w, h };
 }
 
-/** A camera-facing text label. */
+/** A camera-facing text label, on glass: a name tag, a bubble, a score. */
 export function textSprite(text: string, opts: TextOpts = {}): THREE.Sprite {
-  const { tex, w, h } = textTexture(text, opts);
+  const { tex, w, h } = textTexture(text, opts, true);
   const mat = new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true });
   const sprite = new THREE.Sprite(mat);
   sprite.scale.set(w * TEXT_SCALE, h * TEXT_SCALE, 1);
@@ -122,8 +136,9 @@ export interface CardOpts {
   chip?: { text: string; bg: string; color: string };
   title: string;
   body?: string;
+  /** Its color: the card is glass tinted with it (see world/glass.ts). */
   bg: string;
-  /** The outline's color, when it isn't the usual ink. */
+  /** The outline's color, when it means something: a pull request's, a worker asking. */
   border?: string;
   /** Widest a line of text may get, in textSprite `size` pixels. */
   maxWidth?: number;
@@ -131,24 +146,25 @@ export interface CardOpts {
 
 /** Cards are drawn at twice the pixels of other labels so their smaller text stays crisp up close. */
 const CARD_RES = 2;
-const INK = '#2b2d42';
-const FONT = 'Nunito, ui-rounded, system-ui, sans-serif';
 
 /**
- * A speech-bubble card: status pill, bold title (up to 2 lines) and a smaller body (up to 3), with a
- * tail pointing down. Its position is the tip of the tail, so it sits right on top of what it's about.
+ * A speech-bubble card of glass: status pill, bold title (up to 2 lines) and a smaller body (up to
+ * 3), with a tail pointing down. Its position is the tip of the tail, so it sits right on top of
+ * what it's about.
  */
 export function cardSprite(o: CardOpts): THREE.Sprite {
   const R = CARD_RES;
   const maxW = (o.maxWidth ?? 400) * R;
   const pad = 16 * R;
   const lw = 5 * R;
-  const tail = 14 * R;
-  const chipFont = `800 ${19 * R}px ${FONT}`;
+  const tail = 12 * R;
+  // The room the card's shadow needs, all round it.
+  const m = glassMargin(R);
+  const chipFont = `700 ${18 * R}px ${GLASS_FONT}`;
   const chipH = 30 * R;
-  const titleFont = `800 ${30 * R}px ${FONT}`;
+  const titleFont = `700 ${29 * R}px ${GLASS_FONT}`;
   const titleLH = 36 * R;
-  const bodyFont = `700 ${23 * R}px ${FONT}`;
+  const bodyFont = `600 ${22 * R}px ${GLASS_FONT}`;
   const bodyLH = 29 * R;
 
   const ctx = document.createElement('canvas').getContext('2d')!;
@@ -161,21 +177,21 @@ export function cardSprite(o: CardOpts): THREE.Sprite {
   ctx.font = chipFont;
   const chipW = o.chip ? ctx.measureText(o.chip.text).width + 24 * R : 0;
 
-  const w = Math.ceil(Math.max(titleW, bodyW, chipW + 2 * pad) + 2 * pad);
-  const top = o.chip ? chipH / 2 : lw;
+  const w = Math.ceil(Math.max(titleW, bodyW, chipW + 2 * pad) + 2 * pad) + 2 * m;
+  const top = m + (o.chip ? chipH / 2 : lw);
   const titleY = top + (o.chip ? chipH / 2 + 6 * R : pad);
   const bodyY = titleY + title.length * titleLH + 4 * R;
   const bottom = bodyY + body.length * bodyLH + pad * 0.7;
-  const h = Math.ceil(bottom + tail + lw);
+  const h = Math.ceil(bottom + tail + lw) + m;
 
   const canvas = ctx.canvas;
   canvas.width = w;
   canvas.height = h;
-  // One outline for the card and its tail, so the border runs unbroken down the tail.
-  const x0 = lw / 2;
-  const x1 = w - lw / 2;
+  // One outline for the card and its tail, so the hairline runs unbroken down the tail.
+  const x0 = m + lw / 2;
+  const x1 = w - m - lw / 2;
   const cx = w / 2;
-  const r = 18 * R;
+  const r = 16 * R;
   ctx.beginPath();
   ctx.moveTo(x0 + r, top);
   ctx.arcTo(x1, top, x1, bottom, r);
@@ -186,31 +202,27 @@ export function cardSprite(o: CardOpts): THREE.Sprite {
   ctx.arcTo(x0, bottom, x0, top, r);
   ctx.arcTo(x0, top, x1, top, r);
   ctx.closePath();
-  ctx.fillStyle = o.bg;
-  ctx.fill();
-  ctx.lineWidth = lw;
-  ctx.lineJoin = 'round';
-  ctx.strokeStyle = o.border ?? INK;
-  ctx.stroke();
+  paintGlass(ctx, glassTone(o.bg), top, bottom, R, glassRing(o.border));
 
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   if (o.chip) {
+    // The pill sits across the card's top edge: solid under its glass, so the edge doesn't show through it.
+    const chip = glassTone(o.chip.bg);
     ctx.beginPath();
-    ctx.roundRect(cx - chipW / 2, lw / 2, chipW, chipH, chipH / 2);
-    ctx.fillStyle = o.chip.bg;
+    ctx.roundRect(cx - chipW / 2, m + lw / 2, chipW, chipH, chipH / 2);
+    ctx.fillStyle = '#ffffff';
     ctx.fill();
-    ctx.lineWidth = 4 * R;
-    ctx.stroke();
+    paintGlass(ctx, chip, m + lw / 2, m + lw / 2 + chipH, R * 0.7);
     ctx.font = chipFont;
-    ctx.fillStyle = o.chip.color;
-    ctx.fillText(o.chip.text, cx, lw / 2 + chipH / 2 + R);
+    ctx.fillStyle = glassInk(o.chip.color, chip);
+    ctx.fillText(o.chip.text, cx, m + lw / 2 + chipH / 2 + R);
   }
   ctx.font = titleFont;
-  ctx.fillStyle = INK;
+  ctx.fillStyle = GLASS_INK;
   title.forEach((l, i) => ctx.fillText(l, cx, titleY + (i + 0.5) * titleLH));
   ctx.font = bodyFont;
-  ctx.fillStyle = '#5c5f77';
+  ctx.fillStyle = GLASS_MUTED;
   body.forEach((l, i) => ctx.fillText(l, cx, bodyY + (i + 0.5) * bodyLH));
 
   const tex = new THREE.CanvasTexture(canvas);
@@ -218,7 +230,8 @@ export function cardSprite(o: CardOpts): THREE.Sprite {
   tex.anisotropy = 4;
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthWrite: false, transparent: true }));
   sprite.scale.set((w / R) * TEXT_SCALE, (h / R) * TEXT_SCALE, 1);
-  sprite.center.set(0.5, 0);
+  // The tip of the tail is where the sprite is, as it was before the card had a shadow's margin under it.
+  sprite.center.set(0.5, m / h);
   sprite.renderOrder = 10;
   return sprite;
 }

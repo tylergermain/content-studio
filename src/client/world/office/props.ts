@@ -95,11 +95,13 @@ function upholstered(part: 'pillow' | 'pouf', color: string): THREE.Object3D {
  * The lounge's couch: the sofa, facing +z like every model, with a throw pillow leaning on its back cushions
  * either side of its middle, halfway between its places (SEATING's couch, 1.2 apart), clear of whoever sits
  * there. Its origin is on the floor under its middle, it's 4.2 long across x and 1.0 deep, and its seat
- * cushions' tops are 0.47 up. The pillows hang under it, so a click on one is a click on the couch.
+ * cushions' tops are 0.47 up. The pillows hang under it, so a click on one is a click on the couch. `color`
+ * is its upholstery, the lounge's blue unless the office builder painted it.
  */
-export function loungeCouch(): THREE.Group {
+export function loungeCouch(color: string = LOUNGE_COLORS.Sofa): THREE.Group {
   const g = new THREE.Group();
-  g.add(piece('lounge', 'sofa', paintLounge));
+  const cloth = toon(color);
+  g.add(piece('lounge', 'sofa', (name) => (name === 'Sofa' ? cloth : paintLounge(name))));
   for (const [x, color] of [
     [0.6, '#ffd166'],
     [-0.6, '#ef476f'],
@@ -118,7 +120,7 @@ export function pouf(color: string): THREE.Object3D {
   return upholstered('pouf', color);
 }
 
-/** The lounge's round coffee table, 0.9 round, its top 0.46 up (where the holiday pumpkin stands). */
+/** The lounge's round coffee table, 0.9 round, its top 0.46 up. */
 export function coffeeTable(): THREE.Object3D {
   return piece('lounge', 'coffee_table', paintLounge);
 }

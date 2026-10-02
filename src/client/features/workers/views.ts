@@ -21,7 +21,7 @@ import { waitingOnSomeone } from '../../notify';
 import { renderTitle } from '../../shared/title';
 import { store } from '../../state';
 import { $ } from '../../ui/dom';
-import { openExpand } from '../../ui/floorplan';
+import { expandSign, openExpand } from '../../ui/floorplan';
 import { renderWorkers } from '../../ui/workers-panel';
 import { renderLimits } from '../../ui/limits';
 import { modelBadge, providerLabel } from '../../ui/provider';
@@ -348,9 +348,9 @@ export function installWorkerViews(ctx: Ctx, core: CoreState, parts: WorkerViews
   ctx.interactions.define('expand', {
     reach: 8,
     hint: () => {
-      const level = store.floorPlan.wing;
-      if (level >= WING.rows) return { k: 'full', parts: [hintTitle('🏢 Back office'), aside('built all the way out'), key('E', 'Wall a row up')] };
-      return { k: String(level), parts: [hintTitle(level ? '🚧 Room to grow' : '🚧 Room to grow through the wall'), aside(level ? `${level} of ${WING.rows} rows built` : 'the office can get bigger here'), key('E', level ? 'Another row: 2 more desks' : 'Knock through: 2 more desks')] };
+      // Admins build it out; everyone else reads the sign, with no key to press.
+      const sign = expandSign(store.floorPlan.wing, store.me.admin);
+      return { k: sign.k, parts: [hintTitle(sign.title), aside(sign.aside), ...(sign.action ? [key('E', sign.action)] : [])] };
     },
     use: onE(() => openExpand(net)),
   });

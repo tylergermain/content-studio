@@ -64,7 +64,7 @@ export function openPrompt(opts: PromptOptions) {
   const wtRow = opts.worktreeOption
     ? h(
         'label',
-        { for: 'wt-toggle', style: 'display:flex;gap:8px;align-items:center;margin:10px 0 0;font-weight:700;cursor:pointer', title: 'Isolate this worker on its own branch so parallel workers never collide' },
+        { for: 'wt-toggle', style: 'display:flex;gap:8px;align-items:center;margin:10px 0 0;font-weight:500;cursor:pointer', title: 'Isolate this worker on its own branch so parallel workers never collide' },
         wtBox,
         '🌿 Work in its own git worktree & branch',
     )
@@ -78,7 +78,7 @@ export function openPrompt(opts: PromptOptions) {
     'form.modal',
     { role: 'dialog', 'aria-label': opts.title },
     h('header', {}, h('h2', {}, opts.title)),
-    h('div.body', {}, opts.warning ? h('p.setting-note.bad', { style: 'margin:0 0 10px', role: 'alert' }, opts.warning) : null, opts.subtitle ? h('p', { style: 'margin:0 0 10px;font-weight:700;color:var(--muted)' }, opts.subtitle) : null, dictateField(ta), provider?.element ?? null, specialist?.element ?? null, wtRow, repos.element),
+    h('div.body', {}, opts.warning ? h('p.setting-note.bad', { style: 'margin:0 0 10px', role: 'alert' }, opts.warning) : null, opts.subtitle ? h('p', { style: 'margin:0 0 10px;color:var(--muted)' }, opts.subtitle) : null, dictateField(ta), provider?.element ?? null, specialist?.element ?? null, wtRow, repos.element),
     h('footer', {}, h('span.grow', {}, 'Enter to send · Shift+Enter for a new line'), cancel, submit),
   ) as HTMLFormElement;
   form.noValidate = true;
@@ -123,7 +123,7 @@ export function openPrompt(opts: PromptOptions) {
 export function confirmDialog(title: string, body: string, confirmLabel: string, onConfirm: () => void) {
   const yes = h('button.btn.danger', { type: 'button' }, confirmLabel);
   const no = h('button.btn', { type: 'button' }, 'Never mind');
-  const el = h('div.modal', { role: 'alertdialog', 'aria-label': title }, h('header', {}, h('h2', {}, title)), h('div.body', {}, h('p', { style: 'margin:0;font-weight:700' }, body)), h('footer', {}, no, yes));
+  const el = h('div.modal', { role: 'alertdialog', 'aria-label': title }, h('header', {}, h('h2', {}, title)), h('div.body', {}, h('p', { style: 'margin:0' }, body)), h('footer', {}, no, yes));
   const modal = openModal(el);
   no.addEventListener('click', () => modal.close());
   yes.addEventListener('click', () => {
@@ -225,7 +225,7 @@ export function sendHomeDialog(opts: SendHomeOptions) {
     h(
       'div.body',
       {},
-      h('p', { style: 'margin:0 0 12px;font-weight:700' }, `This stops the session at ${opts.where} for everyone and frees the desk. ${opts.name} worked ${across ? `in worktrees of ${across.join(', ')}, each` : 'in its own worktree'} on 🌿 ${branch}:`),
+      h('p', { style: 'margin:0 0 12px' }, `This stops the session at ${opts.where} for everyone and frees the desk. ${opts.name} worked ${across ? `in worktrees of ${across.join(', ')}, each` : 'in its own worktree'} on 🌿 ${branch}:`),
       list,
       status,
     ),
@@ -294,7 +294,7 @@ export function lostWorktreeDialog(opts: LostWorktreeOptions) {
     h(
       'div.body',
       {},
-      h('p', { style: 'margin:0 0 10px;font-weight:700' }, `${folder} was deleted outside agent-office, so ${name} ${opts.openTerminal ? 'is running in a folder that no longer exists' : "can't start there"}.`),
+      h('p', { style: 'margin:0 0 10px' }, `${folder} was deleted outside agent-office, so ${name} ${opts.openTerminal ? 'is running in a folder that no longer exists' : "can't start there"}.`),
       h('p.wt-status', { style: 'margin:0' }, what),
       others.length ? h('p.wt-status.warn', {}, `${plural(others.length, 'other worker')} on this floor lost ${others.length === 1 ? 'its worktree' : 'their worktrees'} too: ${others.join(', ')}.`) : null,
     ),

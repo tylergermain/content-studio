@@ -1,4 +1,4 @@
-import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, STATIONS, STATION_AGENT, WALL_HEIGHT, WING_DESKS, seatHere, seatPlace, type DeskDef, type SeatDef, type SeatPlace, type StationKind } from '../layout.js';
+import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, SEATING_BY_ID, STATIONS, STATION_AGENT, WALL_HEIGHT, WING_DESKS, seatHere, seatPlace, type DeskDef, type SeatDef, type SeatPlace, type StationKind } from '../layout.js';
 import type { Circle, Rect } from '../nav.js';
 import { CASTLE } from './castle.js';
 import { MapError, isObj, num, str } from './check.js';
@@ -66,7 +66,8 @@ function officePlan(): MapPlan {
     meeting: MEETING_SEATS,
     byId,
     seating: SEATING,
-    seatingById: new Map(SEATING.map((s) => [s.id, s])),
+    // The office's own map of them, which follows the floor's furniture (see setFloorSeats in shared/furniture.ts).
+    seatingById: SEATING_BY_ID,
     lineup: [],
     door: { x: FLOOR.minX + 0.45, z: EXIT_DOOR.u },
     tables: [],

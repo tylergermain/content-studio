@@ -5,7 +5,6 @@ import type { Drink } from '../../shared/rooftop';
 import { OpenBook } from '../features/bookshelf/book';
 import { HeldCard } from '../features/carrying/card';
 import { REACH_TIME, SMOKE_CYCLE, cigarette, coffeeMug, dragCurve, drinkGlass, emoteEnvelope, putDownGlass, reachCurve } from './character';
-import { UNDEAD_SKIN, raggedCuff, warlockHand, witchFire } from './costumes';
 import { mesh, toon, toonUnique } from './toon';
 import { ballMesh } from '../features/basketball/world';
 
@@ -28,15 +27,10 @@ interface Arm {
   group: THREE.Group;
   base: THREE.Vector3;
   baseRot: THREE.Euler;
-  side: 1 | -1;
   /** The white cuff at the wrist. */
   cuff: THREE.Mesh;
-  /** The cartoon hand: palm, thumb, and on the right hand the pointing finger. */
-  mitten: THREE.Mesh[];
+  /** The right hand's pointing finger, which a Christmas mitten has none of (see setCostume). */
   finger: THREE.Mesh | null;
-  /** A holiday hand in place of the mitten (see setCostume), and the witch-fire round it. */
-  dressed: THREE.Group | null;
-  fire: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null;
 }
 
 /**
@@ -93,16 +87,14 @@ export class Hands {
   /** Your shirt and skin, under whatever costume the hands wear. */
   private shirt: string;
   private skinTone: string;
-  /** An undead warlock's hands for Halloween, mittens for Christmas (see setCostume). */
+  /** Mittens for Christmas (see setCostume). */
   private costume: Theme | null = null;
-  private rags = toonUnique('#24123a');
 
   constructor(shirt: string, skin: string) {
     this.shirt = shirt;
     this.skinTone = skin;
     this.sleeve = toonUnique(shirt);
     this.skin = toonUnique(skin);
-    this.rags.side = THREE.DoubleSide;
     const sun = new THREE.DirectionalLight('#fff1d6', 2);
     sun.position.set(-0.6, 1.4, 0.9);
     for (const l of [new THREE.HemisphereLight('#fff5e6', '#c9a27a', 1.5), new THREE.AmbientLight('#ffffff', 0.5), sun]) {
@@ -185,43 +177,22 @@ export class Hands {
     this.paint();
   }
 
-  /**
-   * Dresses your hands up for a holiday: an undead warlock's for Halloween (grey-green and bony, with
-   * black claws, ragged purple sleeves and green witch-fire round them), red sleeves and green mittens
-   * for Christmas. Null gives you your own back.
-   */
+  /** Dresses your hands up for a holiday: red sleeves and green mittens for Christmas. Null gives you your own back. */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
-    const warlock = theme === 'halloween';
     for (const arm of [this.right, this.left]) {
-      if (arm.dressed) {
-        arm.dressed.removeFromParent();
-        arm.dressed.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-        // The witch-fire's material is its own (its glow texture is shared, see glowTexture).
-        arm.fire?.material.dispose();
-        arm.dressed = arm.fire = null;
-      }
-      for (const m of arm.mitten) m.visible = !warlock && !(theme === 'christmas' && m === arm.finger);
-      arm.cuff.visible = !warlock;
+      if (arm.finger) arm.finger.visible = theme !== 'christmas';
       // A mitten's fluffy cuff.
       arm.cuff.scale.set(theme === 'christmas' ? 1.3 : 1, theme === 'christmas' ? 1.3 : 1, theme === 'christmas' ? 1.9 : 1);
-      if (!warlock) continue;
-      const g = new THREE.Group();
-      g.add(warlockHand(arm.side, this.skin), raggedCuff(this.rags));
-      arm.fire = witchFire(10);
-      g.add(arm.fire);
-      arm.group.add(g);
-      arm.dressed = g;
     }
     this.paint();
   }
 
   private paint() {
     const c = this.costume;
-    this.sleeve.color.set(c === 'halloween' ? '#3b1d5a' : c === 'christmas' ? '#d62828' : this.shirt);
+    this.sleeve.color.set(c === 'christmas' ? '#d62828' : this.shirt);
     this.skin.color.set(c === 'christmas' ? '#2e9e48' : this.skinTone);
-    if (c === 'halloween') this.skin.color.lerp(UNDEAD_SKIN, 0.8);
   }
 
   /** How lit it is where you stand, 0–1 (see Sky.lightAt): your hands go dark out on a night street. */
@@ -328,26 +299,7 @@ export class Hands {
     group.position.copy(base);
     group.rotation.copy(baseRot);
     this.scene.add(group);
-    return { group, base, baseRot, side, cuff, mitten: [palm, thumb, ...(finger ? [finger] : [])], finger, dressed: null, fire: null };
-  }
-
-  /** Witch-fire curling up round your fingers, and flickering. */
-  private burn(t: number) {
-    for (const arm of [this.right, this.left]) {
-      const fire = arm.fire;
-      if (!fire) continue;
-      const pos = fire.geometry.attributes.position as THREE.BufferAttribute;
-      const n = pos.count;
-      for (let i = 0; i < n; i++) {
-        const rise = (t * 0.45 + i / n) % 1;
-        const a = t * 2.4 * arm.side + (i / n) * Math.PI * 2;
-        const r = 0.055 + Math.sin(t * 3 + i * 1.7) * 0.012 - rise * 0.02;
-        pos.setXYZ(i, Math.cos(a) * r, -0.015 + rise * 0.11, -0.05 + Math.sin(a) * r * 1.3);
-      }
-      pos.needsUpdate = true;
-      fire.material.opacity = 0.6 + 0.25 * Math.sin(t * 9 + arm.side) + 0.1 * Math.sin(t * 23);
-      fire.material.size = 0.028 + 0.006 * Math.sin(t * 5 + arm.side);
-    }
+    return { group, base, baseRot, cuff, finger };
   }
 
   update(dt: number, t: number, s: HandsInput) {
@@ -477,7 +429,6 @@ export class Hands {
       this.ember.emissiveIntensity += ((d > 0.9 ? 1.4 : 0.3) - this.ember.emissiveIntensity) * Math.min(1, dt * 6);
     }
     if (this.emoting) this.emoteStep(dt, l);
-    if (this.costume === 'halloween') this.burn(t);
   }
 
   /** Moves the hands (already placed for this frame) through the emote. */

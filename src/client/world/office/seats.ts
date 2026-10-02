@@ -229,11 +229,12 @@ export const desks: Fixture = (site) => {
     site.desks.set(def.id, view);
     const hw = DESK_SIZE.width / 2 - 0.05;
     const hd = DESK_SIZE.depth / 2 - 0.02;
-    site.colliders.push({ minX: def.x - hw, maxX: def.x + hw, minZ: def.z - hd, maxZ: def.z + hd, top: DESK_SIZE.height });
+    view.collider = { minX: def.x - hw, maxX: def.x + hw, minZ: def.z - hd, maxZ: def.z + hd, top: DESK_SIZE.height };
+    site.colliders.push(view.collider);
     const seat = deskSeat(def, 1.25);
     const it: Interactable = { kind: 'desk', deskId: def.id, x: seat.x, z: seat.z, radius: 1.3 };
     site.interactables.push(it);
-    view.group.userData.interact = it;
+    view.group.userData.interact = view.interact = it;
   });
   return {};
 };

@@ -36,7 +36,22 @@ export const FRAMES = [
   { name: 'Gold', color: '#e9b949' },
   { name: 'Coral', color: '#ff8a5b' },
   { name: 'Teal', color: '#2a9d8f' },
+  // No frame at all: the picture straight on the wall, see-through where it is (a logo, a sign).
+  { name: 'None', color: '' },
 ] as const;
+
+/** The picture with no frame round it (see FRAMES). */
+export const NO_FRAME = FRAMES.length - 1;
+
+/**
+ * A picture of a floor's own (see server/media.ts), as its link: `media:<floor>/<file name>`. The office
+ * serves those itself, from the floor's .agent-office/media folder.
+ */
+const MEDIA = /^media:([a-z0-9-]{1,40})\/([\w][\w.\- ()]{0,120})$/;
+export function mediaLink(url: string): { floor: string; name: string } | undefined {
+  const m = MEDIA.exec(url);
+  return m && !m[2].includes('..') ? { floor: m[1], name: m[2] } : undefined;
+}
 
 /** How wide the frame is around the picture. */
 export const FRAME_BORDER = 0.07;
@@ -184,6 +199,7 @@ export function checkImageUrl(raw: unknown): { url: string } | { error: string }
   const s = typeof raw === 'string' ? raw.trim() : '';
   if (!s) return { error: 'Paste a link to an image' };
   if (s.length > 2048) return { error: 'That link is too long' };
+  if (mediaLink(s)) return { url: s };
   let u: URL;
   try {
     u = new URL(s);

@@ -71,13 +71,11 @@ export const settingsHandlers = {
     ctx.themes.set(msg.pick, who);
     const now = ctx.themes.state().active;
     ctx.toastAll(
-      msg.pick === 'halloween'
-        ? `🎃 ${who} dressed the office up for Halloween`
-        : msg.pick === 'christmas'
-          ? `🎄 ${who} dressed the office up for Christmas`
-          : msg.pick === 'off'
-            ? `${who} took the holiday decorations down`
-            : `📅 ${who} set the decorations to follow the calendar${now ? ` (it's ${now === 'halloween' ? 'Halloween 🎃' : 'Christmas 🎄'} season)` : ''}`,
+      msg.pick === 'christmas'
+        ? `🎄 ${who} dressed the office up for Christmas`
+        : msg.pick === 'off'
+          ? `${who} took the holiday decorations down`
+          : `📅 ${who} set the decorations to follow the calendar${now ? " (it's Christmas 🎄 season)" : ''}`,
     );
   },
   'map.set'(ctx, c, msg) {

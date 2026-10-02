@@ -1,105 +1,257 @@
+/**
+ * The builder's panels, over the room: the bar along the top (undo, the walls, saving), the catalog of
+ * furniture down the left, what's picked on the right, and what the builder has to say at the bottom.
+ * Between them the room shows through, and that's where you drag things (see mode.ts).
+ */
 import './ui.css';
-import { BUILD_AREA, ORIGINAL_DESKS, SNAP, layoutDesks, validateLayout, type DeskLayout } from '../../../shared/office-builder';
-import { FLOOR, PLANTS, WING, WING_DESKS } from '../../../shared/layout';
-import type { Net } from '../../net';
+import type { RoomOptions } from '../../../shared/floorplan';
+import { FLOOR_PALETTES } from '../../../shared/floors';
+import { FURNITURE, FURNITURE_GROUPS, FURNITURE_KINDS, MAX_PIECE_TEXT, PIECE_SCALE, kindDef, type FurnitureKind, type Piece } from '../../../shared/furniture';
+import { WING } from '../../../shared/layout';
+import { SNAP, type DeskPose } from '../../../shared/office-builder';
 import { store } from '../../state';
-import { h, openModal, toast } from '../../ui/dom';
-import { openDeskLabel } from '../../ui/floorplan';
+import { h } from '../../ui/dom';
 
-const NS='http://www.w3.org/2000/svg';
-function svg<K extends keyof SVGElementTagNameMap>(tag:K,attrs:Record<string,string|number>={}) {
-  const el=document.createElementNS(NS,tag);for(const [k,v] of Object.entries(attrs))el.setAttribute(k,String(v));return el;
+/** What's picked, as the inspector shows it: a piece of furniture, or (with no `piece`) one of the room's desks. */
+export interface Picked {
+  id: string;
+  label: string;
+  icon: string;
+  pose: DeskPose;
+  piece?: Piece;
+  /** Why it can't be moved, when it can't. */
+  locked?: string;
 }
-export function openOfficeBuilder(net:Net) {
-  if(!store.me.admin || !store.floor || store.map.pick!=='office')return toast('Open an office floor as an admin to build','warn');
-  const floor=store.floor;
-  let draft:DeskLayout=structuredClone(store.floorPlan.desks??{});
-  let revision=store.floorPlan.layoutRevision??0;
-  let selected=ORIGINAL_DESKS[0].id;
-  let dirty=false, pending=false, conflict=false;
-  const status=h('p.builder-status',{'role':'status'},'Select a desk, then drag it on the plan or use the position controls.');
-  const drawing=svg('svg',{viewBox:'-19 -23 38 37',role:'img','aria-label':'Office floor plan'});
-  drawing.classList.add('builder-plan');
-  const inspector=h('div.builder-inspector');
-  const save=h('button.btn.primary',{type:'button'},'Save layout');
-  const reset=h('button.btn',{type:'button'},'Restore original layout');
-  const reload=h('button.btn',{type:'button'},'Reload saved layout');
-  const wing=h('div.builder-expansion');
-  const root=h('section.modal.office-builder',{},
-    h('header',{},h('div',{},h('p.builder-eyebrow',{},'CONTENT STUDIO / SPACE PLANNING'),h('h2',{},'Build your office'))),
-    h('div.builder-body',{},h('div.builder-workspace',{},h('div.builder-plan-heading',{},h('span',{},'Your floor plan'),h('span',{},'¼ m grid')),drawing,h('p.builder-caption',{},'The blue area is editable. Desks, chairs, and plants need their own space.')),h('aside',{},inspector,wing)),
-    h('footer',{},status,h('div.builder-buttons',{},reload,reset,save)));
-  const busy=(id:string)=>!!store.workerAtDesk(id);
-  const error=()=>validateLayout(draft);
-  function paint(){
-    drawing.replaceChildren();
-    const defs=svg('defs');const pattern=svg('pattern',{id:'builder-grid',width:1,height:1,patternUnits:'userSpaceOnUse'});pattern.append(svg('path',{d:'M 1 0 L 0 0 0 1',fill:'none',stroke:'#dce3e9','stroke-width':0.03}));defs.append(pattern);drawing.append(defs);
-    drawing.append(svg('rect',{x:FLOOR.minX,y:FLOOR.minZ,width:36,height:26,rx:0.3,fill:'url(#builder-grid)',stroke:'#8da1af','stroke-width':0.15}));
-    drawing.append(svg('rect',{x:BUILD_AREA.minX,y:BUILD_AREA.minZ,width:BUILD_AREA.maxX-BUILD_AREA.minX,height:BUILD_AREA.maxZ-BUILD_AREA.minZ,fill:'#e3f1fa',stroke:'#78aed0','stroke-width':0.08}));
-    const text=(x:number,z:number,s:string)=>{const t=svg('text',{x,y:z,'font-size':0.55,fill:'#617682'});t.textContent=s;drawing.append(t);};
-    text(9,-7,'Lounge');text(10.4,10,'Meeting room');text(-13,12,'Kitchen');text(3.4,-11.5,'Elevator');text(-13,-10.4,'Project boards');
-    const level=store.floorPlan.wing;
-    drawing.setAttribute('viewBox',`-19 ${-14-level*WING.row} 38 ${28+level*WING.row}`);
-    if(level){drawing.append(svg('rect',{x:WING.minX,y:-13-level*WING.row,width:WING.maxX-WING.minX,height:level*WING.row,fill:'#e5eadb',stroke:'#8da17a','stroke-width':0.1}));text(13.7,-14,'Back office');}
-    for(const d of WING_DESKS.filter(d=>(d.wing??0)<=level))drawing.append(svg('rect',{x:d.x-1.1,y:d.z-0.55,width:2.2,height:1.1,fill:'#9eb19c'}));
-    for(const [x,z,s] of PLANTS)drawing.append(svg('circle',{cx:x,cy:z,r:0.3*s,fill:'#739579'}));
-    for(const d of layoutDesks(draft)){
-      const g=svg('g',{transform:`translate(${d.x} ${d.z}) rotate(${-d.rotY*180/Math.PI})`,tabindex:0,role:'button','aria-label':`${d.label}${busy(d.id)?', occupied':''}`,'data-desk':d.id});
-      g.classList.add('builder-desk');if(d.id===selected)g.classList.add('selected');
-      g.append(svg('rect',{x:-1.05,y:-0.5,width:2.1,height:1,rx:0.1,fill:busy(d.id)?'#adb9c1':d.id===selected?'#2c718f':'#7896a5'}),svg('rect',{x:-0.32,y:0.68,width:0.64,height:0.55,rx:0.15,fill:'#9caab3'}));
-      const label=svg('text',{x:0,y:0.17,'text-anchor':'middle','font-size':0.4,fill:'white',transform:`rotate(${d.rotY*180/Math.PI})`});label.textContent=d.id.replace('desk-','');g.append(label);
-      g.addEventListener('pointerdown',e=>startDrag(e,d.id));g.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();selected=d.id;render();}});drawing.append(g);
+
+/** What the panels show of the builder. */
+export interface BuilderState {
+  picked(): Picked | null;
+  status(): { text: string; tone: 'info' | 'warn' };
+  dirty(): boolean;
+  pending(): boolean;
+  conflict(): boolean;
+  /** Asking whether to throw the draft away, on the way out. */
+  asking(): boolean;
+  canUndo(): boolean;
+  canRedo(): boolean;
+  wallsCut(): boolean;
+  look(): number | undefined;
+  /** The room's own fittings, as the draft has them. */
+  room(): Required<RoomOptions>;
+  online(): boolean;
+}
+
+/** What the panels do. */
+export interface BuilderActions {
+  add(kind: FurnitureKind): void;
+  /** A press on a catalog card: a click adds the piece, a drag carries it out onto the floor. */
+  place(kind: FurnitureKind, e: PointerEvent): void;
+  moveTo(x: number, z: number): void;
+  turn(way: 1 | -1): void;
+  recolor(color: string): void;
+  resize(scale: number): void;
+  retext(text: string): void;
+  /** The one video a screen plays, by its name in the floor's media folder; '' for every video there. */
+  remedia(media: string): void;
+  duplicate(): void;
+  remove(): void;
+  /** The sign over the picked desk. */
+  sign(): void;
+  undo(): void;
+  redo(): void;
+  save(): void;
+  reload(): void;
+  reset(): void;
+  walls(): void;
+  paint(look: number | undefined): void;
+  /** Changes some of the room's own fittings (see RoomOptions). */
+  room(patch: RoomOptions): void;
+  expand(): void;
+  shrink(): void;
+  /** The floor's boards, kiosk agents and ticker (see features/studio). */
+  setup(): void;
+  close(): void;
+  discard(): void;
+  keep(): void;
+}
+
+/** Paint to pick from, for anything that can be painted. */
+const SWATCHES = ['#5b8def', '#5bc0eb', '#8ecae6', '#06d6a0', '#9bc53d', '#caffbf', '#ffd166', '#ffb400', '#ff8a5b', '#ef476f', '#f7aef8', '#b388eb', '#c98b5a', '#8a5a3b', '#f7f3ea', '#2b2d42'];
+
+const CONTROLS: [string, string][] = [
+  ['Drag', 'Move a desk or a piece'],
+  ['Drag the floor', 'Slide the view'],
+  ['Right-drag', 'Turn the view (or Shift + drag)'],
+  ['Scroll', 'Zoom'],
+  ['R', 'Turn what’s picked'],
+  ['Arrows', 'Nudge it a step'],
+  ['Alt + drag', 'Move it finely'],
+  ['Delete', 'Take it away'],
+  ['Ctrl/⌘ D', 'Another one like it'],
+  ['Ctrl/⌘ Z', 'Undo'],
+  ['W A S D', 'Slide the view'],
+  ['Q E', 'Turn the view'],
+];
+
+export function createBuilderUi(state: BuilderState, act: BuilderActions) {
+  const button = (label: string, title: string, run: () => void, cls = '') => h(`button.btn${cls}` as 'button', { type: 'button', title, onclick: run }, label);
+  const view = h('div.ob-view');
+
+  // ---- The bar ----------------------------------------------------------------------------------
+  const undo = button('↶ Undo', 'Undo (Ctrl/⌘ Z)', act.undo);
+  const redo = button('↷ Redo', 'Redo (Ctrl/⌘ Shift Z)', act.redo);
+  const walls = button('', 'Cut the walls away to see in, or stand them back up', act.walls);
+  const reload = button('Reload saved', 'Throw the draft away and load the layout as it’s saved', act.reload);
+  const reset = button('Original office', 'Put everything back the way the office comes', act.reset);
+  const save = button('Save layout', 'Save it for everyone on the floor (Ctrl/⌘ S)', act.save, '.primary');
+  const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)', onclick: act.close }, '✕');
+  const bar = h('header.ob-panel.ob-bar', {}, h('div.ob-title', {}, h('span', {}, '📐'), h('h2', {}, 'Office builder')), h('div.ob-tools', {}, undo, redo, h('span.ob-gap'), walls, h('span.ob-gap'), reload, reset, save), close);
+
+  // ---- The catalog ------------------------------------------------------------------------------
+  const paints = h('div.ob-paints');
+  const backOffice = h('div.ob-back');
+  const fittings = h('div.ob-back');
+  const catalog = h(
+    'aside.ob-panel.ob-catalog',
+    { 'aria-label': 'Furniture' },
+    h('h3', {}, 'Add furniture'),
+    h('p.ob-note', {}, 'Click one to add it, or drag it out onto the floor.'),
+    ...FURNITURE_GROUPS.flatMap((group) => [
+      h('h4', {}, group),
+      h(
+        'div.ob-cards',
+        {},
+        ...FURNITURE_KINDS.filter((kind) => FURNITURE[kind].group === group).map((kind) => {
+          const k = kindDef(kind);
+          return h('button.ob-card', { type: 'button', title: `${k.label}: click to add, or drag onto the floor`, onpointerdown: ((e: PointerEvent) => act.place(kind, e)) as EventListener }, h('span.ob-icon', {}, k.icon), h('span', {}, k.label));
+        }),
+      ),
+    ]),
+    h('h3', {}, 'The room'),
+    h('h4', {}, 'Paint'),
+    paints,
+    h('h4', {}, 'Fittings'),
+    fittings,
+    h('h4', {}, 'Back office'),
+    backOffice,
+    h('h4', {}, 'Boards and agents'),
+    h('p.ob-note', {}, 'What this floor’s wall boards are for, who stands at its kiosks, and the prices on its stock ticker (the bar is in the catalog, under Work).'),
+    button('🪧 Set up the floor…', 'Boards, kiosk agents, the ticker, Slack and Metricool', act.setup),
+  );
+
+  // ---- What's picked ----------------------------------------------------------------------------
+  const inspector = h('aside.ob-panel.ob-inspector', { 'aria-label': 'Selection' });
+  const status = h('p.ob-says', { role: 'status' });
+  const ask = h('div.ob-ask');
+  const foot = h('footer.ob-panel.ob-status', {}, status, ask);
+  const root = h('section.office-builder', { role: 'dialog', 'aria-label': 'Office builder' }, view, bar, catalog, inspector, foot);
+
+  const field = (label: string, input: HTMLElement) => h('label.ob-field', {}, h('span', {}, label), input);
+
+  function number(value: number, set: (n: number) => void, disabled: boolean) {
+    const input = h('input', { type: 'number', step: SNAP, disabled }) as HTMLInputElement;
+    input.value = String(Math.round(value * 100) / 100);
+    input.addEventListener('change', () => Number.isFinite(input.valueAsNumber) && set(input.valueAsNumber));
+    return input;
+  }
+
+  function inspect(p: Picked): HTMLElement[] {
+    const k = p.piece ? kindDef(p.piece.kind) : undefined;
+    const fixed = !!p.locked || state.pending();
+    const out: HTMLElement[] = [h('div.ob-picked', {}, h('span.ob-icon', {}, p.icon), h('div', {}, h('h3', {}, p.label || k?.label || ''), h('p.ob-note', {}, k?.fixed ? 'Part of the office' : k ? `${k.group} · ${k.label}` : 'A worker’s desk')))];
+    if (p.locked) out.push(h('p.ob-note.warn', {}, p.locked));
+    if (k?.seat?.share) out.push(h('p.ob-note', {}, 'A desk for one of you: sit down at it and your screen goes up on its monitor.'));
+    else if (k?.seat) out.push(h('p.ob-note', {}, 'People can sit here.'));
+    out.push(h('div.ob-row', {}, field('Across (m)', number(p.pose.x, (x) => act.moveTo(x, p.pose.z), fixed)), field('Along (m)', number(p.pose.z, (z) => act.moveTo(p.pose.x, z), fixed))));
+    out.push(h('div.ob-row', {}, h('button.btn', { type: 'button', disabled: fixed, title: 'Turn it left (Shift R)', onclick: () => act.turn(-1) }, '⟲ Turn'), h('button.btn', { type: 'button', disabled: fixed, title: 'Turn it right (R)', onclick: () => act.turn(1) }, '⟳ Turn')));
+    if (p.piece && k?.text !== undefined) {
+      const input = h('input', { type: 'text', maxlength: MAX_PIECE_TEXT, autocomplete: 'off', spellcheck: 'false' }) as HTMLInputElement;
+      input.value = p.piece.text ?? '';
+      input.addEventListener('change', () => act.retext(input.value));
+      out.push(field('It says', input));
     }
-  }
-  function setPose(x:number,z:number,rotY:number,redraw=true){
-    if(busy(selected)||pending||conflict)return;
-    if(![x,z,rotY].every(Number.isFinite)){status.textContent="Enter a valid position";save.disabled=true;return;}
-    draft[selected]={x:Math.round(x/SNAP)*SNAP,z:Math.round(z/SNAP)*SNAP,rotY};dirty=true;if(redraw)render();else{paint();updateState();}
-  }
-  function render(){
-    paint();inspector.replaceChildren();
-    const d=layoutDesks(draft).find(d=>d.id===selected)!;
-    inspector.append(h('p.builder-eyebrow',{},'SELECTED DESK'),h('h3',{},store.floorPlan.labels[d.id]?.text||d.label),h('p.builder-note',{},busy(d.id)?'This desk has a worker. Send it home before moving the desk.':'Position your workspace and leave room behind its chair.'));
-    for(const [key,label] of [['x','Across (m)'],['z','Along (m)']] as const){
-      const input=h('input',{type:'number',step:SNAP,'aria-label':label,disabled:busy(d.id)||pending||conflict});input.value=String(d[key]);input.addEventListener('change',()=>setPose(key==='x'?input.valueAsNumber:d.x,key==='z'?input.valueAsNumber:d.z,d.rotY,false));inspector.append(h('label.builder-field',{},label,input));
+    if (p.piece && k?.sizes) {
+      const input = h('input', { type: 'range', min: PIECE_SCALE.min, max: PIECE_SCALE.max, step: 0.1 }) as HTMLInputElement;
+      input.value = String(p.piece.scale ?? 1);
+      input.addEventListener('change', () => act.resize(input.valueAsNumber));
+      out.push(field('Size', input));
     }
-    inspector.append(h('button.btn',{type:'button',disabled:busy(d.id)||pending||conflict,onclick:()=>setPose(d.x,d.z,(d.rotY+Math.PI/2)%(Math.PI*2))},'Rotate 90°'),h('button.btn',{type:'button',onclick:()=>openDeskLabel(net,d.id)},'Change desk sign'));
-    wing.replaceChildren(h('p.builder-eyebrow',{},'ROOM TO GROW'),h('h3',{},'Back office'),h('p.builder-note',{},`${16+store.floorPlan.wing*2} desks available, with space for ${20-16-store.floorPlan.wing*2} more.`),h('p.builder-note',{},'Expansion changes apply immediately.'),h('button.btn',{type:'button',disabled:store.floorPlan.wing>=WING.rows||pending,onclick:()=>net.send({t:'floor.expand'})},'Expand by 2 desks'),h('button.btn',{type:'button',disabled:store.floorPlan.wing===0||pending,onclick:()=>net.send({t:'floor.shrink'})},'Remove last expansion'));
-    updateState();
-  }
-  function updateState(){
-    const problem=error();save.disabled=!dirty||pending||conflict||typeof problem==='string'||!net.up;
-    reset.disabled=pending||conflict;
-    if(conflict)status.textContent='Someone saved a newer layout. Reload it before saving your changes.';
-    else if(pending)status.textContent='Saving your layout…';
-    else if(typeof problem==='string')status.textContent=problem;
-    else status.textContent=dirty?'Your changes are ready to save.':'Drag a desk to rearrange the floor. Changes apply when you save.';
-    status.classList.toggle('invalid',conflict||typeof problem==='string');
-  }
-  let drag:{id:string,dx:number,dz:number,pointer:number}|null=null;
-  function point(e:PointerEvent){const m=drawing.getScreenCTM();if(!m)return null;return new DOMPoint(e.clientX,e.clientY).matrixTransform(m.inverse());}
-  function startDrag(e:PointerEvent,id:string){
-    e.preventDefault();selected=id;const p=point(e);const d=layoutDesks(draft).find(d=>d.id===id)!;
-    if(p&&!busy(id)&&!pending&&!conflict){drag={id,dx:d.x-p.x,dz:d.z-p.y,pointer:e.pointerId};drawing.setPointerCapture(e.pointerId);}render();
-  }
-  drawing.addEventListener('pointermove',e=>{if(!drag||e.pointerId!==drag.pointer)return;const p=point(e);if(p){const d=layoutDesks(draft).find(d=>d.id===drag!.id)!;setPose(p.x+drag.dx,p.y+drag.dz,d.rotY);}});
-  const stopDrag=()=>{drag=null;};drawing.addEventListener('pointerup',stopDrag);drawing.addEventListener('pointercancel',stopDrag);
-  reset.onclick=()=>{draft={};dirty=true;render();};
-  reload.onclick=()=>{draft=structuredClone(store.floorPlan.desks??{});revision=store.floorPlan.layoutRevision??0;dirty=false;pending=false;conflict=false;render();};
-  save.onclick=()=>{if(save.disabled)return;pending=true;net.send({t:'floor.layout',desks:draft,revision});render();};
-  const off=store.on('floorPlan',()=>{
-    const next=store.floorPlan.layoutRevision??0;
-    if(next!==revision){
-      if(pending && JSON.stringify(store.floorPlan.desks)===JSON.stringify(draft)){dirty=false;pending=false;revision=next;}
-      else if(dirty){conflict=true;pending=false;}
-      else{draft=structuredClone(store.floorPlan.desks??{});revision=next;}
+    if (p.piece && k?.color) {
+      const now = p.piece.color ?? k.color;
+      const custom = h('input.ob-custom', { type: 'color', title: 'Any color', 'aria-label': 'Any color' }) as HTMLInputElement;
+      custom.value = now;
+      custom.addEventListener('change', () => act.recolor(custom.value));
+      out.push(
+        h(
+          'div.ob-field',
+          {},
+          h('span', {}, 'Color'),
+          h('div.ob-swatches', {}, ...SWATCHES.map((c) => h('button.ob-swatch', { type: 'button', class: c === now ? 'on' : '', style: `background:${c}`, title: c, 'aria-label': c, onclick: () => act.recolor(c) })), custom),
+        ),
+      );
     }
-    render();
-  });
-  const workersOff=store.on('workers',render);
-  const mapOff=store.on('map',()=>{if(store.map.pick!=='office')modal.close();});
-  const messageOff=net.onMessage(m=>{if(m.t==='toast'&&pending&&m.level!=='info'){pending=false;render();status.textContent=m.text;}if(m.t==='floor.enter'&&store.floor!==floor)modal.close();});
-  const statusOff=net.onStatus(up=>{if(!up){pending=false;status.textContent='Connection lost. Your draft is still here.';}render();});
-  const modal=openModal(root,{doing:'designing the office',onClose:()=>{off();workersOff();mapOff();messageOff();statusOff();}});
-  render();
+    if (p.piece && k?.plays) {
+      const input = h('input', { type: 'text', maxlength: 120, autocomplete: 'off', spellcheck: 'false', placeholder: 'every video in the folder' }) as HTMLInputElement;
+      input.value = p.piece.media ?? '';
+      input.addEventListener('change', () => act.remedia(input.value.trim()));
+      out.push(field('Plays (a file in the floor’s .agent-office/media)', input));
+    }
+    if (k?.fixed) out.push(h('p.ob-note', {}, 'The office has one of these. Remove it and this floor goes without; the catalog puts it back.'), button('Remove from this floor', 'Take it off this floor (Delete)', act.remove, '.danger'));
+    else if (p.piece) out.push(h('div.ob-row', {}, button('Duplicate', 'Another one like it (Ctrl/⌘ D)', act.duplicate), button('Remove', 'Take it off the floor (Delete)', act.remove, '.danger')));
+    else out.push(button('Change desk sign', 'The sign hanging over this desk', act.sign));
+    return out;
+  }
+
+  /** What the inspector last drew, so it's only drawn again when that changes (and never mid-way through typing in it). */
+  let drawn = '';
+
+  function render() {
+    const pending = state.pending();
+    undo.disabled = !state.canUndo() || pending;
+    redo.disabled = !state.canRedo() || pending;
+    walls.textContent = state.wallsCut() ? '🧱 Walls: cut away' : '🧱 Walls: up';
+    reload.disabled = pending || (!state.dirty() && !state.conflict());
+    reset.disabled = pending;
+    save.disabled = pending || state.conflict() || !state.dirty() || !state.online();
+    save.textContent = pending ? 'Saving…' : 'Save layout';
+
+    const s = state.status();
+    status.textContent = s.text;
+    status.classList.toggle('warn', s.tone === 'warn');
+    const asking = state.asking();
+    foot.classList.toggle('asking', asking);
+    ask.replaceChildren(...(asking ? [h('span', {}, 'Leave without saving? Your changes will be lost.'), button('Keep building', '', act.keep), button('Discard changes', '', act.discard, '.danger')] : []));
+
+    const p = state.picked();
+    const key = JSON.stringify([p, pending]);
+    if (key !== drawn) {
+      drawn = key;
+      inspector.replaceChildren(
+        ...(p
+          ? inspect(p)
+          : [h('h3', {}, 'Nothing picked'), h('p.ob-note', {}, 'Click a desk or a piece of furniture to move it, turn it or paint it.'), h('dl.ob-keys', {}, ...CONTROLS.flatMap(([k, what]) => [h('dt', {}, k), h('dd', {}, what)]))]),
+      );
+    }
+
+    const look = state.look();
+    paints.replaceChildren(
+      h('button.ob-paint', { type: 'button', class: look === undefined ? 'on' : '', title: 'The floor’s own paint', onclick: () => act.paint(undefined) }, 'Own'),
+      ...FLOOR_PALETTES.map((f, i) => h('button.ob-paint', { type: 'button', class: look === i ? 'on' : '', title: f.name, 'aria-label': f.name, style: `background:linear-gradient(135deg, ${f.wall} 50%, ${f.floor} 50%);border-color:${f.trim}`, onclick: () => act.paint(i) })),
+    );
+    const room = state.room();
+    const choice = (label: string, on: boolean, run: () => void) => h('button.btn', { type: 'button', class: on ? 'on' : '', 'aria-pressed': String(on), onclick: run }, label);
+    fittings.replaceChildren(
+      h('p.ob-note', {}, 'The mezzanine: the boss’s loft in the corner, and the stairs up to it.'),
+      h('div.ob-row', {}, choice('Mezzanine', room.loft, () => act.room({ loft: true })), choice('One level', !room.loft, () => act.room({ loft: false }))),
+      h('p.ob-note', {}, 'Driving tees out on the balcony.'),
+      h('div.ob-row', {}, choice('1 tee', room.tees === 1, () => act.room({ tees: 1 })), choice('2 tees', room.tees === 2, () => act.room({ tees: 2 }))),
+    );
+    const wing = store.floorPlan.wing;
+    backOffice.replaceChildren(
+      h('p.ob-note', {}, `${16 + wing * 2} desks, with room for ${(WING.rows - wing) * 2} more through the north wall. This applies straight away.`),
+      h('div.ob-row', {}, h('button.btn', { type: 'button', disabled: wing >= WING.rows, onclick: act.expand }, 'Add 2 desks'), h('button.btn', { type: 'button', disabled: wing === 0, onclick: act.shrink }, 'Wall it up')),
+    );
+  }
+
+  return { root, view, render };
 }

@@ -80,6 +80,7 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     machine: machine.state(),
     sky: sky.state,
     theme: themes.state(),
+    integrations: ctx.feeds.state(),
     map: maps.state(),
     prompts: prompts.state(),
     leaveOnMerge: leaveOnMerge.state(),

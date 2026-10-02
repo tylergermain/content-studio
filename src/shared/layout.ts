@@ -450,11 +450,14 @@ export interface SeatDef {
   roof?: boolean;
   /** At the bar: E there, sitting down, orders a drink. */
   bar?: boolean;
+  /** A desk of your own (a team desk, see shared/furniture.ts): sitting down there puts your screen up on its monitor. */
+  share?: boolean;
 }
 
 /**
  * Where people can sit: the office's couches, beanbags, chairs and the balcony bench (buildOffice puts
- * them there). Workers have their own seats, the desks and bean bags in SEATS.
+ * them there). Workers have their own seats, the desks and bean bags in SEATS. The lounge's are
+ * furniture, so a floor that's been rearranged has its own in their place (see setFloorSeats).
  */
 export const SEATING: SeatDef[] = [
   // The lounge couch, its back to the room, facing the TV.

@@ -4,7 +4,7 @@
  * at a desk; and what the hint bar says at a desk or a board agent's kiosk. Also what the boards'
  * buttons do with a worker.
  */
-import { STATION_AGENT, deskSeat, type DeskDef } from '../../../shared/layout';
+import { deskSeat, type DeskDef } from '../../../shared/layout';
 import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
 import type { AgentEffort, AgentProvider, WorkerInfo } from '../../../shared/protocol';
@@ -14,7 +14,7 @@ import type { CoreState } from '../../core/ctx';
 import { seatBuilt } from '../../core/floors';
 import { aside, key } from '../../core/hint';
 import type { Parts } from '../../core/parts';
-import { STATION_INFO } from '../../core/stations';
+import { stationInfo, stationName } from '../../core/stations';
 import { askNotifyPermission, notifyPermission } from '../../notify';
 import { repoChoices } from '../../shared/hiring';
 import { store } from '../../state';
@@ -183,8 +183,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     const kind = plan().byId.get(deskId)?.station;
     if (!kind) return;
     const w = store.workerAtDesk(deskId);
-    const name = STATION_AGENT[kind].name;
-    const info = STATION_INFO[kind];
+    const name = stationName(kind);
+    const info = stationInfo(kind);
     // A prompt typed into a question it's asking would answer it.
     if (w?.status === 'needs_input') {
       toast(`The ${name} is waiting on an answer — here's its terminal`, 'warn');
@@ -416,14 +416,14 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     const kind = plan().byId.get(deskId)?.station;
     if (!kind) return { k: '', parts: [] };
     const w = store.workerAtDesk(deskId);
-    const info = STATION_INFO[kind];
+    const info = stationInfo(kind);
     if (!w) {
       const m = store.machine;
       const full = officeFull(m);
       return {
         k: `${full}|${m.workers}|${m.limit}`,
         parts: [
-          h('span.title', {}, `${info.icon} ${STATION_AGENT[kind].name}`),
+          h('span.title', {}, `${info.icon} ${stationName(kind)}`),
           aside(info.offer.replace(/^Ask me /, '')),
           full ? h('span.cost', {}, `🚫 Office full · ${m.workers} of ${m.limit} workers`) : key('E', 'Prompt'),
         ],
