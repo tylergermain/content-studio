@@ -36,7 +36,7 @@ export function specialistLaunch(plan: LaunchPlan, info: WorkerInfo, root: strin
           if(env[k]!==undefined && env[k]!==v) throw new Error('MCP servers must use distinct environment variable names');
           env[k]=v;names.push(k);
         }
-        args.push('-c',`${key}.env_vars=${JSON.stringify(names)}`);
+        if(!server.url) args.push('-c',`${key}.env_vars=${JSON.stringify(names)}`);
       }
       if(server.http_headers) throw new Error('For Codex use env_http_headers or bearer_token_env_var instead of inline secret headers');
       if(server.bearer_token_env_var!==undefined) args.push('-c',`${key}.bearer_token_env_var=${JSON.stringify(server.bearer_token_env_var)}`);
