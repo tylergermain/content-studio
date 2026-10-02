@@ -172,6 +172,27 @@ test("gets up from the boss's chair behind it, away from the desk", (t) => {
   assert.equal(player.pos.y, 3);
 });
 
+test('gets up from a guest chair behind it, between the chair and the glass', (t) => {
+  const floor: Collider = { minX: LOFT.minX, maxX: LOFT.maxX, minZ: LOFT.minZ, maxZ: LOFT.maxZ, bottom: 2.75, top: 3 };
+  const desk: Collider = { minX: 12.7, maxX: 15.3, minZ: 9.6, maxZ: 10.8, bottom: 3, top: 3.8 };
+  const glass: Collider = { minX: 9, maxX: 18, minZ: 8, maxZ: 8.12, bottom: 3, top: 99 };
+  const { player, keys, frames } = controller(t, [floor, desk, glass]);
+  for (const id of ['boss-guest-1', 'boss-guest-2']) {
+    const place = seatPlace(SEATING_BY_ID.get(id)!, 0);
+    player.sit(place);
+    keys('Space');
+    frames(1);
+    assert.equal(player.seat, null);
+    for (const c of [glass, desk]) assert.ok(!overlaps(c, player.pos.x, player.pos.z), `${id}: stood inside something at ${player.pos.toArray()}`);
+    assert.ok(player.pos.z > 8.44 && player.pos.z < 8.7, `${id}: got up at ${player.pos.toArray()}`);
+    // Straight back off the chair, the way it's turned: out to the side it's on, not in toward the other one.
+    assert.ok(Math.abs(player.pos.x - 14) > Math.abs(place.x - 14), `${id}: got up at ${player.pos.toArray()}`);
+    keys();
+    frames(60);
+    assert.equal(player.pos.y, 3);
+  }
+});
+
 test('gets up off a beanbag to the side when something stands in front of it', (t) => {
   const bag = SEATING_BY_ID.get('lounge-beanbag-1')!;
   const bean: Collider = { minX: bag.x - 0.5, maxX: bag.x + 0.5, minZ: bag.z - 0.5, maxZ: bag.z + 0.5, top: 0.42 };

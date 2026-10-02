@@ -7,7 +7,7 @@ Back to the [README](../README.md).
 | W A S D / arrows | Walk (hold Shift to run); on the ladder, W and S climb; in a car, W is the gas, S brakes and reverses, A and D steer |
 | Space | Jump (you can land on desks, couches and the cars in the garage); in a car, brake; on a trampoline, hold it to bounce higher; in a ping-pong rally, hit the ball back |
 | Mouse drag / wheel | Orbit / zoom the camera |
-| E | Interact: hire a worker, open its terminal, read a board, take an issue's note off the board, prompt a board agent, call a meeting in the meeting room, draw on the whiteboard, read the docs at the bookshelf, watch the TV, sit down (or get up), ride the elevator, climb the ladder (or get off it), slide down a fire pole, grab a coffee, take a smoke break, tee off at a golf tee (a floor with two has room for two at once), watch a video screen in a window with sound, use something to play with (punch the bag, drop a can from the vending machine, spin the prize wheel, swing at the high striker, kick off a point of foosball, start a ping-pong rally), pet the dog, pick up the basketball (then hold E and let go to shoot), order a drink at the rooftop bar, blow the DJ's air horn, step up to the dart board or the axe lane on the roof (then hold Space and let go to throw), get into one of the cars in the garage (behind the wheel, or beside whoever's driving) or out of it, knock through the north wall past the gong for 2 more desks (admins, at the **🚧 Room to grow** sign). In the [castle](maps.md#the-castle): sit on the throne, where E is for whoever's first in line (or the Hand of the King, with nobody waiting), and speak to the Hand to send out a new worker |
+| E | Interact: hire a worker, open its terminal, read a board, take an issue's note off the board, prompt a board agent, call a meeting in the meeting room, draw on the whiteboard, read the docs at the bookshelf, watch the TV, sit down (or get up), at the boss's desk open the desk's menu (from the boss's chair) or the call window (from a guest's chair), ride the elevator, climb the ladder (or get off it), slide down a fire pole, grab a coffee, take a smoke break, tee off at a golf tee (a floor with two has room for two at once), watch a video screen in a window with sound (a file of the floor's, or a YouTube video from the channels it watches), use something to play with (punch the bag, drop a can from the vending machine, spin the prize wheel, swing at the high striker, kick off a point of foosball, start a ping-pong rally), pet the dog, pick up the basketball (then hold E and let go to shoot), order a drink at the rooftop bar, blow the DJ's air horn, step up to the dart board or the axe lane on the roof (then hold Space and let go to throw), get into one of the cars in the garage (behind the wheel, or beside whoever's driving) or out of it, knock through the north wall past the gong for 2 more desks (admins, at the **🚧 Room to grow** sign). In the [castle](maps.md#the-castle): sit on the throne, where E is for whoever's first in line (or the Hand of the King, with nobody waiting), and speak to the Hand to send out a new worker |
 | K | On the castle's throne: speak to the Hand of the King, to send out a new worker |
 | P | Prompt: give a task to a new worker, or to the one at this desk |
 | C | Changes: the files the worker at this desk changed and their diff; commit, discard or open a PR |
@@ -25,12 +25,14 @@ Back to the [README](../README.md).
 | G / 1–6 | Emote: hold G for the wheel (point and let go) or press 1–6 to wave, give a thumbs up, clap, dance, point or facepalm; everyone on your floor sees it |
 | / | Search the chat and every terminal on your floor |
 | Ctrl + K (⌘K on a Mac) | Command palette: find a worker, issue, PR, service, board, teammate or action; Enter opens it, Shift+Enter walks you there first |
-| V | Join voice; in voice, hold to talk (you're muted when you let go) |
-| M | Mute / unmute in voice |
+| V | Join voice; in voice, hold to talk (you're muted when you let go). It works with the boss's desk's windows open too |
+| M | Mute / unmute in voice, with the boss's desk's windows open too |
 | Ctrl + Space | Dictate, in a worker's terminal or a prompt box: hold it and talk, and what you said is typed in when you let go. A quick tap leaves it listening until the next tap. The **🎤** does the same |
 | Tab | The ☰ menu: every window, and what shows on screen |
 | Esc | Close any window (a terminal too) and get back to looking around |
 | Ctrl + [ | Send Esc to a terminal instead, to close a menu like Claude's `/skills` or interrupt Claude. **⎋ Esc** in the terminal's header does the same |
+
+A game on the boss's monitor takes the arrows, W A S D, Space, Enter and its own letters (Blockfall: X, Z, C, P and Shift) while it's open. Esc closes it, and V and M stay the call's.
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
 

@@ -7,6 +7,7 @@ import type { HandlerMap, ViewPieces } from './types.js';
 
 export const studioView: ViewPieces['studio'] = (_ctx, floor) => floor?.studio.state() ?? EMPTY_STUDIO;
 export const tickerView: ViewPieces['ticker'] = (ctx, floor) => ctx.feeds.ticker(floor?.studio.symbols() ?? []);
+export const watchView: ViewPieces['watch'] = (ctx, floor) => ctx.watch.state(floor?.studio.watching() ?? []);
 
 export const studioHandlers = {
   'studio.setup'(ctx, c, msg) {
@@ -17,6 +18,9 @@ export const studioHandlers = {
     ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() });
     ctx.toFloor(floor, { t: 'ticker', ticker: ctx.feeds.ticker(floor.studio.symbols()) });
     ctx.feeds.refreshTicker();
+    // The channels it watches: what's known of them goes out now, and the new ones are read.
+    ctx.toFloor(floor, { t: 'watch', watch: ctx.watch.state(floor.studio.watching()) });
+    ctx.watch.refresh();
     ctx.toastFloor(floor, `🪧 ${c.peer.name} set up this floor's boards and agents`);
   },
   'studio.post'(ctx, c, msg) {

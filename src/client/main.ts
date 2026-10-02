@@ -33,6 +33,7 @@ import { installBar } from './features/bar';
 import { installBarGames } from './features/bargames';
 import { installBasketball } from './features/basketball';
 import { installBoards } from './features/boards';
+import { installBossDesk } from './features/boss-desk';
 import { installBookshelf } from './features/bookshelf';
 import { installCabinet } from './features/cabinet';
 import { installCarrying } from './features/carrying';
@@ -173,8 +174,9 @@ parts.cards = installCarrying(ctx, {
   officeIsFull: parts.actions.officeIsFull,
   showMeeting: parts.meeting.showMeeting,
 });
-parts.seating = installSeating(ctx, { shares: () => parts.talk.currentShares(), watchShare: () => parts.talk.watchShare(), arcade: parts.arcade, showBar: parts.bar.showBar, usable: () => parts.pointer.usable() });
+parts.seating = installSeating(ctx, { shares: () => parts.talk.currentShares(), watchShare: () => parts.talk.watchShare(), desk: (id) => parts.bossDesk.seat(id), showBar: parts.bar.showBar, usable: () => parts.pointer.usable() });
 installWorkstation(ctx);
+parts.bossDesk = installBossDesk(ctx, { arcade: parts.arcade });
 installScreens(ctx);
 installPlaythings(ctx, { snack: () => parts.coffee.drink() });
 parts.studio = installStudio(ctx, { redress: () => parts.boards.dressBoards(ctx.world()) });

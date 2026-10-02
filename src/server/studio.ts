@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { StationKind } from '../shared/layout.js';
-import { LIMITS, STUDIO_BOARDS, cleanPost, cleanSetup, isStudioBoard, postingBrief, type BoardFeed, type Post, type StudioBoard, type StudioSetup, type StudioState } from '../shared/studio.js';
+import { LIMITS, STUDIO_BOARDS, cleanPost, cleanSetup, isStudioBoard, postingBrief, type BoardFeed, type Post, type StudioBoard, type StudioSetup, type StudioState, type WatchChannel } from '../shared/studio.js';
 
 /**
  * A floor made its own (see shared/studio.ts): what its wall boards are for and what's posted on
@@ -54,6 +54,24 @@ export class Studio {
     return this.setup.ticker?.symbols ?? [];
   }
 
+  /** The YouTube channels this floor watches (see watch.ts). */
+  watching(): WatchChannel[] {
+    return this.setup.watch?.channels ?? [];
+  }
+
+  /** The office found which channel the link `url` is, or what it calls itself: whether that's news. */
+  found(url: string, id: string, name: string): boolean {
+    const c = this.watching().find((x) => x.url === url);
+    if (!c || (c.id === id && (c.name === name || !name))) return false;
+    c.id = id;
+    if (name) c.name = name;
+    // The same channel under two links (its handle, and one of its videos) is watched once.
+    const twice = this.watching().filter((x) => x.id === id);
+    if (twice.length > 1) this.setup.watch!.channels = this.watching().filter((x) => x.id !== id || x === twice[0]);
+    this.save();
+    return true;
+  }
+
   /** What the agent at a kiosk is called here, when the floor has its own. */
   agentName(kind: StationKind): string | undefined {
     return this.setup.agents[kind]?.name;
@@ -79,7 +97,14 @@ export class Studio {
 
   /** Makes the floor's boards and agents what `raw` says (see cleanSetup). Posts on a board that's gone go with it. */
   configure(raw: unknown) {
+    const was = this.watching();
     this.setup = cleanSetup(raw);
+    // What the office had found out about a channel isn't lost to a browser that hadn't heard yet.
+    for (const c of this.watching()) {
+      const known = was.find((x) => x.url === c.url);
+      if (known && !c.id) c.id = known.id;
+      if (known && !c.name && known.id === c.id) c.name = known.name;
+    }
     this.posts = this.posts.filter((p) => this.setup.boards[p.board]);
     this.save();
   }

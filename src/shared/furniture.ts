@@ -167,7 +167,7 @@ export interface Piece {
   scale?: number;
   /** What it says, for a kind that says something. */
   text?: string;
-  /** The one video it plays, by its name in the floor's media folder, for a kind that plays them: every video there, with none. */
+  /** The one video it plays, by its name in the floor's media folder, for a kind that plays them: every video there, with none. Or WATCH_MEDIA. */
   media?: string;
 }
 
@@ -380,6 +380,8 @@ const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 const COLOR = /^#[0-9a-f]{6}$/;
 /** A file's name in a floor's media folder (see server/media.ts). */
 const MEDIA_NAME = /^[\w][\w.\- ()]{0,120}$/;
+/** What `media` is on a screen that plays the newest videos from the channels the floor watches, rather than a file (see StudioSetup.watch). */
+export const WATCH_MEDIA = '@watch';
 
 /** An id for a new piece, that none of `taken` has. */
 export function newPieceId(taken: Iterable<{ id: string }>): string {
@@ -425,7 +427,7 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
       piece.scale = tidy(round(Math.max(PIECE_SCALE.min, Math.min(PIECE_SCALE.max, scale)), GRID));
     }
     if (k.text !== undefined) piece.text = cleanPieceText(r.text) || k.text;
-    if (k.plays && typeof r.media === 'string' && MEDIA_NAME.test(r.media) && !r.media.includes('..')) piece.media = r.media;
+    if (k.plays && typeof r.media === 'string' && (r.media === WATCH_MEDIA || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
     // One of each of what the office comes with, under its own name, and where the office hangs it if it's on a wall.
     if (k.fixed && piece.id !== kind) return `There is only one ${k.label.toLowerCase()}`;
     const hung = PINNED.get(kind);

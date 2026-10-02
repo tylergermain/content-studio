@@ -119,7 +119,7 @@ test('the way round the floor goes over where the stairs were only on a one-leve
 });
 
 test("nobody sits up in the loft on a floor that hasn't one", () => {
-  assert.deepEqual([...LOFT_SEATS].sort(), ['boss-chair', 'loft-couch']);
+  assert.deepEqual([...LOFT_SEATS].sort(), ['boss-chair', 'boss-guest-1', 'boss-guest-2', 'loft-couch']);
   for (const id of LOFT_SEATS) {
     assert.equal(floorSeat(DEFAULT_FURNITURE, 0, id)?.id, id);
     assert.equal(floorSeat(DEFAULT_FURNITURE, 0, id, ROOM_DEFAULTS)?.y, LOFT.y);

@@ -6,6 +6,7 @@
 // Kept per floor by server/studio.ts, in .agent-office/studio.json.
 
 import type { StationKind } from './layout.js';
+import { CHANNEL_ID, channelLink } from './youtube.js';
 
 /** The wall boards a floor can make its own: the ones that hang where Issues and Pull Requests do. */
 export const STUDIO_BOARDS = ['issues', 'pulls'] as const;
@@ -46,10 +47,26 @@ export interface TickerSetup {
   symbols: string[];
 }
 
+/** A YouTube channel a floor watches: its newest videos play on the floor's screens that are set to (see server/watch.ts). */
+export interface WatchChannel {
+  /** The channel's id (UC…), once the office has found which channel the link is: '' until then. */
+  id: string;
+  /** What the channel calls itself, once its feed has been read: '' until then. */
+  name: string;
+  /** The link that was pasted, tidied (see channelLink in shared/youtube.ts). */
+  url: string;
+}
+
+/** The channels a floor watches, in the order they were pasted. */
+export interface WatchSetup {
+  channels: WatchChannel[];
+}
+
 export interface StudioSetup {
   boards: Partial<Record<StudioBoard, BoardSetup>>;
   agents: Partial<Record<StationKind, AgentSetup>>;
   ticker?: TickerSetup;
+  watch?: WatchSetup;
 }
 
 /** Something posted to one of a floor's bulletin boards. */
@@ -111,7 +128,7 @@ export interface TickerState {
   error?: string;
 }
 
-export const LIMITS = { title: 140, body: 600, url: 500, source: 60, name: 40, offer: 60, about: 200, brief: 6000, posts: 60, symbols: 30 } as const;
+export const LIMITS = { title: 140, body: 600, url: 500, source: 60, name: 40, offer: 60, about: 200, brief: 6000, posts: 60, symbols: 30, channels: 20 } as const;
 
 const flat = (v: unknown, max: number): string =>
   typeof v === 'string'
@@ -149,6 +166,22 @@ function cleanFeed(raw: unknown): BoardFeed | undefined {
   return { kind: 'slack', channels };
 }
 
+/** The channels to watch out of `raw`: the ones that are YouTube links, each once, and no more than a floor takes. */
+function cleanChannels(raw: unknown): WatchChannel[] {
+  const channels: WatchChannel[] = [];
+  for (const c of Array.isArray(raw) ? (raw as unknown[]) : []) {
+    const r = c && typeof c === 'object' ? (c as Record<string, unknown>) : { url: c };
+    const link = typeof r.url === 'string' ? channelLink(r.url) : undefined;
+    if (!link) continue;
+    // A /channel/UC… link says which channel it is; any other is whichever the office found it to be.
+    const id = link.kind === 'channel' ? link.id : typeof r.id === 'string' && CHANNEL_ID.test(r.id) ? r.id : '';
+    if (channels.some((x) => x.url === link.url || (id && x.id === id))) continue;
+    channels.push({ id, name: flat(r.name, 80), url: link.url });
+    if (channels.length >= LIMITS.channels) break;
+  }
+  return channels;
+}
+
 /** A setup from somewhere it can't be trusted (a browser, a file): what's valid of it. */
 export function cleanSetup(raw: unknown): StudioSetup {
   const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : {};
@@ -169,6 +202,8 @@ export function cleanSetup(raw: unknown): StudioSetup {
   const t = r.ticker && typeof r.ticker === 'object' ? (r.ticker as Record<string, unknown>) : undefined;
   const symbols = Array.isArray(t?.symbols) ? [...new Set(t.symbols.map(cleanSymbol).filter((s): s is string => !!s))].slice(0, LIMITS.symbols) : [];
   if (symbols.length) setup.ticker = { symbols };
+  const channels = cleanChannels(r.watch && typeof r.watch === 'object' ? (r.watch as Record<string, unknown>).channels : undefined);
+  if (channels.length) setup.watch = { channels };
   return setup;
 }
 

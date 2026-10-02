@@ -14,6 +14,7 @@ changing its script and running it again.
 | `scripts/build_studio.py` | `studio.glb`: `long_table`, `podcast_desk`, `screen`, `ticker`, `softbox`, `camera`, `backdrop`, `lounge_chair`, `stool`, `credenza`, `neon` |
 | `scripts/build_greenery.py` | `greenery.glb`: `fiddle_leaf`, `palm`, `bird_of_paradise`, `pothos`, `planter`, each with its `<name>_leaves` hung under it as in `plants.glb`. It borrows its leaf helpers from `build_plants.py`, so a change to those changes both packs |
 | `scripts/build_play.py` | `play.glb`: the things to play with, each a root named for its kind with the parts that move hung under it, their origins at their pivots (`PLAY_PARTS` in `world/office/furniture-play.ts` lists the names) |
+| `scripts/build_toppers.py` | `toppers.glb`: the emblem a worker wears on its antenna for its provider, one root per provider named `topper_<provider id>` plus `topper_default`. Each has its origin at the point that stands on the antenna's tip, is 0.12 to 0.16 m across, and is made of the two materials `Main` and `Accent`, which `world/toppers.ts` paints in each provider's colours. `-- --shots` writes one sheet of them all; `-- --shots=topper_pi,topper_codex` writes a four-view sheet of each named one |
 | `scripts/build_dog.py`, `scripts/dog_breeds.py` | The office dog in every breed (the presets are in `dog_breeds.py`), each exported as `src/client/models/dog-<breed>.glb` with the same bones, sockets, materials and clips |
 
 A helper only one model needs lives in that model's script. One that several need can join the kit, as a new

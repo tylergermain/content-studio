@@ -29,6 +29,7 @@ import { wing } from './wing';
 import { beanbags, desks, kiosks } from './seats';
 import { meetingRoom } from './meeting-room';
 import { loft } from './loft';
+import { bossDesk } from '../../features/boss-desk/world';
 import type { Fixture, Gives, Site } from './fixture';
 
 // The office floor, put together from its fixtures (see fixture.ts): the room and its walls, the desks
@@ -67,6 +68,7 @@ function floorPlan() {
     wing,
     signs,
     loft,
+    bossDesk,
     meetingRoom,
     elevator,
     garageLift,

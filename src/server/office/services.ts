@@ -14,6 +14,7 @@ import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
 import { Themes } from '../theme.js';
 import { Feeds } from '../feeds.js';
+import { Watch } from '../watch.js';
 import { Maps } from '../maps.js';
 import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
@@ -39,6 +40,13 @@ export function createServices(ctx: Ctx): BuildingServices {
     integrations: (state) => ctx.broadcast({ t: 'integrations', state }),
   });
   feeds.start();
+  // The newest videos from the YouTube channels each floor watches, for its screens.
+  const watch = new Watch({
+    floors: () => floors.values(),
+    watch: (floor) => ctx.toFloor(floor, { t: 'watch', watch: watch.state(floor.studio.watching()) }),
+    studio: (floor) => ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() }),
+  });
+  watch.start();
   // What the building looks like inside: the office, the castle, or a map of your own (⚙️ Settings).
   const maps = new Maps(cfg.dataDir);
   // The prompts the office writes for workers by itself, and the worker everyone starts on (⚙️ Settings).
@@ -133,7 +141,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, feeds, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, feeds, watch, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

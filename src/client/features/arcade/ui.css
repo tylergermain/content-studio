@@ -1,0 +1,5 @@
+/* The bar under a game on the boss's monitor (ui.ts). It carries the desk's own buttons too (see
+   features/boss-desk), so on a narrow window it stops at the page's edges and the tip gives way first,
+   leaving the buttons where they can be clicked. The rest of the game's look is in styles/hud.css. */
+.arcade-bar { width: max-content; max-width: calc(100vw - 24px); }
+.arcade-bar .tip { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

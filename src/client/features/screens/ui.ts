@@ -1,8 +1,11 @@
 /**
- * The window a video screen opens: what's on it, with its sound and the browser's own controls.
+ * The window a video screen opens: what's on it, with its sound and the browser's own controls (or,
+ * for a video from a channel the floor watches, YouTube's own player and its controls).
  */
 import './ui.css';
-import { h, openModal, type Modal } from '../../ui/dom';
+import type { WatchVideo } from '../../../shared/protocol/watch';
+import { clip, h, openModal, type Modal } from '../../ui/dom';
+import { embedFrame, embedUrl } from '../../world/webscreen-player';
 import { mediaUrl, type MediaFile } from './playlist';
 
 export interface Watching {
@@ -39,6 +42,32 @@ export function openScreenWindow({ floor, file, at, size }: Watching): Modal {
       video.pause();
       video.removeAttribute('src');
       video.load();
+    },
+  });
+}
+
+/**
+ * Opens `video`, from a channel the floor watches, in a window: YouTube's own player, bigger, with its
+ * sound and its controls, `at` seconds in (where the screen on the floor is). Closing it (its ✕, or Esc)
+ * stops it and puts you back in the office.
+ */
+export function openWatchWindow(video: WatchVideo, at: number): Modal {
+  const frame = embedFrame(embedUrl(video.id, { start: at, controls: true }), video.title);
+  frame.allowFullscreen = true;
+  // A Short is taller than it's wide.
+  if (video.short) frame.style.setProperty('--shape', String(9 / 16));
+  const link = h('a.screen-link', { href: `https://www.youtube.com/watch?v=${encodeURIComponent(video.id)}`, target: '_blank', rel: 'noopener noreferrer' }, 'Open on YouTube ↗');
+  const el = h('div.modal.screen-window', { role: 'dialog', 'aria-label': video.title }, h('header', {}, h('h2', { title: `${video.channel} · ${video.title}` }, `📺 ${video.channel} · ${video.title}`), link), h('div.screen-stage', {}, frame));
+  // A click on the player takes the keyboard into YouTube's frame, where Esc would never get back out
+  // to close this: the frame keeps the click and hands the keys straight back.
+  const keys = () => setTimeout(() => document.activeElement === frame && frame.blur(), 0);
+  window.addEventListener('blur', keys);
+  return openModal(el, {
+    doing: `📺 watching ${clip(video.title, 40)}`,
+    onClose: () => {
+      window.removeEventListener('blur', keys);
+      // Let go of it, so its sound stops.
+      frame.src = 'about:blank';
     },
   });
 }

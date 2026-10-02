@@ -14,9 +14,9 @@ The camera goes up over the room with the ceiling off and the walls cut away, an
 - **The room's paint.** Pick one of the floor palettes under *The room*, or *Own* for the floor's own color.
 - **The room's fittings.** Under *The room → Fittings*: whether the floor has the mezzanine, and how many driving tees are out on its balcony (see [Room options](#room-options)).
 - **The back office.** *Add 2 desks* and *Wall it up* knock the back office out or close it again. Unlike everything else these apply straight away.
-- **Boards and agents.** *🪧 Set up the floor…* opens what the floor's wall boards are for, who stands at its kiosks, and the prices on its stock ticker (see [A floor's boards and agents](#a-floors-boards-and-agents)). It saves by itself, apart from the layout.
+- **Boards and agents.** *🪧 Set up the floor…* opens what the floor's wall boards are for, who stands at its kiosks, the prices on its stock ticker, and the YouTube channels its screens follow (see [A floor's boards and agents](#a-floors-boards-and-agents)). It saves by itself, apart from the layout.
 
-With a piece picked, the panel on the right sets its position, turns it, paints it (a swatch, or any color), sizes a plant, changes what a sign says, or names the one video a screen plays.
+With a piece picked, the panel on the right sets its position, turns it, paints it (a swatch, or any color), sizes a plant, changes what a sign says, or chooses what a screen plays.
 
 The room's walls, the meeting room, the kitchen, the wall boards, the TV, the board agents' kiosks, the elevator, the ladder and the fire pole stay where they are, and so do the loft and its stairs on a floor that has them. The builder keeps furniture off them and out of the doorways, and says why when something can't stand where you dropped it: it goes back where it was. Rugs lie under anything.
 
@@ -53,10 +53,10 @@ A floor is either **Mezzanine** (the boss's loft on its posts in the south-east 
 
 On a one-level floor:
 
-- The loft, its posts, its stairs, its glass and roof, and everything upstairs (the boss's desk, chair and monitor, the couch, the telescope, the plants, the lamp, the signs) are gone. Nothing is drawn, nothing is in the way, and there's nothing to use or sit on up there. Minesweeper on the boss's monitor isn't reachable on that floor.
+- The loft, its posts, its stairs, its glass and roof, and everything upstairs (the boss's desk, its chair, its two guest chairs and both monitors, the couch, the telescope, the plants, the lamp, the signs) are gone. Nothing is drawn, nothing is in the way, and there's nothing to use or sit on up there. The boss's desk, with its games and its call, isn't on that floor.
 - The floor where the stairs stood is floor like any other: you walk across it, furniture and desks can stand on it, and workers and the dog route over it.
 - The meeting room stays, since meetings need it. With no loft over it, it's a glass room open to the ceiling: a slim rail caps the glass along both walls and over the door, and two slim beams cross it carrying the lights over the table.
-- Nobody can sit on the loft's couch or the boss's chair: the office refuses those two seats on that floor.
+- Nobody can sit on the loft's couch, the boss's chair or the guest chairs: the office refuses those seats on that floor.
 - Anyone up in the loft, on its stairs, or sitting up there when the floor is saved one-level is put down on the floor below. The same happens if you switch from the floor list onto a one-level floor while standing at loft height.
 
 Switching back to **Mezzanine** is refused while anything stands where the stairs go, in the builder and again by the office when it saves: *Clear the floor for the mezzanine first: Sofa is in the way of the stairs*. Move or remove the piece, then switch. If you're standing where the stairs go when the mezzanine comes back, you step out of them.
@@ -73,7 +73,7 @@ Sofas, armchairs, poufs, lounge chairs, stools and floor cushions you add are se
 
 ## Video screens
 
-A floor's screens play that floor's own videos on a loop. There are two kinds in the **Work** group: **Video screen** (on a studio cart) and **Wall screen** (hung at eye level; push it up against a wall, holding **Alt** while dragging to get it flush).
+A floor's screens play that floor's own videos on a loop, or the newest videos from the YouTube channels it watches (see [Channels to watch](#channels-to-watch)). There are two kinds in the **Work** group: **Video screen** (on a studio cart) and **Wall screen** (hung at eye level; push it up against a wall, holding **Alt** while dragging to get it flush).
 
 ### Putting videos up
 
@@ -92,8 +92,9 @@ Nothing needs reloading. The office looks in the folder when you arrive on the f
 ### What each screen plays
 
 - By default a screen plays every video in the folder in turn. Each screen starts on a different one, so two side by side don't mirror each other; with more screens than videos, the ones sharing a file start at different points in it.
-- To loop a single file, pick the screen in the builder and type the file's name under **Plays**. If that file isn't in the folder, the screen falls back to the whole folder.
-- With no videos in the folder, screens show its pictures instead (PNG, JPG, WebP, GIF, SVG), ten seconds each. A screen whose **Plays** names a picture shows just that one.
+- To loop a single file, pick the screen in the builder, choose **What it plays → One file from its media folder** and type the file's name. If that file isn't in the folder, the screen falls back to the whole folder.
+- With no videos in the folder, screens show its pictures instead (PNG, JPG, WebP, GIF, SVG), ten seconds each. A screen whose one file is a picture shows just that one.
+- **What it plays → Channels we watch: newest videos** plays YouTube instead of the folder: see [Channels to watch](#channels-to-watch).
 
 ### How it looks
 
@@ -102,6 +103,23 @@ Nothing needs reloading. The office looks in the folder when you arrive on the f
 - Screens are silent on the floor. Look at one (or stand in front of it in third person): the hint shows the file's name, and **E** opens it in a window with sound and the browser's controls, starting from where the screen was. ✕ or Esc closes it and puts you back in mouse-look.
 
 Each browser plays its own copy; playback isn't synchronised between people. A screen is paused while it's out of view, while you're on the roof or another map, and while the tab is hidden. Its video is released when the screen is taken away or you leave the floor.
+
+### Channels to watch
+
+A floor can follow YouTube channels and play their newest videos on its screens.
+
+1. **List the channels.** **🪧 Set up the floor… → Channels to watch**: paste one link a line and save. A channel's own link (`https://www.youtube.com/@name` or `https://www.youtube.com/channel/UC…`) or a link to any of its videos works. A line that isn't a YouTube link is refused. Up to 20 channels a floor.
+2. **Set a screen to them.** Pick a video screen or a wall screen in the builder and choose **What it plays → Channels we watch: newest videos**. The other choices are the floor's own videos in turn (as it comes) and one named file.
+
+What happens then:
+
+- The office finds which channel each link is and reads its public feed (`https://www.youtube.com/feeds/videos.xml?channel_id=…`) every ten minutes, and at once when the setup changes. The newest 30 videos across the floor's channels go to everyone on the floor. Under the box, the setup shows what each channel is called and how many of the newest videos are its own, or why it couldn't be read.
+- Each screen plays the list newest first and moves on when a video ends or can't be played (its owner doesn't allow embedding, it's gone, or it's a première that hasn't started). Screens start on different videos so two side by side don't mirror each other, and go back to their starting places when a new video comes out. Shorts play pillarboxed.
+- The line under the video reads `<channel> · <title> · <2h ago>`.
+- Screens are silent. Looking at one, the hint names the channel and the video, and **E** opens it in a window with YouTube's controls, sound and a link out to YouTube.
+- With no channels set, the screen shows a card saying where to add them.
+
+Videos run in YouTube's own embedded player (the IFrame Player API on `youtube-nocookie.com`). The office never downloads, proxies or re-encodes a video; only thumbnails go through the office's image proxy. A player runs only while its screen is on your floor, in view and within about 25 m, at most three at once (the nearest in view first); the other screens show the video's thumbnail with the same line under it. Players pause when the screen is out of view or the tab is hidden. The office's machine needs to reach `www.youtube.com`, and each browser `youtube.com`, `youtube-nocookie.com` and `i.ytimg.com`. If YouTube sends the office to its cookie-consent page (some networks in the EU), a handle or a video link can't be read: use the channel's `/channel/UC…` link there.
 
 ## Stock ticker and market board
 
@@ -144,6 +162,7 @@ Each piece can be painted: the trampoline's pad, the bag, the machine's cabinet,
 - **Wall boards.** Either of the two boards (where Issues and Pull Requests hang) can be a bulletin of the floor's own: an icon, a name (*Newsroom*, *Pipeline*) and a line about what goes on it. Its posts come from people and agents posting to it, from the latest in some Slack channels, or from how the socials are doing on Metricool.
 - **Kiosk agents.** The agent at each of the three kiosks can be the floor's own: its name, the line on its card, and its brief (what it's told when it's hired, ahead of the first request). An agent on a floor with bulletin boards is told how to post to them with the `office-board` command.
 - **Ticker.** The symbols the floor's stock ticker and market board show.
+- **Channels to watch.** The YouTube channels whose newest videos play on the screens set to them (see [Channels to watch](#channels-to-watch)).
 - **Connections.** Signing the office in to Slack (a Slack app's bot token) and Metricool (its API token, your userId and the brand's blogId), for the boards the office fills by itself, on every floor. The tokens stay on the office's machine and are never shown back.
 
 **Save for this floor** applies it to everyone there. It's kept per floor in `.agent-office/studio.json`.
@@ -177,7 +196,7 @@ A layout saved by an older version that no longer fits (a piece where something 
 
 ## Who can build
 
-Only admins. The builder opens for nobody else, and everything it changes travels on messages the office refuses from anyone else: the layout and its room options (`floor.layout`), the back office (`floor.expand`, `floor.shrink`), and a floor's boards, agents, ticker and connections (`studio.setup`, `integrations.signIn`). Using what's on the floor (the seats, the screens, the things to play with, the tees) is for everyone.
+Only admins. The builder opens for nobody else, and everything it changes travels on messages the office refuses from anyone else: the layout and its room options (`floor.layout`), the back office (`floor.expand`, `floor.shrink`), and a floor's boards, agents, ticker, watched channels and connections (`studio.setup`, `integrations.signIn`). Using what's on the floor (the seats, the screens, the things to play with, the tees) is for everyone.
 
 Someone who comes in on the shared office password counts as an admin, so none of this holds anyone back until the admins have accounts of their own and the shared password is switched off: see [Add users](../README.md#add-users).
 
@@ -187,4 +206,4 @@ The catalog and each kind's footprint are in [`src/shared/furniture.ts`](../src/
 
 How each piece looks is a builder in `BUILDERS` in [`src/client/world/office/furniture.ts`](../src/client/world/office/furniture.ts), which takes in the ones kept beside it: `furniture-rooms.ts` (the walls), `furniture-studio.ts` and `furniture-greenery.ts` (the studio's pieces and the newer plants), `furniture-screens.ts` (the wall screen), `furniture-ticker.ts` (the market board) and `furniture-play.ts` (the things to play with). Most are modelled in Blender (see [`blender/README.md`](../blender/README.md)). A kind with no builder shows as a plain box. A new kind of furniture is an entry in `FURNITURE` and a builder.
 
-What the pieces do is in the features: team desks' screen sharing in [`src/client/features/workstation/`](../src/client/features/workstation), the video screens in [`src/client/features/screens/`](../src/client/features/screens) (served by `GET /api/media?floor=<id>&list` and `&name=<file>`, in `src/server/media.ts`), the ticker's prices in [`src/client/features/studio/`](../src/client/features/studio) (`ticker.ts`, with the pure parts in `ticker-format.ts`), the things to play with in [`src/client/features/playthings/`](../src/client/features/playthings), and the tees in [`src/client/features/golf/`](../src/client/features/golf). A new plaything is a kind in `shared/furniture.ts`, a piece in `blender/scripts/build_play.py`, a builder in `furniture-play.ts` and a `Toy` in the feature's table.
+What the pieces do is in the features: team desks' screen sharing in [`src/client/features/workstation/`](../src/client/features/workstation), the video screens in [`src/client/features/screens/`](../src/client/features/screens) (served by `GET /api/media?floor=<id>&list` and `&name=<file>`, in `src/server/media.ts`; the channels a floor watches are read by `src/server/watch.ts` and played by `watch.ts` there, on `src/client/world/webscreen.ts`), the ticker's prices in [`src/client/features/studio/`](../src/client/features/studio) (`ticker.ts`, with the pure parts in `ticker-format.ts`), the things to play with in [`src/client/features/playthings/`](../src/client/features/playthings), and the tees in [`src/client/features/golf/`](../src/client/features/golf). A new plaything is a kind in `shared/furniture.ts`, a piece in `blender/scripts/build_play.py`, a builder in `furniture-play.ts` and a `Toy` in the feature's table.
