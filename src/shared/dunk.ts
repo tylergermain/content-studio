@@ -1,9 +1,9 @@
 import { BALL, HOOP } from './hoop.js';
 
-/** Reach the rim near the top of a normal jump, without requiring perfect aim. */
+/** Reach the rim while jumping, without requiring perfect aim. */
 export function canDunk(pos: { x: number; y: number; z: number }, grounded: boolean): boolean {
   return !grounded && [pos.x, pos.y, pos.z].every(Number.isFinite)
-    && pos.y >= 0.7 && pos.y <= 1.6
+    && pos.y >= 0.15 && pos.y <= 1.6
     && Math.hypot(pos.x - HOOP.rim.x, pos.z - HOOP.rim.z) <= 1.4;
 }
 

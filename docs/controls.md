@@ -51,4 +51,4 @@ The prompt edits the way it does in your own terminal (iTerm2's *Natural Text Ed
 
 ### Dunking
 
-Hold the basketball, jump with **Space** near the hoop, then press **F** near the top of the jump to dunk. The hint changes to **F Dunk!** when you are in reach. A dunk uses the shared ball physics, scores two points, and celebrates with confetti. Normal shots still use hold/release E, and Q drops the ball. F retains its normal action when a dunk is not available.
+Hold the basketball, jump with **Space** near the hoop, then press **Space again** while airborne to dunk. The hint changes to **Space Dunk!** when you are in reach. A dunk uses the shared ball physics, scores two points, and celebrates with confetti. Normal shots still use hold/release E, and Q drops the ball. Holding Space does not trigger a dunk; release it and press again.

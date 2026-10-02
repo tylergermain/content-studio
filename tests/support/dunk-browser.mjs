@@ -17,8 +17,8 @@ try {
   store.you='player';store.profile.color='#ff8655';store.ball={holder:'player'};
   const api=installBasketball(ctx,{remotes:new Map(),reach(){}});api.ballNews(false);
   const hint=api.ballHint();if(!hint.parts.some(p=>p.textContent?.includes('Dunk!')))throw Error('Dunk hint missing');document.getElementById('dunk-hint').append(...hint.parts.filter(Boolean));
-  const press=repeat=>key({code:'KeyF',repeat,preventDefault(){}});
-  if(!press(true)||throws)throw Error('Repeated F fired dunk');ctx.player.grounded=true;if(press(false))throw Error('Grounded dunk');ctx.player.grounded=false;
+  const press=repeat=>key({code:'Space',repeat,preventDefault(){}});
+  if(!press(true)||throws)throw Error('Repeated Space fired dunk');ctx.player.grounded=true;if(press(false))throw Error('Grounded dunk');ctx.player.grounded=false;
   if(!press(false)||throws!==1)throw Error('Dunk not sent');if(press(false)||throws!==1)throw Error('Dunk repeated without ball');
   api.ball.update(performance.now()+150,()=>null);renderer.render(scene,camera);
   if(!confetti)throw Error('Dunk did not celebrate');
