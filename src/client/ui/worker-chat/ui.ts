@@ -33,7 +33,13 @@ export function openWorkerChat(id:string,terminal:()=>void,onChanges?:()=>void){
   const raw=h('button.btn.small',{type:'button'},'Terminal');
   const changes=onChanges?h('button.btn.small',{type:'button'},'Changes'):null;
   const form=h('form.chat-compose',{},input,h('div.chat-actions',{},send,interrupt,talk,mute,listen),note,voiceStatus);
-  const el=h('div.modal.worker-chat',{role:'dialog','aria-label':`${worker.name} chat`},h('header',{},h('div',{},h('h2',{},worker.name),h('p.chat-subtitle',{},engineLabel(worker,store.project))),status,changes,raw),h('div.chat-grid',{},h('section.chat-conversation',{},messages,transcript,setup,form),h('aside.chat-preview',{},h('h3.preview-heading',{},'Content preview'),artifactList,stage,caption)));
+  const paneNav=h('div.chat-pane-nav',{'aria-label':'Worker chat views'});
+  const updates=h('button.btn',{type:'button','aria-pressed':'true'},'Updates');
+  const previews=h('button.btn',{type:'button','aria-pressed':'false'},'Content preview');
+  paneNav.append(updates,previews);
+  const el=h('div.modal.worker-chat',{role:'dialog','aria-label':`${worker.name} chat`,'data-pane':'updates'},h('header',{},h('div',{},h('h2',{},worker.name),h('p.chat-subtitle',{},engineLabel(worker,store.project))),status,changes,raw),paneNav,h('div.chat-grid',{},h('section.chat-conversation',{},messages,transcript,setup,form),h('aside.chat-preview',{},h('h3.preview-heading',{},'Content preview'),artifactList,stage,caption)));
+  const choosePane=(pane:string)=>{el.dataset.pane=pane;updates.setAttribute('aria-pressed',String(pane==='updates'));previews.setAttribute('aria-pressed',String(pane==='preview'));};
+  updates.addEventListener('click',()=>choosePane('updates'));previews.addEventListener('click',()=>choosePane('preview'));
   const modal=openModal(el,{doing:`chatting with ${worker.name}`,onClose:()=>{closed=true;clearInterval(timer);abort.abort();live.stop();off();if(current?.id===id)current=undefined;}});current={id,modal};
   const abort=new AbortController();const off=store.on('floor',()=>{if(store.floor!==floor)modal.close();});
   raw.addEventListener('click',()=>{modal.close();terminal();});changes?.addEventListener('click',()=>{modal.close();onChanges?.();});

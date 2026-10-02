@@ -408,3 +408,5 @@ The lounge jukebox is audible across most of the floor, with a gentle fade at di
 Footsteps and jump landings are muted by default. Enable them under Settings → Sound & voice → Footsteps; the choice is saved in your browser.
 Spotify Connect controls are available in the jukebox, with a private connection for each signed-in account. Configure a Spotify developer app and connect your account there; playback uses your chosen Spotify device and requires Premium. See [Spotify setup](docs/spotify.md).
 Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
+
+Worker chat adapts to smaller windows with Updates and Content preview views, keeping the composer accessible without scrolling through the preview.
