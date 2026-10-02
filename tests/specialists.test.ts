@@ -5,6 +5,7 @@ import {tmpdir} from 'node:os';
 import path from 'node:path';
 import {profiles,prepareSpecialist,saveProfile,specialistFolder} from '../src/server/specialists/profiles.js';
 import {specialistLaunch} from '../src/server/specialists/launch.js';
+import {artifactPath,listArtifacts,publicArtifact} from '../src/server/worker-chat/artifacts.js';
 import type {WorkerInfo} from '../src/shared/protocol.js';
 function fixture(t:{after(fn:()=>void):void}){const dir=mkdtempSync(path.join(tmpdir(),'specialists-'));t.after(()=>rmSync(dir,{recursive:true,force:true}));return dir;}
 test('starter roles are lazy, editable and persisted without exposing tool credentials',t=>{
@@ -47,4 +48,12 @@ test('HTTP MCP servers resolve credentials from the worker environment without s
  assert.equal(plan.env?.WEB_TOKEN,'private-token');assert.ok(!plan.args.some(a=>a.includes('env_vars')));
  assert.ok(plan.args.includes('mcp_servers.web.env_http_headers."X-Token"="WEB_TOKEN"'));
  assert.ok(!plan.args.join(' ').includes('private-token'));
+});
+
+test('shared content previews cannot list or open private specialist tool configurations',async t=>{
+ const dir=fixture(t);prepareSpecialist(dir,'researcher','codex');
+ const file='agents/researcher/mcp.local.json';
+ writeFileSync(path.join(dir,file),JSON.stringify({mcpServers:{research:{command:'node',env:{TOKEN:'private-token'}}}}));
+ assert.equal(publicArtifact(file),false);assert.equal(await artifactPath(dir,file),undefined);
+ assert.ok(!(await listArtifacts(dir)).some(a=>a.path===file));
 });
