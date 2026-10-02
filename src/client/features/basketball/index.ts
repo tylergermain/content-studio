@@ -3,8 +3,8 @@
  * and letting it fly, baskets and streaks, and the ball in everyone's hands.
  */
 import * as THREE from 'three';
-import { canDunk, dunkShot } from '../../../shared/dunk';
-import { HOOP, SWEET, idealSpeed, lookAtRim, meter, shotSpeed, throwPitch, tossSpeed, underCeiling } from '../../../shared/hoop';
+import { dunkRelease, physicalThrow, throwCharge } from '../../../shared/basketball-shot';
+import { HOOP } from '../../../shared/hoop';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
@@ -52,7 +52,6 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   let streak = 0;
   let shooting = false;
   let dunking = false;
-  const dunkReady = () => holdingBall() && !office.hoop.away && ctx.inOffice() && !ctx.upTop() && canDunk(ctx.player.pos, ctx.player.grounded);
   /** When you started winding up a shot (performance.now()), or 0. */
   let windFrom = 0;
   // The ball's there to use (and to aim at: it's on the building); a window opening lets go of a wind-up.
@@ -61,11 +60,6 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
 
   // With the ball in your hands, E winds up a shot (let go to shoot) and Q drops it.
   ctx.keys.add('activity', (e) => {
-    if (e.code === 'Space' && dunkReady()) {
-      e.preventDefault();
-      if (!e.repeat) dunk();
-      return true;
-    }
     if (!holdingBall() || (e.code !== 'KeyE' && e.code !== 'KeyQ')) return false;
     if (e.repeat) return true;
     if (e.code === 'KeyE') windUp();
@@ -91,62 +85,38 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     use: onE(() => takeBall()),
   });
 
-  /** How a shot of yours goes from where you are: out of your hands, which way (a heading), how steep, and how hard it takes to sink it (null: you're not shooting at the hoop). */
-  function shotAim(): { from: THREE.Vector3; heading: number; pitch: number; ideal: number | null } {
+  /** Release where your hands are, in the direction you actually aim. */
+  function shotAim(): { from: THREE.Vector3; heading: number; pitch: number } {
     const player = ctx.player;
-    const rim = HOOP.rim;
     const first = player.view === 'first';
-    // First person, the ball goes where you look; third, from over your head the way you face.
-    const facing = first ? player.camYaw + Math.PI : player.facing;
+    const heading = first ? player.camYaw + Math.PI : player.facing;
+    const pitch = player.lookPitch;
     const from = first ? ctx.camera.position.clone() : new THREE.Vector3(player.pos.x, player.pos.y + 1.95, player.pos.z);
-    from.x += Math.sin(facing) * 0.3;
-    from.z += Math.cos(facing) * 0.3;
-    const toRim = Math.atan2(rim.x - from.x, rim.z - from.z);
-    const off = Math.abs(Math.atan2(Math.sin(toRim - facing), Math.cos(toRim - facing)));
-    const far = Math.hypot(rim.x - from.x, rim.z - from.z);
-    const atHoop = off < (first ? 0.35 : 0.6) && far < 16 && far > 0.4;
-    if (first) {
-      const look = throwPitch(player.lookPitch);
-      const pitch = atHoop ? underCeiling(from, look) : look;
-      return { from, heading: facing, pitch, ideal: atHoop ? idealSpeed(from, pitch) : null };
-    }
-    // Facing about the right way, your character squares up to the hoop.
-    if (!atHoop) return { from, heading: facing, pitch: throwPitch(0.15), ideal: null };
-    const pitch = underCeiling(from, throwPitch(lookAtRim(from)));
-    return { from, heading: toRim, pitch, ideal: idealSpeed(from, pitch) };
+    from.x += Math.sin(heading) * Math.cos(pitch) * 0.3;
+    from.y += Math.sin(pitch) * 0.3;
+    from.z += Math.cos(heading) * Math.cos(pitch) * 0.3;
+    return { from, heading, pitch };
   }
 
-  /** Hold E (or the mouse) with the ball: the meter goes up and down until you let go. */
+  /** Hold E (or the mouse) with the ball: charge builds until you let go. */
   function windUp() {
     if (!holdingBall() || windFrom) return;
     windFrom = performance.now();
   }
 
-  /** Let go: it flies as hard as the meter says (right in the green, it drops in). */
+  /** Let go: it flies where you aim with the power you charged. */
   function letFly() {
     if (!windFrom) return;
-    const power = meter((performance.now() - windFrom) / 1000);
+    const held = (performance.now() - windFrom) / 1000;
     windFrom = 0;
     if (!holdingBall()) return;
     const a = shotAim();
-    dunking = false;
-    shooting = a.ideal !== null;
-    release(a.from, a.heading, a.pitch, shooting ? shotSpeed(a.ideal!, power) : tossSpeed(power));
+    dunking = dunkRelease(a.from, ctx.player.grounded, a.pitch);
+    shooting = true;
+    const shot = physicalThrow(a.from, a.heading, a.pitch, held);
+    throwBall(shot);
     if (ctx.player.view === 'first') ctx.hands.shoot();
     else ctx.me.shoot();
-  }
-
-  /** A second Space near the rim while airborne: slam it down using the ordinary synchronized throw. */
-  function dunk() {
-    if (!dunkReady()) return;
-    windFrom = 0;
-    shooting = true;
-    dunking = true;
-    const shot = dunkShot();
-    release(new THREE.Vector3(shot.x, shot.y, shot.z), 0, -Math.PI / 2, -shot.vy);
-    ctx.hands.shoot();
-    ctx.me.shoot();
-    deps.reach();
   }
 
   /** Q with the ball: it drops out of your hands in front of you. */
@@ -164,6 +134,10 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   function release(from: THREE.Vector3, heading: number, pitch: number, speed: number) {
     const c = Math.cos(pitch);
     const s = { x: from.x, y: from.y, z: from.z, vx: Math.sin(heading) * c * speed, vy: Math.sin(pitch) * speed, vz: Math.cos(heading) * c * speed };
+    throwBall(s);
+  }
+
+  function throwBall(s: { x: number; y: number; z: number; vx: number; vy: number; vz: number }) {
     ball.throwNow({ ...s, by: store.you }, performance.now());
     ballPending++;
     ctx.net.send({ t: 'ball.throw', ...s });
@@ -232,7 +206,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     ctx.me.holdBall(mine);
     const hands = ctx.hands;
     hands.holdBall(mine);
-    hands.windUp(windFrom ? meter((now - windFrom) / 1000) : 0);
+    hands.windUp(windFrom ? throwCharge((now - windFrom) / 1000) : 0);
     for (const [id, r] of deps.remotes) r.person.holdBall(ball.holder === id);
     updateScorePops(dt);
     renderShotMeter(now);
@@ -243,33 +217,30 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     if (!ctx.upTop() && ctx.inOffice() && !office.hoop.away) updateBall(now, dt);
   });
 
-  /** The wind-up meter over the hint, while you hold E: a green band where the shot drops in, when you're shooting at the hoop. */
+  /** The wind-up meter over the hint, while you hold E: charge increases with hold time, without a guaranteed scoring band. */
   let meterKey = '';
   function renderShotMeter(now: number) {
     const on = windFrom > 0 && !modalOpen();
-    const at = on ? meter((now - windFrom) / 1000) : 0;
-    const sweet = on && shotAim().ideal !== null;
-    const k = `${on}|${sweet}|${at.toFixed(3)}`;
+    const at = on ? throwCharge((now - windFrom) / 1000) : 0;
+    const k = `${on}|${at.toFixed(3)}`;
     if (k === meterKey) return;
     meterKey = k;
     const el = $('shot-meter');
     el.classList.toggle('hidden', !on);
-    el.classList.toggle('aimed', sweet);
+    el.classList.remove('aimed');
     el.style.setProperty('--at', String(at));
-    el.style.setProperty('--sweet', String(SWEET.at));
-    el.style.setProperty('--width', String(SWEET.width));
   }
 
   /** With the ball in your hands: how to shoot, and how to put it down. */
   function ballHint(): Hint {
     const first = ctx.player.view === 'first';
     return {
-      k: `${streak}|${first}|${!!windFrom}|${dunkReady()}`,
+      k: `${streak}|${first}|${!!windFrom}`,
       parts: [
         h('span.title', {}, '🏀 Ball in hand'),
         streak > 1 ? aside(`🔥 ${streak} in a row`) : '',
-        windFrom ? aside('let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
-        dunkReady() ? key('Space', 'Dunk!') : aside('Jump near the rim, then Space again to dunk'),
+        windFrom ? aside('release to throw; longer hold means more power') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
+        key('Space', 'Jump for a layup'),
         key('Q', 'Drop it'),
       ],
     };

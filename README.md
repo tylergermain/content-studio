@@ -439,4 +439,4 @@ Look at an agent and press **Q** for an in-world live voice conversation. They t
 
 Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and content previews, with the raw Terminal available from that workspace.
 
-With the basketball in hand, jump near the hoop and press **Space again** when the **Dunk!** hint appears to slam it through the net.
+With the basketball in hand, hold **E or click** to charge and release to throw exactly where you aim. Short holds barely move it; long holds throw hard. **Space** jumps for layups and floaters. Dunking requires an airborne downward release from above and immediately beside the rim, followed by a real physics basket.
