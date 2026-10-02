@@ -1,3 +1,4 @@
+import { openJukebox } from '../jukebox/ui';
 /**
  * The command palette (Ctrl+K, ⌘K on a Mac): the workers, the office's actions, its boards, the pull
  * requests, issues and services, and the people in it. Enter does it; Shift+Enter walks you over to
@@ -94,6 +95,7 @@ export function installPalette(ctx: Ctx, parts: PaletteParts) {
       walk: free ? () => walkThen(deskSpot(free)!, free.label, hireAt(free), free) : undefined,
     });
     out.push(at('queue', 'the task queue', { icon: '📋', kind: 'Action', title: 'Open the task queue', detail: 'Issues and tasks waiting for a worker', keywords: ['backlog', 'tasks'], open: showQueue }));
+    out.push(at('jukebox', 'the jukebox', { icon: '🎵', kind: 'Action', title: 'Jukebox', keywords: ['spotify', 'music'], open: () => openJukebox(net, () => parts.hud.showSettings('sound')) }));
     out.push({ icon: '⚙️', kind: 'Action', title: 'Settings', keywords: ['preferences', 'options'], open: () => parts.hud.showSettings() });
     if (store.invites) out.push({ icon: '👥', kind: 'Action', title: 'Invite teammates', keywords: ['team', 'add people'], open: () => openTeam(net) });
     else if (store.me.admin) out.push({ icon: '👥', kind: 'Action', title: 'Invite people', detail: 'Accounts', keywords: ['invite teammates', 'accounts', 'team'], open: () => openAccounts(net) });
