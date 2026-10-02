@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { floorSeat, type Piece } from '../shared/furniture.js';
 import { layoutFurniture, validateLayout, type DeskLayout } from '../shared/office-builder.js';
-import { canLabel, cleanLabel, cleanLook, cleanPlan, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
+import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
 import { DESK_BY_ID, WING, type SeatDef } from '../shared/layout.js';
 
 /**
@@ -77,7 +77,7 @@ export class FloorPlanStore {
    * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
    * (`taken`) stays where it is. Why it couldn't, or nothing.
    */
-  layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
+  layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown; room?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
     if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reload it in the builder';
     const layout = validateLayout(raw.desks, raw.furniture);
     if (typeof layout === 'string') return layout;
@@ -85,8 +85,9 @@ export class FloorPlanStore {
     const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
     for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
     const look = cleanLook(raw.look);
-    const { look: _was, ...rest } = this.plan;
-    const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };
+    const room = cleanRoom(raw.room);
+    const { look: _was, room: _had, ...rest } = this.plan;
+    const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), ...(Object.keys(room).length ? { room } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };
     try {
       writeFileSync(this.file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 });
       renameSync(this.file + '.tmp', this.file);

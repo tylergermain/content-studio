@@ -3,6 +3,7 @@
  * the one being dragged about in the builder. Everything that goes by where they are follows: what you
  * bump into and what you use, the seats there are to sit on, and the way round the floor.
  */
+import { roomOf, type RoomOptions } from '../../../shared/floorplan';
 import { floorPalette } from '../../../shared/floors';
 import { furnitureSeats, setFloorSeats, type Piece } from '../../../shared/furniture';
 import { DESKS, deskSeat, seatAt } from '../../../shared/layout';
@@ -17,6 +18,8 @@ export interface Arrangement {
   furniture: readonly Piece[];
   /** Which of FLOOR_PALETTES it's painted in, over the floor's own. */
   look?: number;
+  /** The room's own fittings, where they aren't the office's (see RoomOptions). */
+  room?: RoomOptions;
 }
 
 export type LayoutSync = ReturnType<typeof createLayoutSync>;
@@ -31,7 +34,7 @@ export function createLayoutSync(ctx: Ctx) {
   /** The layout the floor you're on has saved. */
   function saved(): Arrangement {
     const plan = store.floorPlan;
-    return { desks: plan.desks ?? {}, furniture: layoutFurniture(plan), look: plan.look };
+    return { desks: plan.desks ?? {}, furniture: layoutFurniture(plan), look: plan.look, room: plan.room };
   }
 
   /** Stands everything where `a` has it, on a floor built out `wing` rows. */
@@ -50,6 +53,7 @@ export function createLayoutSync(ctx: Ctx) {
         sign.rotation.y = def.rotY;
       }
     }
+    office.room.set(roomOf(a));
     office.furniture.set(a.furniture, wing);
     setFloorSeats(furnitureSeats(a.furniture, wing));
     setOfficeFurniture(a.furniture);

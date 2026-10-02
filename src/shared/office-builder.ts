@@ -3,7 +3,7 @@
 // it again before it's saved (server/floorplan.ts).
 
 import { DESKS, DESK_SIZE, FLOOR, type DeskDef } from './layout.js';
-import { DEFAULT_FURNITURE, FIXED_KINDS, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, type Box, type Piece } from './furniture.js';
+import { DEFAULT_FURNITURE, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, type Box, type Piece } from './furniture.js';
 import { FIXED, KEEP_CLEAR } from './office-fixed.js';
 
 export interface DeskPose {
@@ -54,11 +54,7 @@ export function layoutDesks(layout: DeskLayout = {}): DeskDef[] {
 
 /** A floor's furniture: its own once it's been rearranged, else the office's as it comes. */
 export function layoutFurniture(plan: { furniture?: readonly Piece[] } | undefined): readonly Piece[] {
-  const list = plan?.furniture;
-  if (!list) return DEFAULT_FURNITURE;
-  // A list from before the office's own things were furniture: they're where they always stood.
-  const missing = FIXED_KINDS.filter((kind) => !list.some((p) => p.id === kind));
-  return missing.length ? [...list, ...DEFAULT_FURNITURE.filter((p) => missing.includes(p.kind))] : list;
+  return plan?.furniture ?? DEFAULT_FURNITURE;
 }
 
 const outside = (b: Box) => b.minX < BUILD_AREA.minX - SLACK || b.maxX > BUILD_AREA.maxX + SLACK || b.minZ < BUILD_AREA.minZ - SLACK || b.maxZ > BUILD_AREA.maxZ + SLACK;

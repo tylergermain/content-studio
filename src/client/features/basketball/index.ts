@@ -53,7 +53,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   /** When you started winding up a shot (performance.now()), or 0. */
   let windFrom = 0;
   // The ball's there to use (and to aim at: it's on the building); a window opening lets go of a wind-up.
-  ctx.usables.add({ usable: () => ball.interactables });
+  ctx.usables.add({ usable: () => (office.hoop.away ? [] : ball.interactables) });
   ctx.windowOpened.add(() => void (windFrom = 0));
 
   // With the ball in your hands, E winds up a shot (let go to shoot) and Q drops it.
@@ -214,7 +214,9 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     renderShotMeter(now);
   }
   ctx.ticks.add('others', ({ dt, now }) => {
-    if (!ctx.upTop() && ctx.inOffice()) updateBall(now, dt);
+    // A floor without the hoop has no ball either.
+    ball.group.visible = !office.hoop.away;
+    if (!ctx.upTop() && ctx.inOffice() && !office.hoop.away) updateBall(now, dt);
   });
 
   /** The wind-up meter over the hint, while you hold E: a green band where the shot drops in, when you're shooting at the hoop. */

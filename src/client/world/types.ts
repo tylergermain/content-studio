@@ -45,6 +45,8 @@ export interface Interactable {
   deskId?: string;
   decorId?: string;
   seatId?: string;
+  /** Which piece of the floor's furniture (see shared/furniture.ts), for something of it you use. */
+  pieceId?: string;
   /** Which of POLES, for a fire pole. */
   pole?: number;
   /** Which of CARS (shared/garage.ts), for a car. */

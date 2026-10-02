@@ -4,6 +4,7 @@
  * Between them the room shows through, and that's where you drag things (see mode.ts).
  */
 import './ui.css';
+import type { RoomOptions } from '../../../shared/floorplan';
 import { FLOOR_PALETTES } from '../../../shared/floors';
 import { FURNITURE, FURNITURE_GROUPS, FURNITURE_KINDS, MAX_PIECE_TEXT, PIECE_SCALE, kindDef, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { WING } from '../../../shared/layout';
@@ -35,6 +36,8 @@ export interface BuilderState {
   canRedo(): boolean;
   wallsCut(): boolean;
   look(): number | undefined;
+  /** The room's own fittings, as the draft has them. */
+  room(): Required<RoomOptions>;
   online(): boolean;
 }
 
@@ -48,6 +51,8 @@ export interface BuilderActions {
   recolor(color: string): void;
   resize(scale: number): void;
   retext(text: string): void;
+  /** The one video a screen plays, by its name in the floor's media folder; '' for every video there. */
+  remedia(media: string): void;
   duplicate(): void;
   remove(): void;
   /** The sign over the picked desk. */
@@ -59,8 +64,12 @@ export interface BuilderActions {
   reset(): void;
   walls(): void;
   paint(look: number | undefined): void;
+  /** Changes some of the room's own fittings (see RoomOptions). */
+  room(patch: RoomOptions): void;
   expand(): void;
   shrink(): void;
+  /** The floor's boards, kiosk agents and ticker (see features/studio). */
+  setup(): void;
   close(): void;
   discard(): void;
   keep(): void;
@@ -101,6 +110,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
   // ---- The catalog ------------------------------------------------------------------------------
   const paints = h('div.ob-paints');
   const backOffice = h('div.ob-back');
+  const fittings = h('div.ob-back');
   const catalog = h(
     'aside.ob-panel.ob-catalog',
     { 'aria-label': 'Furniture' },
@@ -111,7 +121,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
       h(
         'div.ob-cards',
         {},
-        ...FURNITURE_KINDS.filter((kind) => FURNITURE[kind].group === group && !kindDef(kind).fixed).map((kind) => {
+        ...FURNITURE_KINDS.filter((kind) => FURNITURE[kind].group === group).map((kind) => {
           const k = kindDef(kind);
           return h('button.ob-card', { type: 'button', title: `${k.label}: click to add, or drag onto the floor`, onpointerdown: ((e: PointerEvent) => act.place(kind, e)) as EventListener }, h('span.ob-icon', {}, k.icon), h('span', {}, k.label));
         }),
@@ -120,8 +130,13 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
     h('h3', {}, 'The room'),
     h('h4', {}, 'Paint'),
     paints,
+    h('h4', {}, 'Fittings'),
+    fittings,
     h('h4', {}, 'Back office'),
     backOffice,
+    h('h4', {}, 'Boards and agents'),
+    h('p.ob-note', {}, 'What this floor’s wall boards are for, who stands at its kiosks, and the ticker round its walls.'),
+    button('🪧 Set up the floor…', 'Boards, kiosk agents, the ticker, Slack and Metricool', act.setup),
   );
 
   // ---- What's picked ----------------------------------------------------------------------------
@@ -175,7 +190,13 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
         ),
       );
     }
-    if (k?.fixed) out.push(h('p.ob-note', {}, 'It comes with the office: put it anywhere on the floor.'));
+    if (p.piece && k?.plays) {
+      const input = h('input', { type: 'text', maxlength: 120, autocomplete: 'off', spellcheck: 'false', placeholder: 'every video in the folder' }) as HTMLInputElement;
+      input.value = p.piece.media ?? '';
+      input.addEventListener('change', () => act.remedia(input.value.trim()));
+      out.push(field('Plays (a file in the floor’s .agent-office/media)', input));
+    }
+    if (k?.fixed) out.push(h('p.ob-note', {}, 'The office has one of these. Remove it and this floor goes without; the catalog puts it back.'), button('Remove from this floor', 'Take it off this floor (Delete)', act.remove, '.danger'));
     else if (p.piece) out.push(h('div.ob-row', {}, button('Duplicate', 'Another one like it (Ctrl/⌘ D)', act.duplicate), button('Remove', 'Take it off the floor (Delete)', act.remove, '.danger')));
     else out.push(button('Change desk sign', 'The sign hanging over this desk', act.sign));
     return out;
@@ -216,6 +237,14 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
     paints.replaceChildren(
       h('button.ob-paint', { type: 'button', class: look === undefined ? 'on' : '', title: 'The floor’s own paint', onclick: () => act.paint(undefined) }, 'Own'),
       ...FLOOR_PALETTES.map((f, i) => h('button.ob-paint', { type: 'button', class: look === i ? 'on' : '', title: f.name, 'aria-label': f.name, style: `background:linear-gradient(135deg, ${f.wall} 50%, ${f.floor} 50%);border-color:${f.trim}`, onclick: () => act.paint(i) })),
+    );
+    const room = state.room();
+    const choice = (label: string, on: boolean, run: () => void) => h('button.btn', { type: 'button', class: on ? 'on' : '', 'aria-pressed': String(on), onclick: run }, label);
+    fittings.replaceChildren(
+      h('p.ob-note', {}, 'The mezzanine: the boss’s loft in the corner, and the stairs up to it.'),
+      h('div.ob-row', {}, choice('Mezzanine', room.loft, () => act.room({ loft: true })), choice('One level', !room.loft, () => act.room({ loft: false }))),
+      h('p.ob-note', {}, 'Driving tees out on the balcony.'),
+      h('div.ob-row', {}, choice('1 tee', room.tees === 1, () => act.room({ tees: 1 })), choice('2 tees', room.tees === 2, () => act.room({ tees: 2 }))),
     );
     const wing = store.floorPlan.wing;
     backOffice.replaceChildren(

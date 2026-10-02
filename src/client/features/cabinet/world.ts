@@ -162,7 +162,7 @@ export const cabinet: Fixture<'cabinet'> = (site) => {
     group: built.group,
     collider: built.collider,
     use: built.interactable,
-    moved: (p) => Object.assign(CABINET_AT, { x: p.x + Math.sin(p.rotY) * 0.2, z: p.z + Math.cos(p.rotY) * 0.2 }),
+    moved: (p) => p && Object.assign(CABINET_AT, { x: p.x + Math.sin(p.rotY) * 0.2, z: p.z + Math.cos(p.rotY) * 0.2 }),
   });
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable], handle: { cabinet: built } };
 };

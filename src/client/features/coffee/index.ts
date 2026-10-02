@@ -38,5 +38,6 @@ export function installCoffee(ctx: Ctx) {
     use: onE(() => drinkCoffee()),
   });
 
-  return { caffeine, buzz };
+  // A can from the vending machine is the same buzz (see features/playthings).
+  return { caffeine, buzz, drink: drinkCoffee };
 }

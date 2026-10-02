@@ -5,6 +5,7 @@ import { ROOF, ROOF_NAME } from '../../shared/rooftop';
 import type { Net } from '../net';
 import { store } from '../state';
 import { h, openModal, timeAgo, toast, type Modal } from './dom';
+import { floorTools, folderFloor } from './elevator-folder';
 import { confirmDialog } from './prompt';
 
 // The elevator's panel: a button for every floor (every project), and "add a project", which clones
@@ -163,7 +164,7 @@ export function openElevator(opts: ElevatorOptions): void {
     if (!store.me.admin) return btn;
     const off = h('button.btn.floor-off', { type: 'button', title: `Take ${f.name} off the building`, 'aria-label': `Remove ${f.name}` }, '🗑');
     off.addEventListener('click', () => confirmRemove(f));
-    return h('div.floor-row', {}, btn, off);
+    return h('div.floor-row', {}, btn, h('div.floor-tools', {}, ...floorTools(net, f, i, store.floors.filter((o) => !o.cloning).length), off));
   };
 
   const confirmRemove = (f: FloorInfo) => {
@@ -305,6 +306,8 @@ export function openElevator(opts: ElevatorOptions): void {
         listEl,
         statusEl,
         dirEl,
+        // Or a floor that's just a folder, nothing to do with GitHub.
+        ...(store.me.admin ? [folderFloor(net)] : []),
       );
     }
   };

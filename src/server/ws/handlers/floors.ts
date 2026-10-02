@@ -56,6 +56,34 @@ export const floorHandlers = {
     if (err) ctx.warn(c, err);
     else ctx.toastAll(`🛗 ${who} stopped cloning ${def?.repo ?? def?.name ?? 'a floor'}`);
   },
+  'floor.folder'(ctx, c, msg) {
+    const who = c.peer.name;
+    const dir = str(msg.dir, 1024);
+    // It's a folder on the office's machine that workers will run in: admins pick it.
+    const r = ctx.meOf(c.accountId).admin ? ctx.building.addFolder(dir, str(msg.name, 100), who) : 'Only admins can make a folder a floor';
+    if (typeof r === 'string') return ctx.sendTo(c, { t: 'floor.added', repo: dir, error: r });
+    const floor = ctx.openFloor(r);
+    ctx.floorsChanged();
+    if (!floor) return ctx.sendTo(c, { t: 'floor.added', repo: dir, error: `Added ${r.name}, but couldn't open its floor — see the office's log` });
+    console.log(`  ${who} added a floor for the folder ${r.dir} (${r.name})`);
+    ctx.toastAll(`🛗 New floor: ${r.name}, added by ${who}`);
+    ctx.sendTo(c, { t: 'floor.added', repo: dir, floor: floor.id });
+  },
+  'floor.edit'(ctx, c, msg) {
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can rename or move a floor');
+    const id = str(msg.floor, 64);
+    const was = ctx.building.list().find((d) => d.id === id)?.name;
+    const r = ctx.building.edit(id, { name: msg.name === undefined ? undefined : str(msg.name, 100), to: typeof msg.to === 'number' ? msg.to : undefined });
+    if (typeof r === 'string') return ctx.warn(c, r);
+    // The floors go by the building's order: the elevator's buttons, and the storeys from the street up.
+    const open = new Map(ctx.floors);
+    ctx.floors.clear();
+    for (const d of ctx.building.list()) if (open.has(d.id)) ctx.floors.set(d.id, open.get(d.id)!);
+    const floor = ctx.floors.get(id);
+    if (floor) floor.project.name = r.name;
+    ctx.floorsChanged();
+    if (was && was !== r.name) ctx.toastAll(`🛗 ${c.peer.name} renamed the ${was} floor to ${r.name}`);
+  },
   'floor.remove'(ctx, c, msg) {
     const who = c.peer.name;
     // Everyone's workers on it stop: admins do it.

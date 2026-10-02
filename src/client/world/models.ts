@@ -123,6 +123,8 @@ export function piece(name: ModelName, part: string, paint: (name: string) => TH
   const copy = loaded.get(name)?.scene.getObjectByName(part)?.clone();
   if (!copy) return new THREE.Group();
   paintModel(copy, paint, castShadow);
+  // Every copy shares the model's shapes: whoever takes a copy down mustn't let go of them (see disposePiece in world/office/furniture.ts).
+  copy.traverse((o) => (o.userData.shared = true));
   return copy;
 }
 

@@ -106,12 +106,13 @@ function esc(s: string): string {
   return s.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 }
 
-const STYLE = `body{margin:0;min-height:100vh;display:grid;place-items:center;background:#bfe3ff;font:16px/1.5 Nunito,ui-rounded,system-ui,sans-serif;color:#2b2d42}
-main{background:#fffaf3;border:3px solid #2b2d42;border-radius:18px;box-shadow:0 6px 0 #2b2d42;padding:28px 32px;max-width:440px;margin:16px}
-h1{margin:0 0 8px;font-size:22px}p{margin:0 0 14px}code{background:#f1e7d8;border-radius:6px;padding:1px 5px}
-form{display:flex;flex-wrap:wrap;gap:8px}input{flex:1;min-width:0;font:inherit;padding:8px 12px;border:2px solid #2b2d42;border-radius:10px}
-button{font:inherit;font-weight:800;padding:8px 16px;border:2px solid #2b2d42;border-radius:10px;background:#ffd166;cursor:pointer}
-.err{color:#c1121f;font-weight:700;min-height:1.5em;margin:10px 0 0}`;
+// The same glass as the office's own pages (src/client/login.css): a frosted card over a soft sky.
+const STYLE = `body{margin:0;min-height:100vh;display:grid;place-items:center;background:radial-gradient(60% 55% at 18% 16%,rgba(255,255,255,.95) 0,transparent 70%),radial-gradient(55% 60% at 84% 80%,rgba(120,170,255,.6) 0,transparent 70%),#dbeafe;font:16px/1.5 -apple-system,BlinkMacSystemFont,'SF Pro Text','Inter',system-ui,sans-serif;color:#1d1d1f;-webkit-font-smoothing:antialiased}
+main{background:rgba(255,255,255,.66);-webkit-backdrop-filter:blur(28px) saturate(180%);backdrop-filter:blur(28px) saturate(180%);border:1px solid rgba(255,255,255,.6);border-radius:22px;box-shadow:0 28px 72px rgba(30,60,120,.2),0 0 0 .5px rgba(0,0,0,.08);padding:28px 32px;max-width:440px;margin:16px}
+h1{margin:0 0 8px;font-size:22px;font-weight:600;letter-spacing:-.02em}p{margin:0 0 14px}code{background:rgba(118,118,128,.12);border-radius:6px;padding:1px 5px}
+form{display:flex;flex-wrap:wrap;gap:8px}input{flex:1;min-width:0;font:inherit;padding:9px 12px;border:1px solid rgba(60,60,67,.26);border-radius:10px;background:rgba(255,255,255,.9);outline:none}input:focus{border-color:#0071e3;box-shadow:0 0 0 3px rgba(0,113,227,.3)}
+button{font:inherit;font-weight:600;padding:9px 16px;border:0;border-radius:10px;background:#0071e3;color:#fff;cursor:pointer}
+.err{color:#c4231a;font-weight:500;min-height:1.5em;margin:10px 0 0}`;
 
 function page(res: http.ServerResponse, status: number, title: string, body: string, script = '') {
   res.writeHead(status, {

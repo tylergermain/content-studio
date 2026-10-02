@@ -5,6 +5,7 @@
  */
 import type * as THREE from 'three';
 import { isSolid, kindDef, type FurnitureKind } from '../../../shared/furniture';
+import { cleanRoom, roomOf } from '../../../shared/floorplan';
 import { FLOOR } from '../../../shared/layout';
 import { SNAP, validateLayout } from '../../../shared/office-builder';
 import type { Ctx } from '../../core/context';
@@ -20,6 +21,8 @@ import { BuilderCamera, BuilderGizmo } from './view';
 export interface BuildDeps {
   /** The toon outline the office is drawn with: it can't be cut away with the walls, so the builder draws without it. */
   effect: { enabled: boolean };
+  /** Opens the floor's own setup: its boards, kiosk agents and ticker (see features/studio). */
+  setup(): void;
 }
 
 type Drag =
@@ -87,7 +90,11 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
 
     const dirty = () => draft.key() !== savedKey;
     /** Why a desk can't be moved, if it can't: a worker's sitting at it. */
-    const locked = (id: string) => (draft.isDesk(id) && store.workerAtDesk(id) ? 'Send this desk’s worker home before moving it' : undefined);
+    const locked = (id: string) => {
+      if (draft.isDesk(id)) return store.workerAtDesk(id) ? 'Send this desk’s worker home before moving it' : undefined;
+      const k = draft.piece(id) && kindDef(draft.piece(id)!.kind);
+      return k?.pinned ? `The ${k.label.toLowerCase()} hangs where it is: keep it there, or remove it` : undefined;
+    };
 
     function say(text: string | undefined, tone: 'info' | 'warn' = 'info') {
       status = { text: text || HELP, tone: text ? tone : 'info' };
@@ -147,10 +154,19 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       if (piece && !pending && !kindDef(piece.kind).fixed) added(draft.duplicate(piece.id), 'Another one');
     }
 
+    /** Adds a piece of `kind` in the middle of the view. What the floor already has its one of is picked instead. */
+    function addKind(kind: FurnitureKind) {
+      if (pending) return;
+      if (kindDef(kind).fixed && draft.piece(kind)) {
+        say(`This floor already has its ${kindDef(kind).label.toLowerCase()}: here it is`);
+        return select(kind);
+      }
+      added(draft.add(kind, cam.x, cam.z), kindDef(kind).label);
+    }
+
     function remove() {
       if (!selected || pending) return;
       if (draft.isDesk(selected)) say('Desks can be moved, but each one stays on the floor', 'warn');
-      else if (kindDef(draft.piece(selected)!.kind).fixed) say(`The ${kindDef(draft.piece(selected)!.kind).label.toLowerCase()} comes with the office: move it anywhere, but it stays`, 'warn');
       else {
         draft.remove(selected);
         say('');
@@ -176,10 +192,11 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
         return ui.render();
       }
       // As the office will keep it, so what comes back is known to be this.
-      draft.now = { ...clean, ...(draft.now.look !== undefined ? { look: draft.now.look } : {}) };
+      const room = cleanRoom(draft.now.room);
+      draft.now = { ...clean, ...(draft.now.look !== undefined ? { look: draft.now.look } : {}), ...(Object.keys(room).length ? { room } : {}) };
       sentKey = draft.key();
       pending = true;
-      net.send({ t: 'floor.layout', desks: draft.now.desks, furniture: draft.now.furniture, look: draft.now.look, revision });
+      net.send({ t: 'floor.layout', desks: draft.now.desks, furniture: draft.now.furniture, look: draft.now.look, room: draft.now.room, revision });
       say('Saving your layout…');
       ui.render();
     }
@@ -215,16 +232,18 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
         canRedo: () => draft.canRedo,
         wallsCut: () => wallsCut,
         look: () => draft.now.look,
+        room: () => roomOf(draft.now),
         online: () => net.up,
       },
       {
-        add: (kind) => !pending && added(draft.add(kind, cam.x, cam.z), kindDef(kind).label),
+        add: addKind,
         place: startPlacing,
         moveTo: (x, z) => change((id) => draft.edit(() => draft.setPose(id, x, z, draft.pose(id)!.rotY), id)),
         turn: (way) => change((id) => draft.turn(id, way)),
         recolor: (color) => repiece({ color }),
         resize: (scale) => repiece({ scale }),
         retext: (text) => repiece({ text }),
+        remedia: (media) => change((id) => draft.edit(() => (media ? (draft.piece(id)!.media = media) : delete draft.piece(id)!.media), id)),
         duplicate,
         remove,
         sign: () => selected && draft.isDesk(selected) && openDeskLabel(net, selected),
@@ -248,8 +267,14 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
           draft.edit((d) => (look === undefined ? delete d.look : (d.look = look)));
           show();
         },
+        room: (patch) => {
+          if (pending) return;
+          say(draft.edit((d) => (d.room = cleanRoom({ ...roomOf(d), ...patch }))), 'warn');
+          show();
+        },
         expand: () => net.send({ t: 'floor.expand' }),
         shrink: () => net.send({ t: 'floor.shrink' }),
+        setup: deps.setup,
         close: requestClose,
         discard: close,
         keep: () => {
@@ -381,22 +406,24 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
     function startPlacing(kind: FurnitureKind, e: PointerEvent) {
       if (pending || e.button !== 0) return;
       e.preventDefault();
+      // What the office has one of isn't dragged out of the catalog: a click puts it back, or finds it.
+      const single = !!kindDef(kind).fixed;
       const before = draft.key();
       let made: string | null = null;
       const onMove = (ev: PointerEvent) => {
         if (!made) {
-          if (Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 6) return;
+          if (single || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 6) return;
           const at = cam.floorAt(ev, ui.view) ?? { x: cam.x, z: cam.z };
           made = selected = draft.spawn(kind, snap(at.x, SNAP), snap(at.z, SNAP));
           show();
         }
-        dragTo(made, ev, 0, 0);
+        if (made) dragTo(made, ev, 0, 0);
       };
       const onUp = (ev: PointerEvent) => {
         window.removeEventListener('pointermove', onMove);
         window.removeEventListener('pointerup', onUp);
         window.removeEventListener('pointercancel', onUp);
-        if (!made) return added(draft.add(kind, cam.x, cam.z), kindDef(kind).label);
+        if (!made) return addKind(kind);
         if (ev.type === 'pointercancel' || document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.ob-panel')) {
           draft.restore(before);
           say('');

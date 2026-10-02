@@ -17,6 +17,8 @@ declare module '../types' {
     /** Lights, windows and glass for the sky to change with the time of day and the weather. */
     night: NightParts;
     boardMeshes: Record<keyof typeof BOARDS, THREE.Mesh>;
+    /** The sign over each board, which a floor that makes a board its own rewrites (see features/studio). */
+    boardLabels: Record<keyof typeof BOARDS, THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>>;
     tvScreen: THREE.Mesh;
     /** The monitor on the west wall showing how busy the office's machine is (features/boards/machine.ts). */
     machineScreen: THREE.Mesh;
@@ -40,8 +42,9 @@ export const nightLights: Fixture<'night'> = () => ({
 });
 
 /** Cork boards on the walls. */
-export const boards: Fixture<'boardMeshes'> = (site) => {
+export const boards: Fixture<'boardMeshes' | 'boardLabels'> = (site) => {
   const boardMeshes = {} as Record<keyof typeof BOARDS, THREE.Mesh>;
+  const boardLabels = {} as Record<keyof typeof BOARDS, THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>>;
   for (const key of Object.keys(BOARDS) as (keyof typeof BOARDS)[]) {
     const b = BOARDS[key];
     // Out from the wall, the way the board faces.
@@ -58,6 +61,7 @@ export const boards: Fixture<'boardMeshes'> = (site) => {
     label.position.set(b.x + nx * 0.04, b.y + b.height / 2 + 0.5, b.z + nz * 0.04);
     label.rotation.y = b.rotY;
     site.group.add(label);
+    boardLabels[key] = label;
     const it: Interactable = { kind: key, x: b.x + nx * 1.6, z: b.z + nz * 1.6, radius: 2.4 };
     site.interactables.push(it);
     bg.userData.interact = it;
@@ -66,7 +70,7 @@ export const boards: Fixture<'boardMeshes'> = (site) => {
     const bottom = b.y - (b.height + 0.3) / 2;
     site.wall(wall, wall === 'north' || wall === 'south' ? b.x : b.z, (bottom + WALL_HEIGHT) / 2, b.width + 0.3, WALL_HEIGHT - bottom);
   }
-  return { handle: { boardMeshes } };
+  return { handle: { boardMeshes, boardLabels } };
 };
 
 /** Lounge: the TV on the east wall. */

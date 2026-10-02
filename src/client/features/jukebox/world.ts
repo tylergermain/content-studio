@@ -144,6 +144,6 @@ export const jukebox: Fixture<'jukebox'> = (site) => {
   const built = buildJukebox();
   site.wall('east', JUKEBOX.z, JUKEBOX.height / 2, JUKEBOX.width + 0.1, JUKEBOX.height);
   // The office builder stands it wherever the floor wants it, and its music comes from there.
-  site.get('furniture').adopt('jukebox', { group: built.group, collider: built.collider, use: built.interactable, moved: (p) => Object.assign(JUKEBOX_AT, { x: p.x, z: p.z }) });
+  site.get('furniture').adopt('jukebox', { group: built.group, collider: built.collider, use: built.interactable, moved: (p) => Object.assign(JUKEBOX_AT, p ? { x: p.x, y: JUKEBOX.y, z: p.z } : { y: -500 }) });
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable], handle: { jukebox: built } };
 };

@@ -5,17 +5,19 @@
  */
 import { DEFAULT_FURNITURE, isRound, kindDef, newPieceId, pieceBox, pieceRadius, type Box, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { ORIGINAL_DESKS, SNAP, deskRect, layoutProblems, problemAt, type DeskLayout, type DeskPose } from '../../../shared/office-builder';
+import type { RoomOptions } from '../../../shared/floorplan';
 import type { Arrangement } from './sync';
 
 export interface Draft {
   desks: DeskLayout;
   furniture: Piece[];
   look?: number;
+  room?: RoomOptions;
 }
 
 export const snap = (n: number, step: number) => Math.round(n / step) * step;
 /** A layout of the draft's own, to change without changing the one it came from. */
-export const draftOf = (a: Arrangement): Draft => JSON.parse(JSON.stringify({ desks: a.desks, furniture: a.furniture, look: a.look })) as Draft;
+export const draftOf = (a: Arrangement): Draft => JSON.parse(JSON.stringify({ desks: a.desks, furniture: a.furniture, look: a.look, room: a.room })) as Draft;
 
 const TAU = Math.PI * 2;
 
@@ -129,7 +131,9 @@ export class DraftLayout {
   /** A new piece of `kind` at (x, z), wherever that is: its id. Nothing's remembered yet (see remember). */
   spawn(kind: FurnitureKind, x: number, z: number): string {
     const k = kindDef(kind);
-    const piece: Piece = { id: newPieceId(this.now.furniture), kind, x, z, rotY: 0, ...(k.color ? { color: k.color } : {}), ...(k.sizes ? { scale: 1 } : {}), ...(k.text !== undefined ? { text: k.text } : {}) };
+    // What the office has one of goes by its kind's name, and goes back where the office had it.
+    const home = k.fixed ? DEFAULT_FURNITURE.find((p) => p.id === kind) : undefined;
+    const piece: Piece = home ? { ...home } : { id: newPieceId(this.now.furniture), kind, x, z, rotY: 0, ...(k.color ? { color: k.color } : {}), ...(k.sizes ? { scale: 1 } : {}), ...(k.text !== undefined ? { text: k.text } : {}) };
     this.now.furniture.push(piece);
     return piece.id;
   }
@@ -160,9 +164,18 @@ export class DraftLayout {
     return id;
   }
 
-  /** A new piece of `kind` near (x, z): its id, or null when there's no room for it. */
+  /** A new piece of `kind` near (x, z): its id, or null when there's no room for it. What the office has one of goes back where it was, if it can. */
   add(kind: FurnitureKind, x: number, z: number): string | null {
-    return this.place(() => this.spawn(kind, x, z), x, z);
+    const k = kindDef(kind);
+    if (!k.fixed) return this.place(() => this.spawn(kind, x, z), x, z);
+    const before = this.key();
+    const id = this.spawn(kind, x, z);
+    if (!this.problem(id)) {
+      this.remember(before);
+      return id;
+    }
+    this.restore(before);
+    return k.pinned ? null : this.place(() => this.spawn(kind, x, z), x, z);
   }
 
   /** Another piece like `id`, beside it: its id, or null when there's no room (or no such piece). */
@@ -186,6 +199,7 @@ export class DraftLayout {
       d.desks = { ...keep };
       d.furniture = DEFAULT_FURNITURE.map((p) => ({ ...p }));
       delete d.look;
+      delete d.room;
     });
   }
 }

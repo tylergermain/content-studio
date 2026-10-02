@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { ChangesState, FloorInfo, PeerInfo, ProjectInfo, ServerMsg, WorkerInfo } from '../shared/protocol.js';
 import { isBusy } from '../shared/status.js';
-import { DESK_BY_ID } from '../shared/layout.js';
+import { DESK_BY_ID, type StationKind } from '../shared/layout.js';
 import type { FloorDef } from './building.js';
 import { excludeFromGit } from './config.js';
 import { agentProviders, configuredProvider } from './agents.js';
@@ -27,6 +27,7 @@ import { landedWork, landedWorkers, type Landed } from './leave-on-merge.js';
 import type { Ledger } from './usage.js';
 import type { Capacity } from './machine.js';
 import { officePrompt, type PromptSource } from './prompts.js';
+import { Studio } from './studio.js';
 
 type ToastLevel = 'info' | 'warn' | 'error';
 
@@ -119,6 +120,8 @@ export class Floor {
   readonly decor: Decor;
   /** The signs over its desks, and how far its back office is built out. */
   readonly plan: FloorPlanStore;
+  /** What the floor's boards and kiosks are for, when it has made them its own (see shared/studio.ts). */
+  readonly studio: Studio;
   readonly jukebox: Jukebox;
   /** The whiteboard everyone on the floor draws on together. */
   readonly whiteboard: Whiteboard;
@@ -156,6 +159,7 @@ export class Floor {
     this.docs = new Docs(def.dir);
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
+    this.studio = new Studio(dataDir);
     this.jail = new Jail(dataDir);
 
     // Before the workers, so it hears about the ones who wake up needing input.
@@ -201,7 +205,12 @@ export class Floor {
       },
       ctx.ledger,
       ctx.capacity,
-      ctx.prompts,
+      // The office's prompts, but for the kiosks' agents this floor has briefed and named itself (see studio.ts).
+      {
+        text: (id) => (id.startsWith('station.') ? this.studio.brief(id.slice('station.'.length) as StationKind, def.name) : undefined) ?? ctx.prompts.text(id),
+        agent: () => ctx.prompts.agent(),
+        stationName: (kind) => this.studio.agentName(kind),
+      },
       ctx.runAs,
       ctx.dshProfile,
     );

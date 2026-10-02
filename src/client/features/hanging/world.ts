@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { FRAMES, FRAME_BORDER, WALLS, frameRect, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
+import { FRAMES, FRAME_BORDER, WALLS, frameRect, mediaLink, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
 import { FLOOR, LOFT } from '../../../shared/layout';
 import type { Interactable } from '../../world/types';
 import { toon } from '../../world/toon';
@@ -22,6 +22,9 @@ const holds = new Map<string, number>();
 
 /** The office fetches images for us, so a picture shows up whatever its host allows. */
 export function imageUrl(url: string): string {
+  // One of a floor's own pictures comes from its media folder (see mediaLink).
+  const own = mediaLink(url);
+  if (own) return `/api/media?floor=${encodeURIComponent(own.floor)}&name=${encodeURIComponent(own.name)}`;
   return `/api/image?url=${encodeURIComponent(url)}`;
 }
 
@@ -155,11 +158,15 @@ function frameGeometry(w: number, h: number): THREE.ExtrudeGeometry {
 /** A framed w×h picture facing +z, its back against z = 0. It shows "Loading…" until given a texture. */
 function buildFrame(w: number, h: number, frame: number): { group: THREE.Group; picture: PictureMesh } {
   const group = new THREE.Group();
-  const border = new THREE.Mesh(frameGeometry(w, h), toon((FRAMES[frame] ?? FRAMES[0]).color));
-  border.receiveShadow = true;
-  group.add(border);
-  const picture: PictureMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), flat({ map: loadingTexture() }));
-  picture.position.z = FRAME_DEPTH * 0.35;
+  const color = (FRAMES[frame] ?? FRAMES[0]).color;
+  // With no frame the picture's straight on the wall, see-through where it is: a logo, lettering.
+  if (color) {
+    const border = new THREE.Mesh(frameGeometry(w, h), toon(color));
+    border.receiveShadow = true;
+    group.add(border);
+  }
+  const picture: PictureMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), flat(color ? { map: loadingTexture() } : { map: loadingTexture(), transparent: true, alphaTest: 0.04 }));
+  picture.position.z = color ? FRAME_DEPTH * 0.35 : 0.004;
   group.add(picture);
   return { group, picture };
 }

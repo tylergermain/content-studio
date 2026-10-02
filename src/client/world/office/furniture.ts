@@ -2,7 +2,13 @@ import * as THREE from 'three';
 import { DESK_SIZE } from '../../../shared/layout';
 import { kindDef, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
+import { DARK_WOOD, legs, placeholder, type BuiltPiece, type Builders } from './furniture-kit';
+import { PLAY_BUILDERS } from './furniture-play';
+import { ROOMS_BUILDERS } from './furniture-rooms';
+import { STUDIO_BUILDERS } from './furniture-studio';
 import { PALETTE, box } from './materials';
+
+export type { BuiltPiece } from './furniture-kit';
 import { coffeeTable, loungeCouch, plant, pouf, type PlantSpecies } from './props';
 import { chair } from './seats';
 
@@ -11,22 +17,7 @@ import { chair } from './seats';
 // are the models they always were (props.ts); the rest is built here. Each stands on the floor with its
 // origin under the middle of its footprint, its front toward +z.
 
-/** What a piece is built as: its group, and the screen on it if it has one (a team desk's monitor). */
-export interface BuiltPiece {
-  group: THREE.Group;
-  screen?: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-}
-
 const PLANT_SPECIES: Partial<Record<FurnitureKind, PlantSpecies>> = { monstera: 'monstera', 'snake-plant': 'snake_plant', ficus: 'ficus' };
-
-const LEG = '#8d99ae';
-const DARK_WOOD = '#8a5a3b';
-
-/** Four legs under a top `w` by `d`, its underside `h` up. */
-function legs(g: THREE.Group, w: number, d: number, h: number, inset = 0.12) {
-  const mat = toon(LEG);
-  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, h, 8), mat, sx * (w / 2 - inset), h / 2, sz * (d / 2 - inset)));
-}
 
 /** A rug `w` by `d`, lying a hair over the floor (and over the last one laid, where two overlap). */
 function rug(w: number, d: number, corner: number, color: string, lift: number): THREE.Group {
@@ -194,64 +185,59 @@ export function buildPiece(p: Piece, index = 0): BuiltPiece {
   const k = kindDef(p.kind);
   const color = p.color ?? k.color ?? '#ffffff';
   const lift = (index % 12) * 0.0012;
-  const only = (group: THREE.Group): BuiltPiece => ({ group });
-  const wrap = (o: THREE.Object3D): BuiltPiece => {
-    const group = new THREE.Group();
-    group.add(o);
-    return { group };
-  };
-  const species = PLANT_SPECIES[p.kind];
-  if (species) return only(plant(species, 1));
-  switch (p.kind) {
-    case 'team-desk':
-      return teamDesk(color);
-    case 'table':
-      return only(table(color));
-    case 'standing-table':
-      return only(standingTable(color));
-    case 'coffee-table':
-      return wrap(coffeeTable());
-    case 'side-table':
-      return only(sideTable(color));
-    case 'sofa':
-      return only(loungeCouch(color));
-    case 'armchair':
-      return only(armchair(color));
-    case 'pouf':
-      return wrap(pouf(color));
-    case 'rug':
-      return only(rug(6.2, 4.6, 0.6, color, lift));
-    case 'rug-large':
-      return only(rug(7, 7, 1.2, color, lift));
-    case 'rug-small':
-      return only(rug(3, 2, 0.4, color, lift));
-    case 'rug-round': {
-      const g = new THREE.Group();
-      g.add(mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.02, 48), toon(color), 0, 0.011 + lift, 0, false));
-      return only(g);
-    }
-    case 'divider':
-      return only(divider(color));
-    case 'bookcase':
-      return only(bookcase(color));
-    case 'floor-lamp':
-      return only(floorLamp(color));
-    case 'sign':
-      return only(sign(color, p.text ?? k.text ?? ''));
-    default:
-      return only(new THREE.Group());
-  }
+  const build = BUILDERS[p.kind];
+  const built = build ? build(p, color, lift) : placeholder(p, color);
+  return built instanceof THREE.Group ? { group: built } : built;
 }
 
-/** The kinds that are copies of a model (props.ts): their shapes are shared with every other copy, so they're never let go of. */
-const MODELLED = new Set<FurnitureKind>(['monstera', 'snake-plant', 'ficus', 'sofa', 'pouf', 'coffee-table']);
+/** A group round something that isn't one (a model's piece). */
+function wrap(o: THREE.Object3D): THREE.Group {
+  const group = new THREE.Group();
+  group.add(o);
+  return group;
+}
 
-/** Lets go of what a piece was built with that was its own: its shapes, unless they're a model's, and a sign's letters. */
-export function disposePiece(kind: FurnitureKind, group: THREE.Object3D) {
+const plantOf = (species: PlantSpecies) => () => plant(species, 1);
+
+/** Every kind's builder: the ones here, and each part of the catalog's own (the files beside this one). */
+const BUILDERS: Builders = {
+  'team-desk': (_p, color) => teamDesk(color),
+  table: (_p, color) => table(color),
+  'standing-table': (_p, color) => standingTable(color),
+  'coffee-table': () => wrap(coffeeTable()),
+  'side-table': (_p, color) => sideTable(color),
+  sofa: (_p, color) => loungeCouch(color),
+  armchair: (_p, color) => armchair(color),
+  pouf: (_p, color) => wrap(pouf(color)),
+  monstera: plantOf(PLANT_SPECIES.monstera!),
+  'snake-plant': plantOf(PLANT_SPECIES['snake-plant']!),
+  ficus: plantOf(PLANT_SPECIES.ficus!),
+  rug: (_p, color, lift) => rug(6.2, 4.6, 0.6, color, lift),
+  'rug-large': (_p, color, lift) => rug(7, 7, 1.2, color, lift),
+  'rug-small': (_p, color, lift) => rug(3, 2, 0.4, color, lift),
+  'rug-round': (_p, color, lift) => {
+    const g = new THREE.Group();
+    g.add(mesh(new THREE.CylinderGeometry(1.6, 1.6, 0.02, 48), toon(color), 0, 0.011 + lift, 0, false));
+    return g;
+  },
+  divider: (_p, color) => divider(color),
+  bookcase: (_p, color) => bookcase(color),
+  'floor-lamp': (_p, color) => floorLamp(color),
+  sign: (p, color) => sign(color, p.text ?? kindDef(p.kind).text ?? ''),
+  ...ROOMS_BUILDERS,
+  ...STUDIO_BUILDERS,
+  ...PLAY_BUILDERS,
+};
+
+/**
+ * Lets go of what a piece was built with that was its own: its shapes, and a sign's letters. A model's
+ * shapes are shared with every other copy of it (see piece() in world/models.ts), so they're never let go of.
+ */
+export function disposePiece(group: THREE.Object3D) {
   group.traverse((o) => {
     const m = o as THREE.Mesh;
     if (!m.isMesh) return;
-    if (!MODELLED.has(kind)) m.geometry.dispose();
+    if (!m.userData.shared) m.geometry.dispose();
     if (m.userData.letters) {
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();

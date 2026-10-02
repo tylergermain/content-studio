@@ -5,10 +5,11 @@ import type { Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
 import type { Piece } from '../furniture.js';
 import type { DeskLayout } from '../office-builder.js';
-import type { FloorPlan } from '../floorplan.js';
+import type { FloorPlan, RoomOptions } from '../floorplan.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
+import type { StudioState, TickerState } from '../studio.js';
 import type { WhiteboardView } from '../whiteboard.js';
 import type { AgentProvider } from './agents.js';
 import type { GhIssue, GhPull, GhState } from './github.js';
@@ -126,6 +127,10 @@ export interface FloorView {
   cars: CarState[];
   /** Workers sent home and locked up in the dungeon, on a map that has one. */
   jail: JailState;
+  /** What this floor's wall boards and kiosks are for, when it has made them its own, and what's posted on the boards. */
+  studio: StudioState;
+  /** The prices on this floor's ticker (none, when it has no ticker). */
+  ticker: TickerState;
 }
 
 export type FloorClientMsg =
@@ -139,6 +144,13 @@ export type FloorClientMsg =
   | { t: 'floor.repos'; refresh?: boolean }
   /** Clone a repository and make it a new floor; answered with `floor.added` once it's there. */
   | { t: 'floor.add'; repo: string }
+  /**
+   * Make a folder on the office's machine a floor (admins only): no repository, nothing to do with
+   * GitHub. The folder's made if it isn't there. Answered with `floor.added` (its `repo` is the folder).
+   */
+  | { t: 'floor.folder'; dir: string; name?: string }
+  /** Rename a floor, or move it to storey `to` (0 is the bottom one): admins only. */
+  | { t: 'floor.edit'; floor: string; name?: string; to?: number }
   /** Stop a floor's clone before it's there (admins, or whoever added it); the one who added it hears `floor.added` with why. */
   | { t: 'floor.cancel'; floor: string }
   /** Take a floor off the building (admins only). Its checkout stays on disk; everyone on it rides to another floor. */
@@ -154,10 +166,11 @@ export type PlanClientMsg =
   | { t: 'floor.shrink' }
   /**
    * Save the floor as the office builder arranged it (admins only): where its desks stand, its
-   * furniture, and its paint (`look`, one of FLOOR_PALETTES; none is the floor's own). `revision` is
+   * furniture, its paint (`look`, one of FLOOR_PALETTES; none is the floor's own) and its room's own
+   * fittings (`room`, see RoomOptions). `revision` is
    * the layout it was arranged from (FloorPlan.layoutRevision): a newer one saved meanwhile refuses it.
    */
-  | { t: 'floor.layout'; desks: DeskLayout; furniture: Piece[]; look?: number; revision: number };
+  | { t: 'floor.layout'; desks: DeskLayout; furniture: Piece[]; look?: number; room?: RoomOptions; revision: number };
 
 export type FloorServerMsg =
   /** You arrived on another floor: everything on it, replacing the last one's, and where everyone is now. */

@@ -3,6 +3,7 @@ import { DEFAULT_FURNITURE, kindDef, pieceAway, pieceCollider, pieceRadius, piec
 import type { Collider, Interactable } from '../types';
 import type { Fixture } from './fixture';
 import { buildPiece, disposePiece } from './furniture';
+import type { ScreenMesh } from './furniture-kit';
 
 // The furniture on the floor: the lounge, the rugs, the plants and whatever else the office builder
 // put there (see shared/furniture.ts). It's built as the office comes, and then stands wherever the
@@ -17,20 +18,28 @@ export interface PieceView {
   collider?: Collider;
   /** The seat it is, to walk up to and sit on. */
   seat?: Interactable;
-  /** A team desk's monitor, which shows the screen of whoever sits there (features/workstation). */
-  screen?: THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
+  /** What you use it by, when it's something to play with (see KindDef.play, and features/playthings). */
+  play?: Interactable;
+  /** Its screen: a team desk's monitor (features/workstation), a video screen's face (features/screens). */
+  screen?: ScreenMesh;
+  /** A stock ticker's faces (features/studio), and the part of a punching bag that swings (features/playthings). */
+  ticker?: ScreenMesh[];
+  swing?: THREE.Object3D;
   /** Put away: in the way into the back office while that's built out. */
   away: boolean;
 }
 
-/** What a feature built that's furniture too (the whiteboard, the jukebox): what the builder moves about of it. */
+/** What a feature built that's furniture too (the whiteboard, the jukebox, the hoop): what the builder moves about of it. */
 export interface Adopted {
   group: THREE.Group;
   /** What you bump into of it, and what you use it by: both the feature's own, moved with it. */
-  collider: Collider;
-  use: Interactable;
-  /** It's somewhere else now, for whatever else goes by where it is (where its sound comes from). */
-  moved?(p: Piece): void;
+  collider?: Collider;
+  use?: Interactable;
+  /**
+   * It's somewhere else now, or (with no piece) the floor doesn't have it: for whatever else goes by
+   * where it is (where its sound comes from) or whether it's there at all (the ball that goes with the hoop).
+   */
+  moved?(p: Piece | undefined): void;
 }
 
 export interface FurnitureView {
@@ -76,23 +85,33 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
   const adopted = new Map<string, Adopted>();
   let now: { pieces: readonly Piece[]; wing: number } = { pieces: DEFAULT_FURNITURE, wing: 0 };
 
-  /** Stands something a feature built where `p` has it: it's put away, moved and turned, not built or taken down. */
-  function stand(a: Adopted, p: Piece, wing: number) {
-    const away = pieceAway(p, wing);
-    a.group.userData.piece = p.id;
-    a.group.position.set(p.x, a.group.position.y, p.z);
-    a.group.rotation.y = p.rotY;
+  /**
+   * Stands something a feature built where `p` has it: it's put away, moved and turned, not built or
+   * taken down. With no piece the floor doesn't have it: it's put away. What hangs on a wall (see
+   * KindDef.pinned) is left where the feature built it.
+   */
+  function stand(a: Adopted, p: Piece | undefined, wing: number) {
+    const away = !p || pieceAway(p, wing);
     a.group.visible = !away;
-    const box = pieceCollider(p);
-    if (box) Object.assign(a.collider, box);
-    const i = site.colliders.indexOf(a.collider);
-    if (away && i >= 0) site.colliders.splice(i, 1);
-    else if (!away && i < 0) site.colliders.push(a.collider);
-    const front = kindDef(p.kind).use?.z ?? 1.2;
-    a.use.x = p.x + Math.sin(p.rotY) * front;
-    a.use.z = p.z + Math.cos(p.rotY) * front;
-    a.use.off = away;
-    a.moved?.(p);
+    if (p) a.group.userData.piece = p.id;
+    if (p && !kindDef(p.kind).pinned) {
+      a.group.position.set(p.x, a.group.position.y, p.z);
+      a.group.rotation.y = p.rotY;
+      const box = pieceCollider(p);
+      if (box && a.collider) Object.assign(a.collider, box);
+      if (a.use) {
+        const front = kindDef(p.kind).use?.z ?? 1.2;
+        a.use.x = p.x + Math.sin(p.rotY) * front;
+        a.use.z = p.z + Math.cos(p.rotY) * front;
+      }
+    }
+    if (a.collider) {
+      const i = site.colliders.indexOf(a.collider);
+      if (away && i >= 0) site.colliders.splice(i, 1);
+      else if (!away && i < 0) site.colliders.push(a.collider);
+    }
+    if (a.use) a.use.off = away;
+    a.moved?.(away ? undefined : p);
   }
 
   function add(p: Piece, index: number): PieceView {
@@ -101,16 +120,17 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     // What the office builder picks it up by.
     built.group.userData.piece = p.id;
     site.group.add(built.group);
-    const v: PieceView = { piece: { ...p }, group: built.group, screen: built.screen, away: false };
+    const v: PieceView = { piece: { ...p }, group: built.group, screen: built.screen, ticker: built.ticker, swing: built.swing, away: false };
     views.set(p.id, v);
     return v;
   }
 
   function remove(v: PieceView) {
     v.group.removeFromParent();
-    disposePiece(v.piece.kind, v.group);
+    disposePiece(v.group);
     if (v.collider) drop(site.colliders, v.collider);
     if (v.seat) drop(site.interactables, v.seat);
+    if (v.play) drop(site.interactables, v.play);
     views.delete(v.piece.id);
   }
 
@@ -152,18 +172,29 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
       v.seat = undefined;
       delete v.group.userData.interact;
     }
+
+    // Something to play with: walk up to its front.
+    const k = kindDef(p.kind);
+    if (k.play && k.use && !v.away) {
+      const at = { x: p.x + Math.sin(p.rotY) * k.use.z, z: p.z + Math.cos(p.rotY) * k.use.z, radius: k.use.radius };
+      if (!v.play) site.interactables.push((v.play = { kind: 'plaything', pieceId: p.id, ...at }));
+      else Object.assign(v.play, at);
+      v.group.userData.interact = v.play;
+    } else if (v.play) {
+      drop(site.interactables, v.play);
+      v.play = undefined;
+      delete v.group.userData.interact;
+    }
   }
 
   const view: FurnitureView = {
     set(pieces, wing) {
       now = { pieces, wing };
       const kept = new Set<string>();
+      // What the office comes with: where this floor has each, or put away on a floor that doesn't have it.
+      for (const [kind, a] of adopted) stand(a, pieces.find((p) => p.kind === kind), wing);
       pieces.forEach((p, i) => {
-        if (kindDef(p.kind).fixed) {
-          const a = adopted.get(p.kind);
-          if (a) stand(a, p, wing);
-          return;
-        }
+        if (kindDef(p.kind).fixed) return;
         kept.add(p.id);
         let v = views.get(p.id);
         if (v && rebuilt(v.piece, p)) {
@@ -176,8 +207,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     },
     adopt(kind, parts) {
       adopted.set(kind, parts);
-      const p = now.pieces.find((q) => q.kind === kind);
-      if (p) stand(parts, p, now.wing);
+      stand(parts, now.pieces.find((q) => q.kind === kind), now.wing);
     },
     roots: () => [...[...views.values()].map((v) => v.group), ...[...adopted.values()].map((a) => a.group)],
     get: (id) => views.get(id),

@@ -94,7 +94,7 @@ export function installWorkstation(ctx: Ctx) {
     const remote = voice.remoteScreens();
     const desks = new Set<string>();
     for (const v of office.furniture.all()) {
-      if (!v.screen) continue;
+      if (!v.screen || v.piece.kind !== 'team-desk') continue;
       const id = v.piece.id;
       desks.add(id);
       const stream = v.away ? null : screenAt(id, remote);

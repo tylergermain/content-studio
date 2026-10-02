@@ -1,11 +1,13 @@
 import { execFileSync, spawn } from 'node:child_process';
-import { accessSync, constants, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
-import os from 'node:os';
+import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/floors.js';
 import type { CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
 import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
 import { gh } from './github.js';
+import { tildify, untildify, unwritable, within } from './paths.js';
+
+export { tildify } from './paths.js';
 
 /** A floor as floors.json keeps it. */
 export interface FloorDef {
@@ -275,6 +277,43 @@ export class Building {
   }
 
   /**
+   * Makes a folder on the office's machine a floor called `name`: no repository, nothing to do with
+   * GitHub. The folder is made if it isn't there. Returns the floor, or why it can't.
+   */
+  addFolder(raw: string, name: string, by: string): FloorDef | string {
+    const typed = untildify(raw.trim());
+    if (!path.isAbsolute(typed)) return 'Use a full path, like ~/Workspaces/content';
+    const dir = path.resolve(typed);
+    if (this.defs.some((d) => path.resolve(d.dir) === dir)) return `${tildify(dir)} already has a floor`;
+    if (this.defs.length + this.cloning.size >= MAX_FLOORS) return `The building is full (${MAX_FLOORS} floors)`;
+    const why = unwritable(dir);
+    if (why) return why;
+    try {
+      mkdirSync(dir, { recursive: true });
+    } catch (err) {
+      return `Couldn't make ${tildify(dir)}: ${(err as Error).message}`;
+    }
+    const def = this.newDef(name.trim().slice(0, 100) || path.basename(dir), undefined, dir, by);
+    this.defs.push(def);
+    this.save();
+    return def;
+  }
+
+  /** Renames a floor, or moves it to storey `to` (0 is the bottom one). Returns the floor, or why it can't. */
+  edit(id: string, change: { name?: string; to?: number }): FloorDef | string {
+    const def = this.defs.find((d) => d.id === id);
+    if (!def) return 'No such floor';
+    const name = change.name?.trim().slice(0, 100);
+    if (name) def.name = name;
+    if (Number.isInteger(change.to)) {
+      this.defs = this.defs.filter((d) => d !== def);
+      this.defs.splice(Math.max(0, Math.min(this.defs.length, change.to!)), 0, def);
+    }
+    this.save();
+    return def;
+  }
+
+  /**
    * Clones a repository into the projects folder and adds it as a floor. `started` hears about the
    * floor as soon as the clone begins; resolves to the finished floor, or to why there's none. A
    * checkout that's already where the clone would go is used as it is. `account` (whoever's adding it)
@@ -479,35 +518,6 @@ export class Building {
       console.error(`agent-office: couldn't save ${this.clonesFile}: ${(err as Error).message}`);
     }
   }
-}
-
-/** A path under the home folder as ~/…, for showing people. */
-export function tildify(p: string): string {
-  const home = os.homedir();
-  return p === home || p.startsWith(home + path.sep) ? `~${p.slice(home.length)}` : p;
-}
-
-function untildify(p: string): string {
-  return p === '~' || p.startsWith('~/') ? path.join(os.homedir(), p.slice(1)) : p;
-}
-
-/** `dir` is `parent` or somewhere under it. */
-function within(dir: string, parent: string): boolean {
-  const rel = path.relative(parent, dir);
-  return !rel || (rel !== '..' && !rel.startsWith(`..${path.sep}`) && !path.isAbsolute(rel));
-}
-
-/** Why the office couldn't make checkouts under `dir`, if it couldn't. It's made on the first clone, so it needn't exist yet. */
-function unwritable(dir: string): string | undefined {
-  let at = dir;
-  while (!existsSync(at) && path.dirname(at) !== at) at = path.dirname(at);
-  try {
-    if (!statSync(at).isDirectory()) return `${tildify(at)} isn't a folder`;
-    accessSync(at, constants.W_OK);
-  } catch {
-    return `The office can't write in ${tildify(at)}`;
-  }
-  return undefined;
 }
 
 /** The GitHub repository a checkout's origin points at. */

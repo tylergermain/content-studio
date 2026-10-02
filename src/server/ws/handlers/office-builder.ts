@@ -10,7 +10,7 @@ export const officeBuilderHandlers = {
     if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can change the office layout');
     const floor = here(ctx, c);
     if (!floor) return;
-    const error = floor.plan.layout({ desks: msg.desks, furniture: msg.furniture, look: msg.look }, msg.revision, (id) => floor.workers.deskOccupied(id));
+    const error = floor.plan.layout({ desks: msg.desks, furniture: msg.furniture, look: msg.look, room: msg.room }, msg.revision, (id) => floor.workers.deskOccupied(id));
     if (error) return ctx.warn(c, error);
     // Anyone sitting on something that's gone is on their feet, as far as the office knows.
     const plan = floor.plan.state();

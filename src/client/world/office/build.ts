@@ -21,6 +21,7 @@ import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '..
 import { PALETTE, floorTexture, paintPlanks, type Looks } from './materials';
 import { boards, clearOfStairs, lamps, machineMonitor, nightLights, tv } from './room';
 import { furniture } from './furnish';
+import { roomOptions } from './room-options';
 import { plug, walls, type Door } from './shell';
 import { balcony } from './balcony';
 import { downstairs } from './ground';
@@ -40,6 +41,7 @@ import type { Fixture, Gives, Site } from './fixture';
  */
 function floorPlan() {
   return [
+    roomOptions,
     stack,
     nightLights,
     walls,

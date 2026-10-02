@@ -1,5 +1,6 @@
 // People in the office: where they are and what they do, chat, voice and the welcome.
 
+import type { IntegrationsState } from '../studio.js';
 import type { Look } from '../avatar.js';
 import type { BarGame } from '../bargames.js';
 import type { EmoteId } from '../emotes.js';
@@ -130,6 +131,8 @@ export type PresenceServerMsg =
       sky: SkyState;
       /** Christmas decorations, all over the building, or none. */
       theme: ThemeState;
+      /** What the office is signed in to for the boards it fills by itself (Slack, Metricool). */
+      integrations: IntegrationsState;
       /** What the building looks like inside. */
       map: MapState;
       /** The office's prompts and the worker everyone starts on. */

@@ -4,9 +4,10 @@
 // in its plan (shared/floorplan.ts). The workers' desks are the builder's too, but they're seats with
 // ids of their own (see DeskLayout).
 
+import { HOOP } from './hoop.js';
 import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
 
-export type FurnitureGroup = 'Work' | 'Seating' | 'Tables' | 'Plants' | 'Decor';
+export type FurnitureGroup = 'Work' | 'Rooms' | 'Seating' | 'Tables' | 'Plants' | 'Play' | 'Decor';
 
 /** What sitting on a piece takes (see SeatDef), in the piece's own frame. */
 export interface KindSeat {
@@ -43,12 +44,20 @@ export interface KindDef {
   text?: string;
   seat?: KindSeat;
   /**
-   * Part of the office itself (the whiteboard, the jukebox): every floor has the one, under the id
-   * that's the kind's name. The builder moves and turns it, and can't add another or take it away.
+   * Part of the office itself (the whiteboard, the jukebox, the hoop): a floor has the one, under the
+   * id that's the kind's name, or it doesn't have it at all. The builder can't make a second.
    */
   fixed?: boolean;
+  /** It hangs where the office has it (the hoop, on its wall): a floor keeps it or takes it down, and can't move it. */
+  pinned?: boolean;
   /** Where you walk up to it to use it: `z` out from its middle toward its front, and how near's near enough. */
   use?: { z: number; radius: number };
+  /** What E does there, for the things that are for playing with (see client/features/playthings). */
+  play?: 'punch' | 'snack';
+  /** You bounce on it: how hard it throws you back up, in m/s. */
+  bounce?: number;
+  /** It has a screen that plays the floor's own videos (see Piece.media, and client/features/screens). */
+  plays?: boolean;
 }
 
 export const FURNITURE = {
@@ -63,16 +72,40 @@ export const FURNITURE = {
     color: '#5bc0eb',
     seat: { label: '💻 Team desk', places: [0], hips: 0.62, depth: -0.05, out: -0.8, z: 0.42, turn: Math.PI, share: true },
   },
+  'long-table': { label: 'Long table', icon: '🪵', group: 'Work', w: 3.6, d: 1.2, top: 0.76, color: '#c9a36b' },
+  'podcast-desk': { label: 'Podcast desk', icon: '🎙️', group: 'Work', w: 2, d: 1, top: 0.76, color: '#c9a36b' },
+  screen: { label: 'Video screen', icon: '📺', group: 'Work', w: 2.3, d: 0.5, top: 1.85, color: '#2b2d42', plays: true },
+  // Hung from the ceiling over wherever the news is: the market's prices sliding along it (see TickerSetup). Nothing's in the way under it.
+  ticker: { label: 'Stock ticker', icon: '📈', group: 'Work', w: 6, d: 0.3, top: 0 },
+  softbox: { label: 'Softbox light', icon: '💡', group: 'Work', r: 0.45, top: 2, color: '#f7f3ea' },
+  camera: { label: 'Camera on a tripod', icon: '🎥', group: 'Work', r: 0.4, top: 1.6 },
+  backdrop: { label: 'Backdrop', icon: '🎬', group: 'Work', w: 3, d: 0.5, top: 2.5, color: '#218cff' },
+  wall: { label: 'Wall', icon: '🧱', group: 'Rooms', w: 2.4, d: 0.14, top: 2.6, color: '#fff6ea' },
+  'wall-short': { label: 'Short wall', icon: '▫️', group: 'Rooms', w: 1.2, d: 0.14, top: 2.6, color: '#fff6ea' },
+  'glass-wall': { label: 'Glass wall', icon: '🪟', group: 'Rooms', w: 2.4, d: 0.1, top: 2.6, color: '#3d405b' },
+  'glass-short': { label: 'Short glass wall', icon: '🔲', group: 'Rooms', w: 1.2, d: 0.1, top: 2.6, color: '#3d405b' },
+  'wood-wall': { label: 'Wood slat panel', icon: '🪵', group: 'Rooms', w: 2.4, d: 0.12, top: 2.6, color: '#b98554' },
+  'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554' },
   table: { label: 'Table', icon: '🟫', group: 'Tables', w: 2.4, d: 1.1, top: 0.76, color: '#c98b5a' },
   'standing-table': { label: 'Standing table', icon: '🍸', group: 'Tables', r: 0.5, top: 1.05, color: '#c98b5a' },
   'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46 },
+  credenza: { label: 'Credenza', icon: '🗄️', group: 'Tables', w: 2, d: 0.48, top: 0.72, color: '#b98554' },
   'side-table': { label: 'Side table', icon: '▫️', group: 'Tables', w: 0.6, d: 0.6, top: 0.52, color: '#f7f3ea' },
   sofa: { label: 'Sofa', icon: '🛋️', group: 'Seating', w: 4.4, d: 1, top: 0.47, color: '#5b8def', seat: { label: '🛋️ Couch', places: [-1.2, 0, 1.2], hips: 0.5, depth: -0.05, out: 0.9 } },
   armchair: { label: 'Armchair', icon: '🪑', group: 'Seating', w: 1, d: 0.95, top: 0.45, color: '#ef476f', seat: { label: '🪑 Armchair', places: [0], hips: 0.5, depth: 0, out: 0.85 } },
   pouf: { label: 'Pouf', icon: '🫘', group: 'Seating', r: 0.5, top: 0.42, color: '#06d6a0', seat: { label: '🫘 Beanbag', places: [0], hips: 0.42, depth: -0.1, out: 1.2 } },
+  'lounge-chair': { label: 'Lounge chair', icon: '💺', group: 'Seating', w: 0.9, d: 0.9, top: 0.42, color: '#e9dfcf', seat: { label: '💺 Lounge chair', places: [0], hips: 0.46, depth: -0.02, out: 0.85 } },
+  stool: { label: 'Stool', icon: '🪑', group: 'Seating', r: 0.24, top: 0.72, color: '#2b2d42', seat: { label: '🪑 Stool', places: [0], hips: 0.78, depth: 0, out: 0.7 } },
+  cushion: { label: 'Floor cushion', icon: '🧘', group: 'Seating', r: 0.42, top: 0.14, color: '#b388eb', seat: { label: '🧘 Cushion', places: [0], hips: 0.3, depth: 0, out: 0.9 } },
+  trampoline: { label: 'Trampoline', icon: '🤸', group: 'Play', r: 1.3, top: 0.34, color: '#5bc0eb', bounce: 8.6 },
+  'punching-bag': { label: 'Punching bag', icon: '🥊', group: 'Play', r: 0.5, top: 2.1, color: '#ef476f', use: { z: 0.95, radius: 1.3 }, play: 'punch' },
+  'vending-machine': { label: 'Vending machine', icon: '🥤', group: 'Play', w: 1, d: 0.8, top: 1.95, color: '#118ab2', use: { z: 1.1, radius: 1.3 }, play: 'snack' },
+  'ping-pong': { label: 'Ping-pong table', icon: '🏓', group: 'Play', w: 2.74, d: 1.53, top: 0.76, color: '#1a7f5a' },
+  foosball: { label: 'Foosball table', icon: '⚽', group: 'Play', w: 1.5, d: 0.8, top: 0.9, color: '#8a5a3b' },
   monstera: { label: 'Monstera', icon: '🪴', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
   'snake-plant': { label: 'Snake plant', icon: '🌿', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
   ficus: { label: 'Ficus', icon: '🌳', group: 'Plants', r: 0.3, top: 0.5, sizes: true },
+  planter: { label: 'Planter box', icon: '🌱', group: 'Plants', w: 1.8, d: 0.45, top: 1, color: '#2b2d42' },
   rug: { label: 'Rug', icon: '🟦', group: 'Decor', w: 6.2, d: 4.6, top: 0, color: '#bde0fe' },
   'rug-large': { label: 'Large rug', icon: '🟪', group: 'Decor', w: 7, d: 7, top: 0, color: '#ffc6ff' },
   'rug-small': { label: 'Small rug', icon: '🟩', group: 'Decor', w: 3, d: 2, top: 0, color: '#caffbf' },
@@ -81,19 +114,23 @@ export const FURNITURE = {
   bookcase: { label: 'Bookcase', icon: '📚', group: 'Decor', w: 1.6, d: 0.45, top: 1.9, color: '#c98b5a' },
   'floor-lamp': { label: 'Floor lamp', icon: '💡', group: 'Decor', r: 0.25, top: 1.7, color: '#ffd166' },
   sign: { label: 'Sign', icon: '🪧', group: 'Decor', w: 1.8, d: 0.4, top: 1.6, color: '#2b2d42', text: 'Friday Labs' },
+  // Lit letters, hung at head height against whatever's behind them: nothing's in the way under it.
+  neon: { label: 'Neon sign', icon: '✨', group: 'Decor', w: 2.6, d: 0.2, top: 0, color: '#ff5fa2', text: 'ON AIR' },
   // What the office comes with (see KindDef.fixed), each built by its own feature (features/whiteboard and the rest).
   whiteboard: { label: 'Whiteboard', icon: '📝', group: 'Decor', w: 4.4, d: 0.96, top: 3.05, fixed: true, use: { z: 1.7, radius: 2.3 } },
-  jukebox: { label: 'Jukebox', icon: '🎵', group: 'Decor', w: 1.4, d: 0.8, top: 1.85, fixed: true, use: { z: 1.3, radius: 1.6 } },
-  arcade: { label: 'Arcade cabinet', icon: '🕹️', group: 'Decor', w: 0.84, d: 0.85, top: 1.9, fixed: true, use: { z: 1.2, radius: 1.3 } },
+  jukebox: { label: 'Jukebox', icon: '🎵', group: 'Play', w: 1.4, d: 0.8, top: 1.85, fixed: true, use: { z: 1.3, radius: 1.6 } },
+  arcade: { label: 'Arcade cabinet', icon: '🕹️', group: 'Play', w: 0.84, d: 0.85, top: 1.9, fixed: true, use: { z: 1.2, radius: 1.3 } },
+  // On its wall, over a key painted on the floor: nothing's in the way down there (the backboard is overhead).
+  hoop: { label: 'Basketball hoop', icon: '🏀', group: 'Play', w: 1.4, d: 0.5, top: 0, fixed: true, pinned: true },
   docs: { label: 'Docs bookshelf', icon: '📚', group: 'Decor', w: 1.78, d: 0.48, top: 2.37, fixed: true, use: { z: 1.2, radius: 1.6 } },
   gong: { label: 'Gong', icon: '🔔', group: 'Decor', w: 2.4, d: 0.6, top: 2.55, fixed: true, use: { z: 1.3, radius: 1.5 } },
 } as const satisfies Record<string, KindDef>;
 
 export type FurnitureKind = keyof typeof FURNITURE;
 export const FURNITURE_KINDS = Object.keys(FURNITURE) as FurnitureKind[];
-/** The kinds every floor has one of, and no more (see KindDef.fixed). */
+/** The kinds a floor has one of at most (see KindDef.fixed). */
 export const FIXED_KINDS = FURNITURE_KINDS.filter((k) => (FURNITURE[k] as KindDef).fixed);
-export const FURNITURE_GROUPS: readonly FurnitureGroup[] = ['Work', 'Seating', 'Tables', 'Plants', 'Decor'];
+export const FURNITURE_GROUPS: readonly FurnitureGroup[] = ['Work', 'Rooms', 'Seating', 'Tables', 'Plants', 'Play', 'Decor'];
 
 export function kindDef(kind: FurnitureKind): KindDef {
   return FURNITURE[kind];
@@ -113,6 +150,8 @@ export interface Piece {
   scale?: number;
   /** What it says, for a kind that says something. */
   text?: string;
+  /** The one video it plays, by its name in the floor's media folder, for a kind that plays them: every video there, with none. */
+  media?: string;
 }
 
 /** The most pieces a floor takes. */
@@ -164,7 +203,11 @@ export const DEFAULT_FURNITURE: readonly Piece[] = [
   { id: 'arcade', kind: 'arcade', x: FLOOR.maxX - 0.45, z: CABINET.z, rotY: 3 * QUARTER },
   { id: 'docs', kind: 'docs', x: BOOKSHELF.x, z: FLOOR.maxZ - 0.25, rotY: 2 * QUARTER },
   { id: 'gong', kind: 'gong', x: GONG.x, z: GONG.z, rotY: 0 },
+  { id: 'hoop', kind: 'hoop', x: FLOOR.minX + 0.6, z: HOOP.z, rotY: QUARTER },
 ];
+
+/** Where a floor has something of the office's that it can't move (see KindDef.pinned): where the office has it. */
+const PINNED = new Map(DEFAULT_FURNITURE.filter((p) => kindDef(p.kind).pinned).map((p) => [p.kind, p]));
 
 /** The seats the default furniture has, which SEATING lists too: a floor's own furniture takes their place (see setFloorSeats). */
 const DEFAULT_SEAT_IDS = new Set(DEFAULT_FURNITURE.filter((p) => kindDef(p.kind).seat).map((p) => p.id));
@@ -316,6 +359,8 @@ export function cleanPieceText(text: unknown): string {
 
 const ID = /^[a-z0-9][a-z0-9-]{0,23}$/;
 const COLOR = /^#[0-9a-f]{6}$/;
+/** A file's name in a floor's media folder (see server/media.ts). */
+const MEDIA_NAME = /^[\w][\w.\- ()]{0,120}$/;
 
 /** An id for a new piece, that none of `taken` has. */
 export function newPieceId(taken: Iterable<{ id: string }>): string {
@@ -361,12 +406,13 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
       piece.scale = tidy(round(Math.max(PIECE_SCALE.min, Math.min(PIECE_SCALE.max, scale)), GRID));
     }
     if (k.text !== undefined) piece.text = cleanPieceText(r.text) || k.text;
-    // One of each of what the office comes with, under its own name.
+    if (k.plays && typeof r.media === 'string' && MEDIA_NAME.test(r.media) && !r.media.includes('..')) piece.media = r.media;
+    // One of each of what the office comes with, under its own name, and where the office hangs it if it's on a wall.
     if (k.fixed && piece.id !== kind) return `There is only one ${k.label.toLowerCase()}`;
+    const hung = PINNED.get(kind);
+    if (hung) Object.assign(piece, { x: hung.x, z: hung.z, rotY: hung.rotY });
     ids.add(piece.id);
     out.push(piece);
   }
-  // A list from before the office's own things were furniture: they're where they always stood.
-  for (const kind of FIXED_KINDS) if (!ids.has(kind)) out.push({ ...DEFAULT_FURNITURE.find((p) => p.id === kind)! });
   return out;
 }

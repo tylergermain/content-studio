@@ -158,6 +158,6 @@ export const gong: Fixture<'gong'> = (site) => {
   const built = buildGong();
   site.wall('north', GONG.x, (GONG.height + 0.3) / 2, GONG.width + 1.2, GONG.height + 0.3);
   // The office builder stands it wherever the floor wants it, and it rings from there.
-  site.get('furniture').adopt('gong', { group: built.group, collider: built.colliders[0], use: built.interactable, moved: (p) => Object.assign(GONG_AT, { x: p.x, z: p.z }) });
+  site.get('furniture').adopt('gong', { group: built.group, collider: built.colliders[0], use: built.interactable, moved: (p) => p && Object.assign(GONG_AT, { x: p.x, z: p.z }) });
   return { group: built.group, colliders: built.colliders, interactables: [built.interactable], update: (_t, dt) => built.update(dt), handle: { gong: built } };
 };
