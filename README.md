@@ -399,6 +399,8 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [How it works](docs/how-it-works.md): the architecture, and security notes
 - [Code layout](docs/code-layout.md): where the code lives, adding a feature or an agent provider, and the size guard
 
+The lounge jukebox is audible across most of the floor, with a gentle fade at distant desks. Adjust your personal jukebox volume in Settings → Sound & voice.
+
 ## License
 
 [MIT](LICENSE)
