@@ -3,6 +3,7 @@
  * and letting it fly, baskets and streaks, and the ball in everyone's hands.
  */
 import * as THREE from 'three';
+import { canDunk, dunkShot } from '../../../shared/dunk';
 import { HOOP, SWEET, idealSpeed, lookAtRim, meter, shotSpeed, throwPitch, tossSpeed, underCeiling } from '../../../shared/hoop';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
@@ -50,6 +51,8 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   /** Baskets of yours in a row, and whether your last throw was a shot at the hoop (a miss of a pass or a drop doesn't count). */
   let streak = 0;
   let shooting = false;
+  let dunking = false;
+  const dunkReady = () => holdingBall() && !office.hoop.away && ctx.inOffice() && !ctx.upTop() && canDunk(ctx.player.pos, ctx.player.grounded);
   /** When you started winding up a shot (performance.now()), or 0. */
   let windFrom = 0;
   // The ball's there to use (and to aim at: it's on the building); a window opening lets go of a wind-up.
@@ -58,6 +61,11 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
 
   // With the ball in your hands, E winds up a shot (let go to shoot) and Q drops it.
   ctx.keys.add('activity', (e) => {
+    if (e.code === 'Space' && dunkReady()) {
+      e.preventDefault();
+      if (!e.repeat) dunk();
+      return true;
+    }
     if (!holdingBall() || (e.code !== 'KeyE' && e.code !== 'KeyQ')) return false;
     if (e.repeat) return true;
     if (e.code === 'KeyE') windUp();
@@ -121,10 +129,24 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     windFrom = 0;
     if (!holdingBall()) return;
     const a = shotAim();
+    dunking = false;
     shooting = a.ideal !== null;
     release(a.from, a.heading, a.pitch, shooting ? shotSpeed(a.ideal!, power) : tossSpeed(power));
     if (ctx.player.view === 'first') ctx.hands.shoot();
     else ctx.me.shoot();
+  }
+
+  /** A second Space near the rim while airborne: slam it down using the ordinary synchronized throw. */
+  function dunk() {
+    if (!dunkReady()) return;
+    windFrom = 0;
+    shooting = true;
+    dunking = true;
+    const shot = dunkShot();
+    release(new THREE.Vector3(shot.x, shot.y, shot.z), 0, -Math.PI / 2, -shot.vy);
+    ctx.hands.shoot();
+    ctx.me.shoot();
+    deps.reach();
   }
 
   /** Q with the ball: it drops out of your hands in front of you. */
@@ -135,6 +157,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     const f = player.view === 'first' ? player.camYaw + Math.PI : player.facing;
     const from = handsOf(store.you, new THREE.Vector3()) ?? ctx.camera.localToWorld(new THREE.Vector3(0, -0.25, -0.45));
     shooting = false;
+    dunking = false;
     release(from, f, 0, 0.25);
   }
 
@@ -169,14 +192,15 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     const mine = b.by === store.you;
     const points = b.three ? 3 : 2;
     const peer = store.peers.get(b.by);
-    const how = b.swish ? 'SWISH! ' : b.bank ? 'BANK! ' : '';
+    const isDunk = mine && dunking;
+    const how = isDunk ? 'DUNK! ' : b.swish ? 'SWISH! ' : b.bank ? 'BANK! ' : '';
     popScore(mine ? `${how}+${points}` : `${clip(peer?.name ?? 'Someone', 16)} ${how}+${points}`, mine ? store.profile.color : (peer?.color ?? '#ff6b1a'));
     if (mine) {
       streak++;
-      const said = b.swish ? 'Swish!' : b.bank ? 'Off the glass!' : 'In off the rim!';
+      const said = isDunk ? 'Dunk!' : b.swish ? 'Swish!' : b.bank ? 'Off the glass!' : 'In off the rim!';
       toast(`🏀 ${said} +${points} from ${b.distance.toFixed(1)} m${streak > 1 ? ` · 🔥 ${streak} in a row` : ''}`);
     }
-    if (b.three || (mine && streak >= 3)) ctx.confetti.burst(HOOP.rim.x + 0.3, HOOP.rim.y, HOOP.rim.z, 140, 0.7);
+    if (isDunk || b.three || (mine && streak >= 3)) ctx.confetti.burst(HOOP.rim.x + 0.3, HOOP.rim.y, HOOP.rim.z, 140, 0.7);
   };
 
   /** Points floating up off the hoop, and fading. */
@@ -240,11 +264,12 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   function ballHint(): Hint {
     const first = ctx.player.view === 'first';
     return {
-      k: `${streak}|${first}|${!!windFrom}`,
+      k: `${streak}|${first}|${!!windFrom}|${dunkReady()}`,
       parts: [
         h('span.title', {}, '🏀 Ball in hand'),
         streak > 1 ? aside(`🔥 ${streak} in a row`) : '',
         windFrom ? aside('let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
+        dunkReady() ? key('Space', 'Dunk!') : aside('Jump near the rim, then Space again to dunk'),
         key('Q', 'Drop it'),
       ],
     };

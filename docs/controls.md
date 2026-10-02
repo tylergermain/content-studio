@@ -48,3 +48,7 @@ The prompt edits the way it does in your own terminal (iTerm2's *Natural Text Ed
 | ⌘ + ⌫ | Delete to the start of the line (Mac) |
 | ⌘ + ⌦ | Delete to the end of the line (Mac) |
 | ⌘ + ← / → | Jump to the start / end of the line (Mac) |
+
+### Dunking
+
+Hold the basketball, jump with **Space** near the hoop, then press **Space again** while airborne to dunk. The hint changes to **Space Dunk!** when you are in reach. A dunk uses the shared ball physics, scores two points, and celebrates with confetti. Normal shots still use hold/release E, and Q drops the ball. Holding Space does not trigger a dunk; release it and press again.
