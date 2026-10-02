@@ -386,3 +386,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## License
 
 [MIT](LICENSE)
+
+Spotify Connect controls are available to admins in the jukebox. Configure a Spotify developer app and connect your account there; playback uses your chosen Spotify device and requires Premium. See [Spotify setup](docs/spotify.md).
