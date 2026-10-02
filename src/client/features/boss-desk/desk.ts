@@ -78,24 +78,6 @@ export function mirrorWanted(s: { role: DeskRole | null; playing: boolean; guest
   return s.role === 'boss' && s.playing && s.guests > 0 && (s.kind === 'game' || !s.sharing);
 }
 
-/** How long the call with someone who has just sat down across the desk is given to connect, in ms, before the game goes out to them. */
-export const CALL_SETTLES = 1500;
-
-/** Who's across the desk and whether each is on the call, in a line: it changes when a guest sits down, gets up, or joins or leaves the call. */
-export function callKey(guests: readonly { id: string; voice?: boolean }[]): string {
-  return guests.map((p) => `${p.id}|${p.voice ? 1 : 0}`).join(',');
-}
-
-/**
- * Whether the game can start going out, `changedAt` being when callKey last changed. A guest who has
- * just sat down is being put on the call, which changes the connection between the two browsers from
- * the guest's side; a share starting from the boss's side in the same moment collides with it, and
- * one of the two (the game, or the guest's voice) never arrives. So the game waits out that moment.
- */
-export function callSettled(changedAt: number, now: number): boolean {
-  return now - changedAt >= CALL_SETTLES;
-}
-
 /** What the desk's monitors say when there's no picture to show: who's at the desk and what they're up to. */
 export function deskCard(boss: DeskPerson | null, connecting = false): { icon: string; title: string; line: string } {
   if (!boss) return { icon: '👑', title: "Boss's desk", line: 'Nobody at the desk' };
