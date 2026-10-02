@@ -40,3 +40,11 @@ test('Claude merges native tool configs and Codex passes secrets through environ
  assert.equal(claude.args.filter(a=>a==='--mcp-config').length,1);assert.ok(claude.args.includes('office.json'));assert.equal(claude.args.at(-1),'Task');
  assert.throws(()=>specialistLaunch({args:[]},{...info,provider:'pi'},dir),/adapter/);
 });
+test('HTTP MCP servers resolve credentials from the worker environment without stdio-only options',t=>{
+ const dir=fixture(t);prepareSpecialist(dir,'researcher','codex');
+ writeFileSync(path.join(specialistFolder(dir,'researcher'),'mcp.local.json'),JSON.stringify({mcpServers:{web:{url:'http://127.0.0.1:9/mcp',env:{WEB_TOKEN:'private-token'},bearer_token_env_var:'WEB_TOKEN',env_http_headers:{'X-Token':'WEB_TOKEN'}}}}));
+ const plan=specialistLaunch({args:[]},{specialist:'researcher',provider:'codex'} as WorkerInfo,dir);
+ assert.equal(plan.env?.WEB_TOKEN,'private-token');assert.ok(!plan.args.some(a=>a.includes('env_vars')));
+ assert.ok(plan.args.includes('mcp_servers.web.env_http_headers."X-Token"="WEB_TOKEN"'));
+ assert.ok(!plan.args.join(' ').includes('private-token'));
+});
