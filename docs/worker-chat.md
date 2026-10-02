@@ -21,3 +21,9 @@ Automated tests cover session parsing, private-content exclusion, workspace boun
 If voice stays at the microphone permission step, allow microphone access in the browser. After 20 seconds, an unresolved permission request shows a clear error and stops the connection attempt. If the in-app browser cannot show the permission prompt, open the same Content Studio URL in Chrome.
 
 On narrow windows, use Updates and Content preview to switch views. The conversation and preview scroll independently, and message and voice controls stay beneath the updates. Wider windows show both views side by side.
+
+## Talking in the office
+
+Look directly at an agent within 4.5 meters and press **Q** to begin live voice without opening the chat window. The agent turns toward you and follows your position while you talk. A small overlay shows connection status and transcripts, with microphone mute, playback, and end controls. Press Q again or Esc to end, or walk more than 7 meters away. Changing floors or opening a modal also ends the conversation and restores the agent’s original orientation. Q still returns a carried issue card or handles an active game first.
+
+Configure the OpenAI API key through the agent’s **Talk live** setup first. The shortcut uses the same session context, permissions, and OpenAI API billing as the chat window. Turning toward you is a local visual effect; it does not pause the coding session.
