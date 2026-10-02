@@ -19,3 +19,5 @@ Microphone access requires HTTPS or localhost. The existing localhost SSH tunnel
 Automated tests cover session parsing, private-content exclusion, workspace boundaries, key storage, same-origin checks, duplicate submissions, and the GPT-Live session request schema using a mocked API. A real microphone and GPT-Live project key are required to verify the end-to-end voice call. API access errors appear in the panel instead of silently selecting another model.
 
 If voice stays at the microphone permission step, allow microphone access in the browser. After 20 seconds, an unresolved permission request shows a clear error and stops the connection attempt. If the in-app browser cannot show the permission prompt, open the same Content Studio URL in Chrome.
+
+On narrow windows, use Updates and Content preview to switch views. The conversation and preview scroll independently, and message and voice controls stay beneath the updates. Wider windows show both views side by side.
