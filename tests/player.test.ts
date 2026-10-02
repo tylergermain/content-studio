@@ -5,6 +5,7 @@ import { PlayerController } from '../src/client/player/index.js';
 import { Effects } from '../src/client/player/effects.js';
 import type { Collider } from '../src/client/world/types.js';
 import { BALCONY, FLOOR, LOFT, SEATING_BY_ID, SLAB, STAIRS, seatAt, seatPlace } from '../src/shared/layout.js';
+import { BIG, BIG_FLIGHTS, BIG_POSTS, DECK_Y, POST_R, deckSolids } from '../src/shared/mezzanine.js';
 
 /** The office floor: upstairs, over the garage, so off it you'd drop to the street. */
 const officeFloor: Collider = { ...FLOOR, bottom: -SLAB, top: 0 };
@@ -268,4 +269,67 @@ test('a buzz on you walks you further and jumps you higher', (t) => {
     }
   }
   assert.ok(highest[1] > highest[0] * 1.4, `jumped ${highest[1]} against ${highest[0]}`);
+});
+
+test('walks up and down the big mezzanine’s stairs, under its rail, and not off its edge or in at the side of the steps', (t) => {
+  // The south wall too: the deck runs up to it, and without it a walker carries on off the floor.
+  const wall: Collider = { minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: FLOOR.maxZ, maxZ: FLOOR.maxZ + 0.3, top: 99 };
+  const { player, keys, frames } = controller(t, [...deckSolids(), wall]);
+  const flight = BIG_FLIGHTS[0];
+  const x = (flight.minX + flight.maxX) / 2;
+  player.pos.set(x, 0, flight.fromZ - 0.7);
+  keys('KeyS', 'ShiftLeft');
+  frames(24, 0.05);
+  assert.ok(player.pos.z > BIG.minZ + 0.1, `stuck climbing at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, DECK_Y);
+  keys('KeyW', 'ShiftLeft');
+  frames(30, 0.05);
+  assert.ok(player.pos.z < flight.fromZ, `stuck descending at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, 0);
+
+  // At a walk too, a step at a time.
+  player.pos.set(x, 0, flight.fromZ - 0.7);
+  keys('KeyS');
+  frames(260);
+  assert.ok(player.pos.z > BIG.minZ + 0.1, `stuck climbing at a walk at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, DECK_Y);
+
+  // On the office floor the rail is overhead: you walk in under the deck.
+  player.pos.set(-2, 0, 4);
+  player.vy = 0;
+  keys('KeyS');
+  frames(320);
+  assert.ok(player.pos.z > 6, `stopped under the rail at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, 0);
+
+  // Up on the deck it stops you at the edge.
+  player.pos.set(-2, DECK_Y, 7);
+  player.vy = 0;
+  player.grounded = true;
+  keys('KeyW');
+  frames(120);
+  assert.ok(player.pos.z > BIG.minZ + 0.1, `walked off the deck at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, DECK_Y);
+
+  // The fence either side of the steps: nobody walks into them from the side, or steps off one.
+  player.pos.set(flight.minX - 1.4, 0, 2);
+  player.vy = 0;
+  keys('KeyD');
+  frames(120);
+  assert.ok(player.pos.x < flight.minX - 0.1, `walked into the side of the stairs at ${player.pos.toArray()}`);
+  player.pos.set(x, 1.6, 2.2);
+  player.vy = 0;
+  keys('KeyA');
+  frames(60);
+  assert.ok(player.pos.x > flight.minX && player.pos.y >= 1.6, `stepped off the side of the stairs at ${player.pos.toArray()}`);
+});
+
+test('a post of the big mezzanine doesn’t trap whoever is standing against it', (t) => {
+  const { player, keys, frames } = controller(t, deckSolids());
+  const [px, pz] = BIG_POSTS[3];
+  player.pos.set(px, 0, pz - POST_R - 0.03);
+  keys('KeyW');
+  frames(30);
+  assert.ok(player.pos.z < pz - 1, `stuck at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, 0);
 });

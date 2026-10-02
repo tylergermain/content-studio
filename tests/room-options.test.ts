@@ -141,8 +141,8 @@ test('a floor saves its room with its layout, and is checked against the room it
     assert.match(plan.layout({ desks: {}, furniture: onStairs, room: { loft: true } }, 0, free)!, /^Sofa is in the way of the stairs$/);
     // All one level, it can: and the loft's seats are gone, for whoever gets round the floor and whoever sits down.
     assert.equal(plan.layout({ desks: {}, furniture: onStairs, room: { loft: false } }, 0, free), undefined);
-    assert.deepEqual(plan.state().room, { loft: false });
-    assert.deepEqual(plan.layoutNow().room, { tees: 1, loft: false });
+    assert.deepEqual(plan.state().room, { mezzanine: 'none' });
+    assert.deepEqual(plan.layoutNow().room, { ...ROOM_DEFAULTS, mezzanine: 'none', boss: false });
     assert.equal(plan.seat('boss-chair'), undefined);
     assert.equal(plan.seat('loft-couch'), undefined);
     assert.equal(plan.seat('couch')?.id, 'couch');
@@ -151,7 +151,7 @@ test('a floor saves its room with its layout, and is checked against the room it
 
     // Across a restart the layout's still there: it's read back against the room it was saved with.
     const again = new FloorPlanStore(dir);
-    assert.deepEqual(again.state().room, { loft: false });
+    assert.deepEqual(again.state().room, { mezzanine: 'none' });
     assert.deepEqual([again.state().furniture?.at(-1)?.id, again.state().furniture?.at(-1)?.x, again.state().furniture?.at(-1)?.z], ['new', sofaOnStairs.x, sofaOnStairs.z]);
     assert.equal(again.state().layoutRevision, 1);
     assert.equal(again.seat('boss-chair'), undefined);
@@ -160,7 +160,7 @@ test('a floor saves its room with its layout, and is checked against the room it
     const why = 'Clear the floor for the mezzanine first: Sofa is in the way of the stairs';
     assert.equal(again.layout({ desks: {}, furniture: onStairs, room: { loft: true } }, 1, free), why);
     assert.equal(again.layout({ desks: {}, furniture: onStairs }, 1, free), why);
-    assert.deepEqual(again.state().room, { loft: false });
+    assert.deepEqual(again.state().room, { mezzanine: 'none' });
     assert.equal(again.state().layoutRevision, 1);
     // Something wrong either way is just what's wrong.
     assert.match(again.layout({ desks: {}, furniture: [...defaults(), { id: 'new', kind: 'sofa', x: 40, z: 0, rotY: 0 }] }, 1, free)!, /^Sofa must stay inside the room$/);
@@ -176,7 +176,7 @@ test('a floor saves its room with its layout, and is checked against the room it
 test('a plan read back keeps a one-level layout, and drops one that only fit while it was', () => {
   const onStairs = [...defaults(), sofaOnStairs];
   const flat = cleanPlan({ wing: 0, labels: {}, desks: {}, furniture: onStairs, room: { loft: false }, layoutRevision: 4 });
-  assert.deepEqual([flat.room, flat.furniture?.length, flat.layoutRevision], [{ loft: false }, onStairs.length, 4]);
+  assert.deepEqual([flat.room, flat.furniture?.length, flat.layoutRevision], [{ mezzanine: 'none' }, onStairs.length, 4]);
   // The same furniture on a floor that has the mezzanine doesn't fit: the layout goes, as any that doesn't.
   const stale = cleanPlan({ wing: 0, labels: {}, desks: {}, furniture: onStairs, layoutRevision: 4 });
   assert.deepEqual([stale.room, stale.furniture, stale.layoutRevision], [undefined, undefined, undefined]);

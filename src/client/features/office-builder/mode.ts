@@ -1,19 +1,21 @@
 /**
  * Build mode: the camera goes up over the room, and you drag the desks and the furniture about on the
- * floor itself, turn them, paint them, add more from the catalog and take them away. What you do is a
- * draft only you see (draft.ts) until you save it; closing the builder puts the room back as it's saved.
+ * floor itself, turn them, paint them, add more from the catalog and take them away, on the office
+ * floor or upstairs (levels.ts). What you do is a draft only you see (draft.ts) until you save it;
+ * closing the builder puts the room back as it's saved.
  */
 import type * as THREE from 'three';
 import { isSolid, kindDef, type FurnitureKind } from '../../../shared/furniture';
 import { cleanRoom, roomOf } from '../../../shared/floorplan';
-import { FLOOR } from '../../../shared/layout';
-import { SNAP, validateLayout } from '../../../shared/office-builder';
+import { validateLayout } from '../../../shared/office-builder';
 import type { Ctx } from '../../core/context';
-import { isTyping } from '../../player';
 import { store } from '../../state';
 import { openModal, toast } from '../../ui/dom';
 import { openDeskLabel } from '../../ui/floorplan';
-import { DraftLayout, draftOf, snap } from './draft';
+import { DraftLayout, draftOf } from './draft';
+import { createBuilderKeys } from './keys';
+import { createLevels } from './levels';
+import { createPlacing } from './placing';
 import type { LayoutSync } from './sync';
 import { createBuilderUi, type Picked } from './ui';
 import { BuilderCamera, BuilderGizmo } from './view';
@@ -33,8 +35,6 @@ type Drag =
   | { kind: 'orbit'; x: number; y: number };
 
 const HELP = 'Drag anything to move it. R turns it, Delete removes it.';
-const CAMERA_KEYS = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyQ', 'KeyE', 'Equal', 'Minus', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight']);
-const NUDGE: Record<string, [right: number, ahead: number]> = { ArrowUp: [0, 1], ArrowDown: [0, -1], ArrowLeft: [-1, 0], ArrowRight: [1, 0] };
 /** Whether `o` is drawn: it and everything it hangs from. */
 const shown = (o: THREE.Object3D | null): boolean => !o || (o.visible && shown(o.parent));
 
@@ -84,7 +84,6 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
     let conflict = false;
     let asking = false;
     let status: { text: string; tone: 'info' | 'warn' } = { text: HELP, tone: 'info' };
-    const held = new Set<string>();
     let drag: Drag | null = null;
     let closed = false;
 
@@ -111,7 +110,9 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
 
     /** The draft, in the room: everything stands where it has it, with the outlines under what's picked and pointed at. */
     function show() {
-      if (selected && !draft.pose(selected)) selected = null;
+      levels.follow();
+      // What's picked is on the level being worked on, or it isn't picked.
+      if (selected && (!draft.pose(selected) || draft.levelOf(selected) !== levels.now)) selected = null;
       sync.arrange(draft.now, 0);
       sync.paint(draft.now.look);
       outline();
@@ -138,8 +139,8 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       say(locked(selected) ?? make(selected), 'warn');
       show();
     }
-    /** A change to the picked piece of furniture. */
-    const repiece = (set: object) => change((id) => draft.edit(() => Object.assign(draft.piece(id) ?? {}, set), id));
+    /** The office floor or upstairs: which one's being worked on, and what moves between them. */
+    const levels = createLevels({ draft, cam, gizmo, picked: () => selected, select, busy: () => pending, say, show });
 
     /** The new piece `id` is what's picked, or there was no room for one. */
     function added(id: string | null, what: string) {
@@ -161,15 +162,15 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
         say(`This floor already has its ${kindDef(kind).label.toLowerCase()}: here it is`);
         return select(kind);
       }
-      added(draft.add(kind, cam.x, cam.z), kindDef(kind).label);
+      added(draft.add(kind, cam.x, cam.z, levels.now), kindDef(kind).label);
     }
 
     function remove() {
       if (!selected || pending) return;
       if (draft.isDesk(selected)) say('Desks can be moved, but each one stays on the floor', 'warn');
       else {
-        draft.remove(selected);
-        say('');
+        const hung = draft.remove(selected);
+        say(hung ? `${hung === 1 ? 'The painting' : `The ${hung} paintings`} on it went with it. Undo brings ${hung === 1 ? 'it' : 'them'} back.` : '');
       }
       show();
     }
@@ -234,15 +235,14 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
         look: () => draft.now.look,
         room: () => roomOf(draft.now),
         online: () => net.up,
+        ...levels.state,
       },
       {
         add: addKind,
-        place: startPlacing,
+        place: (kind, e) => place(kind, e),
         moveTo: (x, z) => change((id) => draft.edit(() => draft.setPose(id, x, z, draft.pose(id)!.rotY), id)),
         turn: (way) => change((id) => draft.turn(id, way)),
-        recolor: (color) => repiece({ color }),
-        resize: (scale) => repiece({ scale }),
-        retext: (text) => repiece({ text }),
+        edit: (patch) => change((id) => draft.repiece(id, patch)),
         remedia: (media) => change((id) => draft.edit(() => (media ? (draft.piece(id)!.media = media) : delete draft.piece(id)!.media), id)),
         duplicate,
         remove,
@@ -267,11 +267,8 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
           draft.edit((d) => (look === undefined ? delete d.look : (d.look = look)));
           show();
         },
-        room: (patch) => {
-          if (pending) return;
-          say(draft.edit((d) => (d.room = cleanRoom({ ...roomOf(d), ...patch }))), 'warn');
-          show();
-        },
+        room: (patch) => !pending && (say(draft.setRoom(patch), 'warn'), show()),
+        ...levels.act,
         expand: () => net.send({ t: 'floor.expand' }),
         shrink: () => net.send({ t: 'floor.shrink' }),
         setup: deps.setup,
@@ -284,15 +281,32 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       },
     );
 
+    /** A card off the catalog, clicked or carried out onto the floor (placing.ts). */
+    const place = createPlacing({
+      draft,
+      cam,
+      view: ui.view,
+      busy: () => pending,
+      level: () => levels.now,
+      add: addKind,
+      made: (id) => ((selected = id), show()),
+      dragTo,
+      drop,
+      cancel: (before) => (draft.restore(before), say(''), show()),
+    });
+
     // ---- The mouse ------------------------------------------------------------------------------
 
-    /** The desk or the piece under the mouse, by its id. */
+    /** The desk or the piece under the mouse, by its id: one on the level being worked on. */
     function pick(e: PointerEvent): string | null {
       const roots = [...sync.deskIds.map((id) => office.desks.get(id)!.group), ...office.furniture.roots()];
       for (const hit of cam.rayAt(e, ui.view).intersectObjects(roots, true)) {
         // Not what's cut away with the walls, nor what's put away.
         if (hit.point.y > gizmo.height + 0.01 || !shown(hit.object)) continue;
-        for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) if (typeof o.userData.piece === 'string') return o.userData.piece as string;
+        let o: THREE.Object3D | null = hit.object;
+        while (o && typeof o.userData.piece !== 'string') o = o.parent;
+        // (What's on the other level is looked past: under the deck from upstairs, there's the office floor.)
+        if (o && draft.levelOf(o.userData.piece as string) === levels.now) return o.userData.piece as string;
       }
       return null;
     }
@@ -316,7 +330,9 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       const piece = id ? draft.piece(id) : undefined;
       const pan = (hit: string | null): Drag => ({ kind: 'pan', at, pick: hit, moved: false, sx: e.clientX, sy: e.clientY });
       // A rug's most of the floor: the first press on one picks it (or drags the floor), the next drags it.
-      if (!id || (piece && !isSolid(piece) && selected !== id) || pending) drag = pan(id);
+      // (What hangs from the ceiling goes the same way. A painting or a doorway is as small as a wall: one press drags it.)
+      const flat = !!piece && !isSolid(piece) && !kindDef(piece.kind).hangs && piece.kind !== 'doorway';
+      if (!id || (flat && selected !== id) || pending) drag = pan(id);
       else {
         select(id);
         const p = draft.pose(id)!;
@@ -324,16 +340,13 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       }
     }
 
-    /** Drags the picked thing to under the mouse, on the grid (a finer one with Alt held), and says if it can't stand there. */
-    function dragTo(id: string, e: PointerEvent, dx: number, dz: number) {
+    /**
+     * Drags the picked thing to under the mouse, on the grid (a finer one with Alt held) and on its own
+     * level's floor, a painting onto a wall no further than `within` (see dragPose), and says if it can't be there.
+     */
+    function dragTo(id: string, e: PointerEvent, dx: number, dz: number, within?: number) {
       const at = cam.floorAt(e, ui.view);
-      const p = draft.pose(id);
-      if (!at || !p) return;
-      const grid = e.altKey && !draft.isDesk(id) ? 0.05 : SNAP;
-      const x = Math.max(FLOOR.minX, Math.min(FLOOR.maxX, snap(at.x + dx, grid)));
-      const z = Math.max(FLOOR.minZ, Math.min(FLOOR.maxZ, snap(at.z + dz, grid)));
-      if (x === p.x && z === p.z) return;
-      draft.setPose(id, x, z, p.rotY);
+      if (!at || !draft.dragTo(id, { x: at.x + dx, z: at.z + dz }, e.altKey, within)) return;
       sync.arrange(draft.now, 0);
       const why = draft.problem(id);
       say(why, 'warn');
@@ -399,69 +412,16 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       cam.place();
     }
 
-    /**
-     * A card off the catalog: click it and the piece lands in the middle of the view; drag it out over
-     * the floor and it goes where you let go (back onto a panel, or somewhere it can't stand, and it's gone).
-     */
-    function startPlacing(kind: FurnitureKind, e: PointerEvent) {
-      if (pending || e.button !== 0) return;
-      e.preventDefault();
-      // What the office has one of isn't dragged out of the catalog: a click puts it back, or finds it.
-      const single = !!kindDef(kind).fixed;
-      const before = draft.key();
-      let made: string | null = null;
-      const onMove = (ev: PointerEvent) => {
-        if (!made) {
-          if (single || Math.hypot(ev.clientX - e.clientX, ev.clientY - e.clientY) < 6) return;
-          const at = cam.floorAt(ev, ui.view) ?? { x: cam.x, z: cam.z };
-          made = selected = draft.spawn(kind, snap(at.x, SNAP), snap(at.z, SNAP));
-          show();
-        }
-        if (made) dragTo(made, ev, 0, 0);
-      };
-      const onUp = (ev: PointerEvent) => {
-        window.removeEventListener('pointermove', onMove);
-        window.removeEventListener('pointerup', onUp);
-        window.removeEventListener('pointercancel', onUp);
-        if (!made) return addKind(kind);
-        if (ev.type === 'pointercancel' || document.elementFromPoint(ev.clientX, ev.clientY)?.closest('.ob-panel')) {
-          draft.restore(before);
-          say('');
-          return show();
-        }
-        drop(made, before);
-      };
-      window.addEventListener('pointermove', onMove);
-      window.addEventListener('pointerup', onUp);
-      window.addEventListener('pointercancel', onUp);
-    }
+    // ---- The keys (keys.ts) ---------------------------------------------------------------------
 
-    // ---- The keys -------------------------------------------------------------------------------
-
-    /** Whether the builder's the window on top (not the desk sign's editor over it). */
-    const onTop = () => modal.backdrop.parentElement?.lastElementChild === modal.backdrop;
-
-    /** An arrow key with something picked: it goes a step that way, the way the screen has it. */
-    function nudge([right, ahead]: [number, number]) {
-      // The nearest of the floor's own four ways to the screen's.
-      const q = (Math.round(cam.yaw / (Math.PI / 2)) * Math.PI) / 2;
-      const c = Math.round(Math.cos(q));
-      const s = Math.round(Math.sin(q));
-      change((id) => {
-        const p = draft.pose(id)!;
-        return draft.edit(() => draft.setPose(id, p.x + (c * right - s * ahead) * SNAP, p.z + (-s * right - c * ahead) * SNAP, p.rotY), id);
-      });
-    }
-
-    function keyDown(e: KeyboardEvent) {
-      if (!onTop()) return;
-      const take = () => {
-        e.preventDefault();
-        e.stopPropagation();
-      };
-      if (e.key === 'Escape') {
-        take();
-        if (isTyping(e)) return (e.target as HTMLElement).blur();
+    const keys = createBuilderKeys({
+      cam,
+      draft,
+      change,
+      onTop: () => modal.backdrop.parentElement?.lastElementChild === modal.backdrop,
+      asking: () => asking,
+      picked: () => !!selected,
+      escape() {
         if (asking) {
           asking = false;
           return ui.render();
@@ -472,26 +432,12 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
           return show();
         }
         return selected ? select(null) : requestClose();
-      }
-      if (isTyping(e) || asking) return;
-      const act = (run: () => unknown) => {
-        take();
-        run();
-      };
-      if (e.metaKey || e.ctrlKey) {
-        if (e.code === 'KeyZ') act(() => !pending && draft.step(e.shiftKey) && show());
-        else if (e.code === 'KeyY') act(() => !pending && draft.step(true) && show());
-        else if (e.code === 'KeyD') act(duplicate);
-        else if (e.code === 'KeyS') act(save);
-        return;
-      }
-      if (e.code === 'KeyR') act(() => change((id) => draft.turn(id, e.shiftKey ? -1 : 1)));
-      else if (e.code === 'Delete' || e.code === 'Backspace') act(remove);
-      else if (selected && NUDGE[e.code]) act(() => nudge(NUDGE[e.code]));
-      else if (CAMERA_KEYS.has(e.code)) act(() => held.add(e.code));
-    }
-    const keyUp = (e: KeyboardEvent) => held.delete(e.code);
-    const letGo = () => held.clear();
+      },
+      step: (again) => !pending && draft.step(again) && show(),
+      duplicate,
+      save,
+      remove,
+    });
 
     // ---- Opening and closing --------------------------------------------------------------------
 
@@ -510,9 +456,7 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
       closed = true;
       session = null;
       for (const off of offs) off();
-      window.removeEventListener('keydown', keyDown, true);
-      window.removeEventListener('keyup', keyUp, true);
-      window.removeEventListener('blur', letGo);
+      keys.stop();
       scene.remove(gizmo.group);
       renderer.clippingPlanes = [];
       deps.effect.enabled = true;
@@ -547,9 +491,6 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
     ui.view.addEventListener('pointercancel', up);
     ui.view.addEventListener('wheel', wheel, { passive: false });
     ui.view.addEventListener('contextmenu', (e) => e.preventDefault());
-    window.addEventListener('keydown', keyDown, true);
-    window.addEventListener('keyup', keyUp, true);
-    window.addEventListener('blur', letGo);
 
     const modal = openModal(ui.root, { escCloses: false, closeButton: false, backdropCloses: false, doing: '📐 arranging the office', onClose: cleanUp });
     modal.backdrop.classList.add('ob-backdrop');
@@ -561,11 +502,7 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
 
     return {
       frame(dt) {
-        const on = (code: string) => (held.has(code) ? 1 : 0);
-        const far = cam.dist * 0.9 * dt;
-        cam.pan((on('KeyD') + on('ArrowRight') - on('KeyA') - on('ArrowLeft')) * far, (on('KeyW') + on('ArrowUp') - on('KeyS') - on('ArrowDown')) * far);
-        cam.yaw += (on('KeyQ') - on('KeyE')) * 1.6 * dt;
-        cam.dist *= Math.exp((on('Minus') - on('Equal')) * 1.4 * dt);
+        keys.steer(dt);
         // Every frame: the office puts its camera back on your shoulders before this.
         cam.place();
       },

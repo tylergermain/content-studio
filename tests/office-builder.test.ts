@@ -73,7 +73,8 @@ test('every kind in the catalog is something the builder can stand on an empty s
   for (const kind of FURNITURE_KINDS) {
     const k = FURNITURE[kind];
     assert.ok(('r' in k && k.r > 0) || ('w' in k && k.w > 0 && k.d > 0), `${kind} takes up floor`);
-    assert.equal(problemAt(withPiece({ id: 'new', kind, x: 5, z: 7.5, rotY: 0 }), 'new'), undefined, kind);
+    // (But for what hangs: a painting goes on a wall, not out on the floor. See tests/painting.test.ts.)
+    assert.equal(problemAt(withPiece({ id: 'new', kind, x: 5, z: 7.5, rotY: 0 }), 'new'), 'hangs' in k ? `${k.label} needs a wall to hang on` : undefined, kind);
   }
 });
 

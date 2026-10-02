@@ -1,6 +1,8 @@
 import type * as THREE from 'three';
 import type { FloorPalette } from '../../shared/floors';
-import { LOFT, WALL_HEIGHT, FLOOR, type DeskDef } from '../../shared/layout';
+import type { RoomOptions } from '../../shared/floorplan';
+import { WALL_HEIGHT, FLOOR, type DeskDef } from '../../shared/layout';
+import { DECK_Y, HEADROOM, deckOf, onDeck } from '../../shared/mezzanine';
 import { OFFICE_PLAN, type BoardKey, type MapPlan } from '../../shared/maps';
 import { wayHome, wayIn, wayToBalcony, type Pt } from '../../shared/nav';
 import type { Area } from './confetti';
@@ -50,10 +52,20 @@ export interface World {
   update(t: number, dt: number, people: Iterable<{ x: number; y: number; z: number }>): void;
 }
 
-/** Where confetti rains from over (x, z) downstairs in the office: the ceiling, or under the loft, the underside of its floor. */
-function ceilingOver(x: number, z: number): number {
-  const loft = x > LOFT.minX && x < LOFT.maxX && z > LOFT.minZ && z < LOFT.maxZ;
-  return loft ? LOFT.y - 0.35 : WALL_HEIGHT - 0.1;
+/** Where confetti rains from over (x, z) downstairs in the office: the ceiling, or under the room's upstairs, the underside of its floor. */
+function ceilingOver(room: RoomOptions, x: number, z: number): number {
+  return onDeck(room, x, z) ? HEADROOM - 0.1 : WALL_HEIGHT - 0.1;
+}
+
+/**
+ * Where confetti rains in a room: all over the office floor, and over its upstairs when it has one,
+ * from under the corner loft's roof or, on the big mezzanine, from the ceiling.
+ */
+function rainIn(room: RoomOptions): World['rain'] {
+  const rain: World['rain'] = [{ area: FLOOR, top: (x, z) => ceilingOver(room, x, z) }];
+  const deck = deckOf(room);
+  if (deck) rain.push({ area: deck.slab, top: () => DECK_Y + deck.height - 0.1 });
+  return rain;
 }
 
 /**
@@ -75,10 +87,10 @@ export function officeWorld(office: Office, upstairs: () => boolean, wing: () =>
       home: (seat) => (upstairs() ? { way: wayToBalcony(seat, wing()), chute: true } : { way: wayHome(seat, wing()), chute: false }),
       in: (seat) => wayIn(seat, wing()),
     },
-    rain: [
-      { area: FLOOR, top: ceilingOver },
-      { area: LOFT, top: () => LOFT.y + LOFT.height - 0.1 },
-    ],
+    // The floor you're on has its own upstairs (see RoomOptions), so this is worked out when it's asked for.
+    get rain() {
+      return rainIn(office.room.get());
+    },
     setBeanbags: (out) => office.setBeanbags(out),
     setLook: (p) => office.setLook(p),
     setProjectName: (name) => office.setProjectName(name),

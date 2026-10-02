@@ -134,11 +134,15 @@ test('what the boss did last is kept in the browser, and a browser that keeps no
   assert.doesNotThrow(() => recall());
 });
 
-test('a floor has the desk when it has the mezzanine', () => {
+test("a floor has the desk when it has the boss's office", () => {
   assert.equal(hasBossDesk(ROOM_DEFAULTS), true);
   assert.equal(hasBossDesk({}), true, "a room that doesn't say has it");
   assert.equal(hasBossDesk({ loft: true }), true);
   assert.equal(hasBossDesk({ loft: false }), false);
+  // It's the corner loft's: not an empty loft's, the big mezzanine's or a one-level floor's.
+  assert.equal(hasBossDesk({ mezzanine: 'corner', boss: false }), false);
+  assert.equal(hasBossDesk({ mezzanine: 'big' }), false);
+  assert.equal(hasBossDesk({ mezzanine: 'none' }), false);
 });
 
 test('the guest chairs are up in the loft, across the desk, turned in toward it', () => {
@@ -156,6 +160,7 @@ test('the guest chairs are up in the loft, across the desk, turned in toward it'
     assert.ok(LOFT_SEATS.has(id), `${id} goes with the loft`);
     assert.equal(floorSeat(DEFAULT_FURNITURE, 0, id, ROOM_DEFAULTS)?.y, LOFT.y);
     assert.equal(floorSeat(DEFAULT_FURNITURE, 0, id, { loft: false }), undefined);
+    assert.equal(floorSeat(DEFAULT_FURNITURE, 0, id, { boss: false }), undefined);
     assert.equal(seatAt(`${id}:1`), undefined);
   }
 

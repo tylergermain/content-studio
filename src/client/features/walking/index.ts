@@ -77,8 +77,8 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     if (Math.hypot(at.x - player.pos.x, at.z - player.pos.z) < NEAR_ENOUGH && Math.abs(at.y - player.pos.y) < 1) return arrivedAt(at);
     if (now < walkingTo.replanAt) return;
     walkingTo.replanAt = now + 800;
-    // Round the office's rooms and up its stairs.
-    player.walkPath(wayTo(player.pos, at, officeWing()));
+    // Round the office's rooms and up its stairs, whichever this floor has.
+    player.walkPath(wayTo(player.pos, at, officeWing(), ctx.office.room.get()));
   }
 
   ctx.ticks.add('steer', ({ now }) => walkTick(now));
@@ -117,7 +117,7 @@ export function installWalking(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     toast(`🚶 Walking over to ${what}`);
     const to = { x: at.x, y: at.y ?? 0, z: at.z };
     // As walkTick does: round the office's rooms (and its back office).
-    player.walkPath(wayTo(player.pos, to, officeWing()));
+    player.walkPath(wayTo(player.pos, to, officeWing(), ctx.office.room.get()));
   }
 
   function errandEnd(why: 'arrived' | 'cancelled' | 'stuck') {

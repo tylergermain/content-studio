@@ -6,64 +6,119 @@ Open **Menu → Office builder**, or press **U**, on an office floor. Building i
 
 The camera goes up over the room with the ceiling off and the walls cut away, and you arrange the floor itself: pick something up, drag it across the floor, and let go. What you do is a draft that only you see until you **Save layout**; closing the builder (✕ or Esc) puts the room back as it's saved, after asking if there are changes to lose.
 
+Each floor is its own building: besides its furniture it chooses its [structure](#structure) (one level, the corner loft or the big mezzanine; whether the loft is the boss's office; a kitchen or none; which walls are wood), what stands [upstairs](#upstairs), and the [paintings](#paintings) on its walls.
+
 ## What you can arrange
 
 - **The workers' desks.** The room's 16 desks go anywhere there's floor for the desk and its chair. Each one stays on the floor (workers keep their desk ids), and a desk with a worker at it stays put until that worker is sent home.
 - **Furniture.** Everything else that stands on the floor: the lounge's couch, table and poufs, the rugs, the plants, and whatever you add from [the catalog](#the-catalog) on the left.
-- **What the office comes with.** The whiteboard, the jukebox, the arcade cabinet, the docs bookshelf and the gong move and turn like furniture, and the basketball hoop stays on its wall. There's one of each, so they can't be duplicated. A floor can go without one (*Remove from this floor*), and the catalog puts it back.
+- **What the office comes with.** The whiteboard, the jukebox, the arcade cabinet, the docs bookshelf and the gong move and turn like furniture, and the basketball hoop stays on its wall. There's one of each, so they can't be duplicated. A floor can go without one (*Remove from this floor*), and the catalog puts it back. While the hoop is off, pictures can hang on its stretch of the west wall.
 - **The room's paint.** Pick one of the floor palettes under *The room*, or *Own* for the floor's own color.
-- **The room's fittings.** Under *The room → Fittings*: whether the floor has the mezzanine, and how many driving tees are out on its balcony (see [Room options](#room-options)).
+- **The room's structure.** Under *The room → Structure*: what the floor has for an upstairs, whether its loft is the boss's office, whether it has the kitchen, which of its outside walls are wood, and how many driving tees are out on its balcony (see [Structure](#structure)).
+- **Upstairs.** On a floor with the big mezzanine, or with the corner loft kept as an empty room, the *Ground / Upstairs* bar under the top bar switches to the deck, and you furnish it the same way (see [Upstairs](#upstairs)).
 - **The back office.** *Add 2 desks* and *Wall it up* knock the back office out or close it again. Unlike everything else these apply straight away.
 - **Boards and agents.** *🪧 Set up the floor…* opens what the floor's wall boards are for, who stands at its kiosks, the prices on its stock ticker, and the YouTube channels its screens follow (see [A floor's boards and agents](#a-floors-boards-and-agents)). It saves by itself, apart from the layout.
 
-With a piece picked, the panel on the right sets its position, turns it, paints it (a swatch, or any color), sizes a plant, changes what a sign says, or chooses what a screen plays.
+With a piece picked, the panel on the right sets its position, turns it, paints it (a swatch, or any color), sizes a plant, changes what a sign or a doorway says, chooses what a screen plays or which picture a painting shows, and moves it upstairs or back down.
 
-The room's walls, the meeting room, the kitchen, the wall boards, the TV, the board agents' kiosks, the elevator, the ladder and the fire pole stay where they are, and so do the loft and its stairs on a floor that has them. The builder keeps furniture off them and out of the doorways, and says why when something can't stand where you dropped it: it goes back where it was. Rugs lie under anything.
+The room's walls, the meeting room, the wall boards, the TV, the board agents' kiosks, the elevator, the ladder and the fire pole stay where they are, and so do the kitchen and the floor's upstairs with its stairs and posts, on a floor that has them. The builder keeps furniture off them and out of the doorways, and says why when something can't stand where you dropped it: it goes back where it was. Rugs lie under anything.
 
 ## The catalog
 
-Down the left, in groups. Click a card to drop one in the middle of the view, or drag it out onto the floor. A floor holds up to 150 pieces.
+Down the left, in groups. Click a card to drop one in the middle of the view, or drag it out onto the floor. It lands on the level you're working on. A floor holds up to 300 pieces, upstairs and paintings included.
 
 | Group | What's in it |
 | --- | --- |
 | **Work** | Team desk, long table, podcast desk (two boom arms with mics, and a mixer), video screen and wall screen, stock ticker and market board, softbox light, camera on a tripod, backdrop |
-| **Rooms** | Wall, glass wall and wood slat panel, each full length or short |
+| **Rooms** | Wall, glass wall and wood slat panel, each full length or short, and a doorway |
 | **Seating** | Sofa, armchair, pouf, lounge chair, stool, floor cushion |
 | **Tables** | Table, standing table, coffee table, credenza, side table |
 | **Plants** | Monstera, snake plant, ficus, fiddle-leaf fig, palm, bird of paradise, pothos on a stand, planter box |
 | **Play** | Trampoline, punching bag, vending machine, ping-pong table, foosball table, dance mat, prize wheel, high striker, and the office's jukebox, arcade cabinet and basketball hoop |
-| **Decor** | Rugs in four shapes, divider, bookcase, floor lamp, sign, neon sign, and the office's whiteboard, docs bookshelf and gong |
+| **Decor** | Rugs in four shapes, divider, bookcase, floor lamp, sign, neon sign, painting, and the office's whiteboard, docs bookshelf and gong |
 
 A few notes on particular pieces:
 
 - **Rooms.** The walls are all 2.6 m tall with square-cut ends, so a row of them tiles end to end: that's how a floor gets a studio, a booth or an office of its own. A wall takes paint (its skirting and cap come out a shade of it). A glass wall is a steel frame three panes high, in the piece's color. A wood slat panel has slats on both faces, at a pitch that carries across the joins.
+- **Doorway.** A frame to walk through, as long as a short wall and as tall as the others, with the room's name over the opening on both sides. Leave a gap for it in a row of walls; nothing bumps into it. *The room's name* in the panel on the right sets what it says.
+- **Painting.** One of the floor's own pictures in a frame, on any wall: see [Paintings](#paintings).
 - **Plants.** Every plant but the planter box comes in sizes. You bump into the planter, not the leaves. The planter box is planted end to end, with vines over its front only: its back is clear, so it can stand against a wall.
 - **Neon sign.** It hangs at head height at the front of its footprint, so on the same spot as a wall or a wood panel it lies on that wall's face. Its words and its color are the piece's.
 - **Softbox.** Its face glows in the piece's color.
 - **Stool.** It's bar height, so it suits the standing table rather than the long table or the podcast desk.
-- **Stock ticker, neon sign.** They hang from the ceiling on wires, so under the loft they poke through its floor. The high striker is 2.7 m tall and does the same.
+- **Stock ticker, neon sign.** They hang from the ceiling on wires, so under the corner loft they poke through its floor; the high striker is 2.7 m tall and does the same. Under the big mezzanine the builder refuses them (*Stock ticker hangs too high to go under the mezzanine*): hang them in the open part of the floor. A neon sign can go upstairs, where it hangs at head height without its wires.
 
-## Room options
+## Structure
 
-Each floor has two fittings of its own, under *The room → Fittings*. They're part of the draft, and saved with the layout (`room` in the floor's `floorplan.json`; only what differs from the office as it comes is written).
+Under *The room → Structure*. Each floor chooses its own, so no two floors have to be the same room. The choices are part of the draft and are saved with the layout (`room` in the floor's `floorplan.json`; only what differs from the office as it comes is written). Changing one that moves what's built in (the upstairs, the kitchen) is refused while something stands in the way, in the builder and again by the office when it saves, and the reason says what to clear first.
 
-### Mezzanine, or one level
+### Layout: one level, the corner loft or the big mezzanine
 
-A floor is either **Mezzanine** (the boss's loft on its posts in the south-east corner, with the stairs along the south wall) or **One level**. The office comes with the mezzanine.
+| | What the floor has |
+| --- | --- |
+| **One level** | No upstairs, no stairs and no posts. |
+| **Corner loft** | A glass room on posts in the south-east corner, over the meeting room, with stairs along the south wall. It's the boss's office, or an empty room (below). This is what the office comes with. |
+| **Big mezzanine** | A deck wall to wall along the south side, 36 m by 7.8 m (about a third of the floor), 3 m up on a row of seven posts, with a glass rail along its open edge. One flight of stairs climbs to it from the middle of the floor, beside the fire pole. It comes empty: you furnish it on the [Upstairs](#upstairs) level. |
 
 On a one-level floor:
 
-- The loft, its posts, its stairs, its glass and roof, and everything upstairs (the boss's desk, its chair, its two guest chairs and both monitors, the couch, the telescope, the plants, the lamp, the signs) are gone. Nothing is drawn, nothing is in the way, and there's nothing to use or sit on up there. The boss's desk, with its games and its call, isn't on that floor.
+- The loft, its posts, its stairs, its glass and roof, and everything upstairs are gone. Nothing is drawn, nothing is in the way, and there's nothing to use or sit on up there.
 - The floor where the stairs stood is floor like any other: you walk across it, furniture and desks can stand on it, and workers and the dog route over it.
-- The meeting room stays, since meetings need it. With no loft over it, it's a glass room open to the ceiling: a slim rail caps the glass along both walls and over the door, and two slim beams cross it carrying the lights over the table.
-- Nobody can sit on the loft's couch, the boss's chair or the guest chairs: the office refuses those seats on that floor.
-- Anyone up in the loft, on its stairs, or sitting up there when the floor is saved one-level is put down on the floor below. The same happens if you switch from the floor list onto a one-level floor while standing at loft height.
+- The meeting room stays, since meetings need it. With nothing over it, it's a glass room open to the ceiling: a slim rail caps the glass along both walls and over the door, and two slim beams cross it carrying the lights over the table.
 
-Switching back to **Mezzanine** is refused while anything stands where the stairs go, in the builder and again by the office when it saves: *Clear the floor for the mezzanine first: Sofa is in the way of the stairs*. Move or remove the piece, then switch. If you're standing where the stairs go when the mezzanine comes back, you step out of them.
+With the big mezzanine:
+
+- Everything under the deck has 2.75 m of headroom: desks, the kitchen, the meeting room, the jukebox and the arcade all fit. What's taller, or hangs from the ceiling, can't stand under it: the basketball hoop (take it off the floor first: pick it and *Remove from this floor*), the whiteboard, a stock ticker and a neon sign are refused there, each with why.
+- Lights are set into the deck's underside. The low windows in the walls it runs along end at the deck: from below each is a window up to the ceiling, with a solid top panel where the deck passes behind it, and upstairs a skirting covers the rest.
+- The boss's office isn't on that floor: it belongs to the corner loft.
+- The workers, the dog and Marc stay on the office floor. Upstairs is for people.
+
+Switching layout is refused while the new one has no place for something: *Clear the floor for the mezzanine first: Sofa is in the way of the stairs* (move or remove the piece, then switch), or *Clear upstairs first: …* when pieces stand on a deck that would go (the level bar's **Clear upstairs** takes them all away at once, and Undo brings them back). If you're standing where stairs arrive, you step out of them; up on a deck or its stairs when it goes, you're put down on the floor below. The same happens if you switch from the floor list onto another floor while standing at deck height where that floor has no deck.
+
+### The loft is: the boss's office, or an empty room
+
+On a corner-loft floor. **Boss's office** is the loft as it comes: the boss's desk with its chair, the two guest chairs and both monitors, the couch, the telescope, the plants, the lamp and the signs. **Empty room** takes all of that out and leaves the glass room, to furnish on the [Upstairs](#upstairs) level like any other. The boss's desk, with its games and its call, is only on a floor whose loft is the boss's office, and nobody can sit on the loft's couch, the boss's chair or the guest chairs anywhere else: the office refuses those seats on that floor.
+
+Going back to **Boss's office** is refused while your own furniture is up there. A floor that goes from one level or the big mezzanine back to the corner loft gets the boss's office again.
+
+### Kitchen
+
+**Kitchen** is the counter, the fridge and the coffee machine in the south-west corner. **No kitchen** takes them away, with the fridge's hum and the coffee to drink, and that corner is floor like any other. Bringing it back is refused while something stands where it goes (*Clear the floor for the kitchen first: …*).
+
+### Wood walls
+
+Any of the room's four outside walls can be panelled in wood slats from the baseboard to the ceiling: pick **N**, **E**, **S** or **W** (north is the wall with the boards and the elevator), and **Oak** or **Walnut** for all of them. The slats run round that wall's windows and doors and behind its boards, the TV and any pictures. On the north wall they leave out the elevator, and stop where the back office opens (the last 4.6 m, east of the gong).
+
+For wood on part of a wall, or on an office of its own, use the catalog's wood slat panels: they're 2.6 m tall pieces that stand anywhere, upstairs too.
 
 ### One tee, or two
 
 **1 tee** is the balcony as it comes: the tee next to the ashtray, and the bistro table with its two stools. **2 tees** adds a second bay east of the balcony doors, with its own bag of clubs, and puts the bistro table and its stools away to make room (anyone sitting on a stool is stood up). With two, one person is on each and both can swing at once; see [Features](features.md).
+
+## Upstairs
+
+A floor has an upstairs to furnish when its layout is the **big mezzanine**, or the **corner loft** with *The loft is: Empty room*. A bar then appears under the top bar: **Ground** and **Upstairs**.
+
+- **Upstairs** takes the camera up to the deck: the grid, what the mouse picks up and what you add from the catalog are all the deck's. The walls are cut away 2.7 m over the deck instead of over the floor. **Ground** goes back down; from there the deck is cut away so you see the floor under it.
+- Furniture upstairs is ordinary furniture: walls, glass, wood panels and doorways make rooms, and desks, sofas, tables, plants, screens, rugs and paintings go in them. It stays on the deck (it can't be dragged off the edge), keeps the top of the stairs clear, and has to fit under what's overhead: 3.8 m on the big mezzanine, 2.8 m in the loft.
+- What only stands on the office floor is greyed out in the catalog while you're upstairs: everything in the *Play* group, the stock ticker, and what the office has one of (the whiteboard, the jukebox, the arcade, the docs, the gong, the hoop). The workers' desks stay downstairs too.
+- **⬆ Move upstairs** and **⬇ Move downstairs**, in the panel on the right, take the picked piece to the other level, as near where it stood as there's room. A wall takes the paintings on it along. The view follows the piece.
+- **＋ Add starter rooms**, on an empty big mezzanine, stands four glass-fronted rooms along the deck: 26 pieces (glass fronts, cross walls and four doorways named *Office 1*, *Office 2*, *Studio* and *Office 3*), with an open landing where the stairs arrive. They're ordinary pieces: rename a doorway, move a wall, or take any of it away.
+- **Clear upstairs** removes everything on the deck in one go. Undo brings it back.
+
+People walk up the stairs, sit at team desks and on sofas up there, and watch its screens, as on the office floor. Rooms upstairs are 2.6 m partitions open to the ceiling, with doorways to walk through rather than doors. Someone upstairs shows as *upstairs* in the people list.
+
+## Paintings
+
+A **painting** (*Decor* in the catalog) is one of the floor's own pictures in a frame. Unlike the pictures anyone hangs with **F** (which go on the room's four outside walls and are everyone's to move), a painting is part of the layout: only admins place it, it's saved with the floor, and it goes on any wall, the ones you put up included.
+
+- **Where it hangs.** On the inside of an outside wall, or on either face of a wall, short wall, wood slat panel or short wood panel on the same level. Glass takes none. A new painting lands on the nearest wall to the middle of the view (beside one that's already there, not over it); dragged out of the catalog, it rides the nearest wall until you let go.
+- **Moving it.** Drag it along its wall, or across to another: within 0.6 m of a wall it snaps onto it and faces the way that wall does, on the side of the wall the mouse is on. Its frame stays on the wall as you drag: it stops half its width from the end of a run of walls (walls stood end to end count as one). Let go of it out in the room and it goes back where it was (*Painting needs a wall to hang on*). **R**, or *⇄ Other side of the wall*, hangs it on the wall's other face; the arrow keys slide it along the wall.
+- **With its wall.** Move or turn a wall and the paintings on it move and turn with it; move it upstairs and they go too; remove it and they're removed with it (Undo brings both back).
+- **Its picture.** The panel on the right shows a thumbnail of every image file in the floor's media folder (`<floor folder>/.agent-office/media`, the same folder the [video screens](#video-screens) play from: PNG, JPG, WebP, GIF, SVG). Click one and the painting shows it and takes that picture's own shape, so a scene hangs wide and a portrait tall. *None* leaves an empty frame. A file that's since gone from the folder shows as *Image unavailable* in its frame.
+- **Frame, size, height.** Six frame colors, or none (the picture straight on the wall). *Size* is the picture's long side, 0.3 m to 3.4 m. *Height* is how far its middle hangs above the floor it's on; its frame always stays clear of that floor.
+
+Paintings aren't checked against windows, boards, the pictures hung with **F** or each other, so look before you save. Under the big mezzanine a painting has to fit below the deck.
 
 ## Team desks
 
@@ -171,39 +226,44 @@ Each piece can be painted: the trampoline's pad, the bag, the machine's cabinet,
 
 | | |
 | --- | --- |
-| Drag a desk or a piece | Move it, a quarter meter at a time (hold **Alt** for 5 cm) |
+| Drag a desk or a piece | Move it, a quarter meter at a time (hold **Alt** for 5 cm). A painting snaps onto the wall it's near |
+| **Ground** / **Upstairs** | The level you're arranging, on a floor with an upstairs to furnish |
 | Drag the floor | Slide the view |
 | Right-drag, or **Shift** + drag | Turn and tilt the view |
 | Scroll | Zoom |
 | **W A S D**, **Q E**, **+ −** | Slide, turn and zoom the view from the keyboard |
-| **R** / **Shift R** | Turn what's picked a quarter turn (round things an eighth) |
+| **R** / **Shift R** | Turn what's picked a quarter turn (round things an eighth); a painting goes to the other side of its wall |
 | Arrow keys | Nudge what's picked a step |
-| **Delete** | Remove the picked piece |
+| **Delete** | Remove the picked piece (a wall, with the paintings on it) |
 | **Ctrl/⌘ D** | Another one like it |
 | **Ctrl/⌘ Z**, **Ctrl/⌘ Shift Z** | Undo, redo |
 | **Ctrl/⌘ S** | Save |
 | **Esc** | Let go of what's picked, then close |
 
-*Walls* in the top bar stands the walls back up to see the room whole. A rug takes two presses: the first picks it (so dragging across one still slides the view), the next drags it.
+*Walls* in the top bar stands the walls back up to see the room whole. A rug takes two presses: the first picks it (so dragging across one still slides the view), the next drags it. What's on the other level isn't picked up: from upstairs you look past what's on the office floor.
 
 ## Saving
 
-**Save layout** applies the draft to everyone on the floor: what's in the way, where there is to sit, and how the dog and the workers get round the room all follow. Layouts are kept per floor in that floor's `.agent-office/floorplan.json`, with its desk signs and its back office, across restarts. **Reload saved** throws the draft away. **Original office** puts the office back as it comes (as a draft, to save). If another admin saves while you're building, your draft is kept and you're asked to reload before saving over theirs.
+**Save layout** applies the draft to everyone on the floor: its structure, what's in the way, where there is to sit, and how the dog and the workers get round the room all follow. Layouts are kept per floor in that floor's `.agent-office/floorplan.json`, with its desk signs and its back office, across restarts. **Reload saved** throws the draft away. **Original office** puts the office back as it comes (as a draft, to save). If another admin saves while you're building, your draft is kept and you're asked to reload before saving over theirs.
 
-Anyone sitting on something that was moved moves with it; on something that was removed, they're stood up. Anyone standing where something now stands steps out of it.
+Anyone sitting on something that was moved moves with it; on something that was removed, they're stood up. Anyone standing where something now stands steps out of it (upstairs, to the top of the stairs). When a floor's upstairs changes, the pictures hung with **F** that no longer fit their wall slide to the nearest stretch that takes them (one that fits nowhere on its wall is taken down, and the office's log says which).
 
-A layout saved by an older version that no longer fits (a piece where something built-in now is) is dropped when the floor loads: the office as it comes, with the floor's signs and back office kept.
+A layout saved by an older version that no longer fits (a piece where something built-in now is) is dropped when the floor loads: the office as it comes, less what its structure has no place for (the hoop, under a big mezzanine), with the floor's structure, signs and back office kept. A floor saved before there were three layouts keeps the one it had: one that was *One level* still is.
 
 ## Who can build
 
-Only admins. The builder opens for nobody else, and everything it changes travels on messages the office refuses from anyone else: the layout and its room options (`floor.layout`), the back office (`floor.expand`, `floor.shrink`), and a floor's boards, agents, ticker, watched channels and connections (`studio.setup`, `integrations.signIn`). Using what's on the floor (the seats, the screens, the things to play with, the tees) is for everyone.
+Only admins. The builder opens for nobody else, and everything it changes travels on messages the office refuses from anyone else: the layout, its structure, what's upstairs and its paintings (`floor.layout`), the back office (`floor.expand`, `floor.shrink`), and a floor's boards, agents, ticker, watched channels and connections (`studio.setup`, `integrations.signIn`). Using what's on the floor (the seats, the screens, the things to play with, the tees) is for everyone.
 
 Someone who comes in on the shared office password counts as an admin, so none of this holds anyone back until the admins have accounts of their own and the shared password is switched off: see [Add users](../README.md#add-users).
 
 ## Where it lives
 
-The catalog and each kind's footprint are in [`src/shared/furniture.ts`](../src/shared/furniture.ts), the rules for where things may stand in [`src/shared/office-builder.ts`](../src/shared/office-builder.ts) and [`src/shared/office-fixed.ts`](../src/shared/office-fixed.ts), a floor's room options in [`src/shared/floorplan.ts`](../src/shared/floorplan.ts), and build mode in [`src/client/features/office-builder/`](../src/client/features/office-builder).
+The catalog and each kind's footprint are in [`src/shared/furniture.ts`](../src/shared/furniture.ts), the rules for where things may stand in [`src/shared/office-builder.ts`](../src/shared/office-builder.ts) and [`src/shared/office-fixed.ts`](../src/shared/office-fixed.ts), a floor's room options in [`src/shared/floorplan.ts`](../src/shared/floorplan.ts), its upstairs (the decks, their stairs and posts) in [`src/shared/mezzanine.ts`](../src/shared/mezzanine.ts) with the starter rooms in `mezzanine-rooms.ts`, the faces a painting hangs on in [`src/shared/wall-faces.ts`](../src/shared/wall-faces.ts) with its size in `hangings.ts`, the wood walls' rectangles in `panels.ts`, and build mode in [`src/client/features/office-builder/`](../src/client/features/office-builder).
 
-How each piece looks is a builder in `BUILDERS` in [`src/client/world/office/furniture.ts`](../src/client/world/office/furniture.ts), which takes in the ones kept beside it: `furniture-rooms.ts` (the walls), `furniture-studio.ts` and `furniture-greenery.ts` (the studio's pieces and the newer plants), `furniture-screens.ts` (the wall screen), `furniture-ticker.ts` (the market board) and `furniture-play.ts` (the things to play with). Most are modelled in Blender (see [`blender/README.md`](../blender/README.md)). A kind with no builder shows as a plain box. A new kind of furniture is an entry in `FURNITURE` and a builder.
+Build mode is `mode.ts` (the session: the mouse, saving, what's picked) over `draft.ts` (the layout being worked on, every change to it and what each can be undone to), with `levels.ts` (the office floor or upstairs), `drag.ts` (where a dragged thing lands, and what a wall carries: pure, tested in `tests/builder-snap.test.ts`), `placing.ts` (a card off the catalog), `keys.ts`, `view.ts` (the camera, the grid and the outlines), `sync.ts` (standing a layout in the room, and settling you after one changes), and the panels: `ui.ts`, `room-ui.ts` (Structure), `hang-ui.ts` (a painting's picture, frame, size and height) and `media-picker.ts` (what a screen plays).
 
-What the pieces do is in the features: team desks' screen sharing in [`src/client/features/workstation/`](../src/client/features/workstation), the video screens in [`src/client/features/screens/`](../src/client/features/screens) (served by `GET /api/media?floor=<id>&list` and `&name=<file>`, in `src/server/media.ts`; the channels a floor watches are read by `src/server/watch.ts` and played by `watch.ts` there, on `src/client/world/webscreen.ts`), the ticker's prices in [`src/client/features/studio/`](../src/client/features/studio) (`ticker.ts`, with the pure parts in `ticker-format.ts`), the things to play with in [`src/client/features/playthings/`](../src/client/features/playthings), and the tees in [`src/client/features/golf/`](../src/client/features/golf). A new plaything is a kind in `shared/furniture.ts`, a piece in `blender/scripts/build_play.py`, a builder in `furniture-play.ts` and a `Toy` in the feature's table.
+In the 3D office the structure is fixtures that follow the floor's room (see [Code layout](code-layout.md)): `loft.ts` (the corner loft's shell and stairs), `boss-office.ts`, `mezzanine.ts` (the big deck), `panelling.ts` (wood walls) and `world/kitchen.ts`.
+
+How each piece looks is a builder in `BUILDERS` in [`src/client/world/office/furniture.ts`](../src/client/world/office/furniture.ts), which takes in the ones kept beside it: `furniture-rooms.ts` (the walls), `furniture-decor.ts` (the painting and the doorway), `furniture-studio.ts` and `furniture-greenery.ts` (the studio's pieces and the newer plants), `furniture-screens.ts` (the wall screen), `furniture-ticker.ts` (the market board) and `furniture-play.ts` (the things to play with). Most are modelled in Blender (see [`blender/README.md`](../blender/README.md)). A kind with no builder shows as a plain box. A new kind of furniture is an entry in `FURNITURE` and a builder.
+
+What the pieces do is in the features: a painting's picture in [`src/client/features/hanging/`](../src/client/features/hanging) (`paintings.ts`, on the frames in `src/client/world/frames.ts`), team desks' screen sharing in [`src/client/features/workstation/`](../src/client/features/workstation), the video screens in [`src/client/features/screens/`](../src/client/features/screens) (served by `GET /api/media?floor=<id>&list` and `&name=<file>`, in `src/server/media.ts`; the channels a floor watches are read by `src/server/watch.ts` and played by `watch.ts` there, on `src/client/world/webscreen.ts`), the ticker's prices in [`src/client/features/studio/`](../src/client/features/studio) (`ticker.ts`, with the pure parts in `ticker-format.ts`), the things to play with in [`src/client/features/playthings/`](../src/client/features/playthings), and the tees in [`src/client/features/golf/`](../src/client/features/golf). A new plaything is a kind in `shared/furniture.ts`, a piece in `blender/scripts/build_play.py`, a builder in `furniture-play.ts` and a `Toy` in the feature's table.

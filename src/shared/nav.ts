@@ -6,7 +6,8 @@
 import { DEFAULT_FURNITURE, furnitureObstacles, type Piece } from './furniture.js';
 import { deskRect } from './office-builder.js';
 import type { RoomOptions } from './floorplan.js';
-import { fixedIn, hasLoft, type Circle, type Rect } from './office-fixed.js';
+import { structureKey } from './mezzanine.js';
+import { fixedIn, type Circle, type Rect } from './office-fixed.js';
 import { BALCONY, BALCONY_DOOR, BEANBAGS, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, EXIT_STAIRS, FLOOR, KIOSK, PARACHUTE, ROAD, WING, builtDesks, wingLevel, wingMinZ, type DeskDef } from './layout.js';
 
 export type { Circle, Rect } from './office-fixed.js';
@@ -46,7 +47,7 @@ export function deskPoint(d: DeskDef, t: number, s: number): Pt {
 /**
  * What's in the way on the office floor, built out `wing` rows: its desks, its furniture (the lounge,
  * the plants and whatever else the office builder put there) and everything built into a room like
- * `room` (see fixedIn: the stairs are only in the way on a floor with the mezzanine).
+ * `room` (see fixedIn: the stairs are only in the way on a floor with a mezzanine). What stands upstairs is in nobody's way down here.
  */
 function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly Piece[] = floorFurniture, room: RoomOptions = floorRoom): Obstacles {
   const rects: Rect[] = [];
@@ -290,10 +291,10 @@ export function setOfficeFurniture(pieces: readonly Piece[]) {
   clearOfficeNav();
 }
 
-/** The floor's room is `room` from now on (with the mezzanine and its stairs, or all one level): its grids are made again, for that room. */
+/** The floor's room is `room` from now on (its upstairs and its stairs, its kitchen, or none of them): its grids are made again, for that room, when what's built into it changed. */
 export function setOfficeRoom(room: RoomOptions) {
-  if (hasLoft(room) === hasLoft(floorRoom)) return;
-  floorRoom = { loft: hasLoft(room) };
+  if (structureKey(room) === structureKey(floorRoom)) return;
+  floorRoom = { ...room };
   clearOfficeNav();
 }
 

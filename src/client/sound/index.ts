@@ -239,6 +239,11 @@ export class OfficeSound {
     coffee(this.a);
   }
 
+  /** Whether the floor you're on has its kitchen (see RoomOptions.kitchen): with none, there's no fridge to hum. */
+  setKitchen(on: boolean) {
+    this.fridge.quiet = !on;
+  }
+
   bark(x: number, z: number, times: number) {
     bark(this.a, x, z, times);
   }

@@ -1,29 +1,24 @@
 import * as THREE from 'three';
 import { LOFT, STAIRS, WALL_T } from '../../../shared/layout';
-import { mesh, roundedBox, textPlane, toon } from '../toon';
-import type { Collider, Interactable } from '../types';
-import type { Fixture } from './fixture';
+import { mesh, toon } from '../toon';
+import type { Collider } from '../types';
+import { keep, type Fixture } from './fixture';
 import { PALETTE, box, floorTexture, glassPane, type Looks } from './materials';
-import { floorPlant, pendant, plant } from './props';
-import { chair, seatable } from './seats';
 
-/** The loft as it's built: all of it in a group of its own, with what's in the way of it and what there is to use up there. */
+/** The loft as it's built: all of it in a group of its own, with what's in the way of it. */
 interface Loft {
   group: THREE.Group;
   colliders: Collider[];
-  interactables: Interactable[];
-  /** The monitor on the boss's desk. */
-  screen: THREE.Mesh;
 }
 
 /**
- * The upstairs office: a loft on posts in the south-east corner, with glass on the two sides that
- * face the desks, reached by stairs along the south wall.
+ * The upstairs room: a loft on posts in the south-east corner, with glass on the two sides that
+ * face the desks, reached by stairs along the south wall. It's built empty: its floor, its posts, its
+ * roof, its glass and the stairs.
  */
 export function buildLoft(looks: Looks): Loft {
   const group = new THREE.Group();
   const colliders: Collider[] = [];
-  const interactables: Interactable[] = [];
   const { minX, maxX, minZ, maxZ, y: floorY, height } = LOFT;
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -124,139 +119,27 @@ export function buildLoft(looks: Looks): Loft {
   group.add(handrail);
   // You can't step off the side of the stairs, or climb on from it.
   colliders.push({ minX: fromX, maxX: toX, minZ: STAIRS.minZ - 0.1, maxZ: STAIRS.minZ, top: 99 });
-
-  // Inside: the big desk facing the glass, a comfy couch, a telescope aimed at the desks.
-  const deskX = cx + 0.5;
-  const deskZ = cz - 0.3;
-  const desk = new THREE.Group();
-  desk.add(mesh(roundedBox(2.6, 0.1, 1.2, 0.1), woodMat, 0, 0.78, 0));
-  desk.add(mesh(box(2.4, 0.66, 0.08), toon('#8a5a3b'), 0, 0.4, -0.5));
-  for (const sx of [-1, 1]) desk.add(mesh(box(0.1, 0.72, 1.0), toon('#8a5a3b'), sx * 1.15, 0.37, 0));
-  desk.add(mesh(roundedBox(0.9, 0.55, 0.06, 0.03), toon(PALETTE.ink), 0, 1.18, -0.2));
-  // Its neck is thinner than its body, so it doesn't stand out in front of the picture.
-  desk.add(mesh(box(0.08, 0.2, 0.05), toon(PALETTE.ink), 0, 0.93, -0.2));
-  // The desk's games play on it, and it shows what the boss shares (features/arcade, features/boss-desk).
-  const screen = mesh(new THREE.PlaneGeometry(0.8, 0.45), new THREE.MeshBasicMaterial({ color: '#4cc9f0' }), 0, 1.18, -0.165, false);
-  desk.add(screen);
-  desk.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), toon('#ffd166'), 0.9, 0.89, 0.15));
-  const plate = textPlane('👑 BOSS', { bg: '#ffd166', size: 48 });
-  plate.scale.multiplyScalar(0.55);
-  plate.position.set(0, 0.5, -0.55);
-  plate.rotation.y = Math.PI;
-  desk.add(plate);
-  const bossChair = chair('#2b2d42');
-  bossChair.scale.setScalar(1.2);
-  bossChair.position.set(0, 0, 1.0);
-  desk.add(bossChair);
-  seatable(bossChair, 'boss-chair', 1.2, interactables);
-  // Clicking the screen is using the chair: sit down, then play.
-  screen.userData.interact = bossChair.userData.interact;
-  desk.position.set(deskX, floorY, deskZ);
-  group.add(desk);
-  colliders.push({ minX: deskX - 1.3, maxX: deskX + 1.3, minZ: deskZ - 0.6, maxZ: deskZ + 0.6, bottom: floorY, top: floorY + 0.8 });
-
-  const couch = new THREE.Group();
-  const couchMat = toon('#ef476f');
-  couch.add(mesh(roundedBox(1, 0.45, 2.4, 0.2), couchMat, 0, 0.3, 0));
-  couch.add(mesh(roundedBox(0.35, 0.9, 2.4, 0.15), couchMat, 0.45, 0.55, 0));
-  for (const sz of [-1, 1]) couch.add(mesh(roundedBox(1, 0.7, 0.3, 0.15), couchMat, 0, 0.45, sz * 1.1));
-  couch.add(mesh(roundedBox(0.2, 0.45, 0.5, 0.1), toon('#ffd166'), 0.2, 0.75, 0.4));
-  couch.position.set(maxX - 0.65, floorY, cz);
-  group.add(couch);
-  colliders.push({ minX: maxX - 1.15, maxX, minZ: cz - 1.2, maxZ: cz + 1.2, bottom: floorY, top: floorY + 0.55 });
-  seatable(couch, 'loft-couch', 1.8, interactables);
-
-  const rug = mesh(roundedBox(4.6, 0.02, 3.2, 0.6), toon('#caffbf'), deskX - 0.3, floorY + 0.015, cz + 0.1, false);
-  group.add(rug);
-
-  const scope = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    const leg = mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 6), inkMat, Math.sin(a) * 0.2, 0.52, Math.cos(a) * 0.2);
-    leg.rotation.set(Math.cos(a) * -0.35, 0, Math.sin(a) * 0.35);
-    scope.add(leg);
-  }
-  const tube = new THREE.Group();
-  const tubeGeo = new THREE.CylinderGeometry(0.1, 0.06, 0.9, 14);
-  tubeGeo.rotateX(Math.PI / 2);
-  tube.add(mesh(tubeGeo, toon('#ffd166'), 0, 0, 0.1));
-  tube.add(mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 14).rotateX(Math.PI / 2), toon(PALETTE.ink), 0, 0, 0.55));
-  tube.position.y = 1.08;
-  scope.add(tube);
-  scope.position.set(minX + 0.9, floorY, minZ + 0.9);
-  group.add(scope);
-  tube.lookAt(-6, 0.8, 0);
-  const telescope: Interactable = { kind: 'telescope', x: scope.position.x, y: floorY, z: scope.position.z, radius: 1.65 };
-  scope.userData.interact = telescope;
-  interactables.push(telescope);
-  colliders.push({ minX: minX + 0.65, maxX: minX + 1.15, minZ: minZ + 0.65, maxZ: minZ + 1.15, bottom: floorY, top: floorY + 1.3 });
-
-  for (const [i, [px, pz, s]] of [
-    [maxX - 0.6, minZ + 0.6, 1],
-    [maxX - 0.6, maxZ - 0.6, 1.2],
-  ].entries()) {
-    // Starting past the monstera, which spreads too wide for a corner this tight.
-    const p = plant(floorPlant(i + 1), s);
-    p.position.set(px, floorY, pz);
-    group.add(p);
-    const r = 0.3 * s;
-    colliders.push({ minX: px - r, maxX: px + r, minZ: pz - r, maxZ: pz + r, bottom: floorY, top: floorY + 0.5 * s });
-  }
-
-  const lamp = pendant();
-  lamp.position.set(deskX, roofY - 0.4, cz);
-  group.add(lamp);
-
-  // Signs: one on the back wall inside, one over the glass for everyone downstairs. The one inside is
-  // up under the ceiling, which leaves the wall behind the desk free for a row of pictures.
-  const inside = textPlane('👑 Boss Office', { bg: '#fffaf3', size: 64 });
-  inside.scale.multiplyScalar(0.6);
-  inside.position.set(maxX - 3, floorY + 2.52, maxZ - 0.04);
-  inside.rotation.y = Math.PI;
-  group.add(inside);
-  const outside = textPlane('👑 Boss Office', { bg: '#2b2d42', color: '#fffaf3', size: 64, border: '#fffaf3' });
-  outside.scale.multiplyScalar(1.4);
-  // In front of the roof's trim (minZ - 0.04 to minZ), or the trim hides the sign's lower half.
-  outside.position.set(cx, roofY + 0.2, minZ - 0.07);
-  outside.rotation.y = Math.PI;
-  group.add(outside);
-  return { group, colliders, interactables, screen };
-}
-
-declare module '../types' {
-  interface OfficeHandles {
-    /** The monitor on the boss's desk upstairs, where the arcade's games play (features/arcade/ui.ts). */
-    bossScreen: THREE.Mesh;
-  }
-}
-
-/** Puts `items` in `list` (those that aren't in it), or takes them out of it. */
-function keep<T>(list: T[], items: readonly T[], there: boolean) {
-  for (const item of items) {
-    const i = list.indexOf(item);
-    if (there && i < 0) list.push(item);
-    else if (!there && i >= 0) list.splice(i, 1);
-  }
+  return { group, colliders };
 }
 
 /**
- * The loft up the stairs, over the meeting room: the boss's office. It's the floor's choice (see
- * RoomOptions.loft): on one that's all one level the lot is put away, the loft and its posts, the
- * stairs and everything upstairs, with what you'd bump into and what you'd use or sit on up there, so
- * the floor where the stairs stood is floor like any other. The meeting room under it stays (see
- * meeting-room.ts, which caps its glass where the loft's floor was).
+ * The corner loft, up the stairs and over the meeting room. It's the floor's choice (see
+ * RoomOptions.mezzanine): on one that hasn't it the lot is put away, the loft and its posts and the
+ * stairs, with what you'd bump into of them, so the floor where the stairs stood is floor like any
+ * other. What's in it is another fixture's: the boss's office (boss-office.ts), or on a floor that keeps
+ * the room empty, the floor's own furniture. The meeting room under it stays (see meeting-room.ts,
+ * which caps its glass where the loft's floor was).
  */
-export const loft: Fixture<'bossScreen'> = (site) => {
+export const loft: Fixture = (site) => {
   const built = buildLoft(site.looks);
   let there = false;
+  built.group.visible = false;
   site.get('room').on((room) => {
-    if (room.loft === there) return;
-    there = room.loft;
+    const corner = room.mezzanine === 'corner';
+    if (corner === there) return;
+    there = corner;
     built.group.visible = there;
     keep(site.colliders, built.colliders, there);
-    keep(site.interactables, built.interactables, there);
-    // Whatever still has hold of one (what you were aiming at) can't use it either.
-    for (const it of built.interactables) it.off = !there;
   });
-  return { group: built.group, handle: { bossScreen: built.screen } };
+  return { group: built.group };
 };

@@ -4,10 +4,13 @@
 // in its plan (shared/floorplan.ts). The workers' desks are the builder's too, but they're seats with
 // ids of their own (see DeskLayout).
 
+import { FRAMES, PICTURE_MAX, PICTURE_MIN } from './decor.js';
 import type { RoomOptions } from './floorplan.js';
+import { PAINTING, hangSize } from './hangings.js';
 import { HOOP } from './hoop.js';
 import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
-import { LOFT_SEATS, hasLoft } from './office-fixed.js';
+import { hasBoss, levelY } from './mezzanine.js';
+import { LOFT_SEATS } from './office-fixed.js';
 
 export type FurnitureGroup = 'Work' | 'Rooms' | 'Seating' | 'Tables' | 'Plants' | 'Play' | 'Decor';
 
@@ -60,6 +63,14 @@ export interface KindDef {
   bounce?: number;
   /** It has a screen that plays the floor's own videos (see Piece.media, and client/features/screens). */
   plays?: boolean;
+  /** It hangs on a wall: its origin is on the wall's face, its front out from it, and the builder snaps it there (see shared/wall-faces.ts). */
+  hangs?: boolean;
+  /** It shows one of the floor's own pictures (see Piece.media, and client/features/hanging). */
+  shows?: boolean;
+  /** A wall things hang on: either face of it takes a painting. */
+  wall?: boolean;
+  /** It hangs from the ceiling, or high on a wall: nothing's in the way under it, and it can't go under a mezzanine. */
+  overhead?: boolean;
 }
 
 export const FURNITURE = {
@@ -80,18 +91,20 @@ export const FURNITURE = {
   // The same screen with no stand, hung at eye level: pushed up against a wall, with nothing in the way under it.
   'wall-screen': { label: 'Wall screen', icon: '🖥️', group: 'Work', w: 2.2, d: 0.12, top: 0, color: '#2b2d42', plays: true, use: { z: 1.3, radius: 1.9 } },
   // Hung from the ceiling over wherever the news is: the market's prices sliding along it (see TickerSetup). Nothing's in the way under it.
-  ticker: { label: 'Stock ticker', icon: '📈', group: 'Work', w: 6, d: 0.3, top: 0 },
+  ticker: { label: 'Stock ticker', icon: '📈', group: 'Work', w: 6, d: 0.3, top: 0, overhead: true },
   // The same prices as a table, on a screen on a stand: for a corner of the newsroom, where the bar's too long.
   'ticker-screen': { label: 'Market board', icon: '📊', group: 'Work', w: 1.6, d: 0.3, top: 1.5, color: '#2b2d42' },
   softbox: { label: 'Softbox light', icon: '💡', group: 'Work', r: 0.45, top: 2, color: '#f7f3ea' },
   camera: { label: 'Camera on a tripod', icon: '🎥', group: 'Work', r: 0.4, top: 1.6 },
   backdrop: { label: 'Backdrop', icon: '🎬', group: 'Work', w: 3, d: 0.5, top: 2.5, color: '#218cff' },
-  wall: { label: 'Wall', icon: '🧱', group: 'Rooms', w: 2.4, d: 0.14, top: 2.6, color: '#fff6ea' },
-  'wall-short': { label: 'Short wall', icon: '▫️', group: 'Rooms', w: 1.2, d: 0.14, top: 2.6, color: '#fff6ea' },
+  wall: { label: 'Wall', icon: '🧱', group: 'Rooms', w: 2.4, d: 0.14, top: 2.6, color: '#fff6ea', wall: true },
+  'wall-short': { label: 'Short wall', icon: '▫️', group: 'Rooms', w: 1.2, d: 0.14, top: 2.6, color: '#fff6ea', wall: true },
   'glass-wall': { label: 'Glass wall', icon: '🪟', group: 'Rooms', w: 2.4, d: 0.1, top: 2.6, color: '#3d405b' },
   'glass-short': { label: 'Short glass wall', icon: '🔲', group: 'Rooms', w: 1.2, d: 0.1, top: 2.6, color: '#3d405b' },
-  'wood-wall': { label: 'Wood slat panel', icon: '🪵', group: 'Rooms', w: 2.4, d: 0.12, top: 2.6, color: '#b98554' },
-  'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554' },
+  'wood-wall': { label: 'Wood slat panel', icon: '🪵', group: 'Rooms', w: 2.4, d: 0.12, top: 2.6, color: '#b98554', wall: true },
+  'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554', wall: true },
+  // A frame to walk through, with the room's name over it: what a row of walls leaves a gap for.
+  doorway: { label: 'Doorway', icon: '🚪', group: 'Rooms', w: 1.2, d: 0.14, top: 0, color: '#fff6ea', text: 'Office' },
   table: { label: 'Table', icon: '🟫', group: 'Tables', w: 2.4, d: 1.1, top: 0.76, color: '#c98b5a' },
   'standing-table': { label: 'Standing table', icon: '🍸', group: 'Tables', r: 0.5, top: 1.05, color: '#c98b5a' },
   'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46 },
@@ -132,13 +145,16 @@ export const FURNITURE = {
   'floor-lamp': { label: 'Floor lamp', icon: '💡', group: 'Decor', r: 0.25, top: 1.7, color: '#ffd166' },
   sign: { label: 'Sign', icon: '🪧', group: 'Decor', w: 1.8, d: 0.4, top: 1.6, color: '#2b2d42', text: 'Friday Labs' },
   // Lit letters, hung at head height against whatever's behind them: nothing's in the way under it.
-  neon: { label: 'Neon sign', icon: '✨', group: 'Decor', w: 2.6, d: 0.2, top: 0, color: '#ff5fa2', text: 'ON AIR' },
+  neon: { label: 'Neon sign', icon: '✨', group: 'Decor', w: 2.6, d: 0.2, top: 0, color: '#ff5fa2', text: 'ON AIR', overhead: true },
+  // One of the floor's own pictures in a frame, on any wall: an outside one, or either face of one the builder put up.
+  // Its footprint is the frame's, out from the wall's face (`w` is what it has until its picture says: see hangSize).
+  painting: { label: 'Painting', icon: '🖼️', group: 'Decor', w: 1.2, d: 0.08, top: 0, hangs: true, shows: true },
   // What the office comes with (see KindDef.fixed), each built by its own feature (features/whiteboard and the rest).
   whiteboard: { label: 'Whiteboard', icon: '📝', group: 'Decor', w: 4.4, d: 0.96, top: 3.05, fixed: true, use: { z: 1.7, radius: 2.3 } },
   jukebox: { label: 'Jukebox', icon: '🎵', group: 'Play', w: 1.4, d: 0.8, top: 1.85, fixed: true, use: { z: 1.3, radius: 1.6 } },
   arcade: { label: 'Arcade cabinet', icon: '🕹️', group: 'Play', w: 0.84, d: 0.85, top: 1.9, fixed: true, use: { z: 1.2, radius: 1.3 } },
   // On its wall, over a key painted on the floor: nothing's in the way down there (the backboard is overhead).
-  hoop: { label: 'Basketball hoop', icon: '🏀', group: 'Play', w: 1.4, d: 0.5, top: 0, fixed: true, pinned: true },
+  hoop: { label: 'Basketball hoop', icon: '🏀', group: 'Play', w: 1.4, d: 0.5, top: 0, fixed: true, pinned: true, overhead: true },
   docs: { label: 'Docs bookshelf', icon: '📚', group: 'Decor', w: 1.78, d: 0.48, top: 2.37, fixed: true, use: { z: 1.2, radius: 1.6 } },
   gong: { label: 'Gong', icon: '🔔', group: 'Decor', w: 2.4, d: 0.6, top: 2.55, fixed: true, use: { z: 1.3, radius: 1.5 } },
 } as const satisfies Record<string, KindDef>;
@@ -167,17 +183,31 @@ export interface Piece {
   scale?: number;
   /** What it says, for a kind that says something. */
   text?: string;
-  /** The one video it plays, by its name in the floor's media folder, for a kind that plays them: every video there, with none. Or WATCH_MEDIA. */
+  /** The one video it plays, by its name in the floor's media folder, for a kind that plays them: every video there, with none. Or WATCH_MEDIA. For a kind that shows a picture, the picture's name there. */
   media?: string;
+  /** Upstairs, on the floor's loft or mezzanine (see shared/mezzanine.ts): none is the office floor. */
+  level?: 1;
+  /** For a kind that shows a picture: its frame, one of FRAMES (shared/decor.ts). */
+  frame?: number;
+  /** How long the picture's longest side is, in meters. */
+  size?: number;
+  /** The picture's shape, width over height: over 1 is a scene, under 1 a portrait. */
+  aspect?: number;
+  /** How high the picture's middle hangs above the floor the piece is on. */
+  lift?: number;
 }
 
-/** The most pieces a floor takes. */
-export const MAX_PIECES = 150;
+/** The most pieces a floor takes: the rooms upstairs and the paintings on their walls are all pieces. */
+export const MAX_PIECES = 300;
 /** The longest a sign's text may be, in characters. */
 export const MAX_PIECE_TEXT = 28;
 export const PIECE_SCALE = { min: 0.6, max: 1.8 } as const;
 /** Furniture stands on a 5 cm grid (the builder drags it a quarter meter at a time, see SNAP). */
 const GRID = 0.05;
+/** What hangs on a wall is on a finer one: a wall's faces are 6 or 7 cm off its middle. */
+const HANG_GRID = 0.01;
+/** How high a picture's middle may hang, and the least its frame keeps off the floor under it. */
+const LIFT = { min: 0.3, max: 3.6, clear: 0.15 } as const;
 
 const TAU = Math.PI * 2;
 const QUARTER = Math.PI / 2;
@@ -244,6 +274,28 @@ export function isSolid(p: Piece): boolean {
   return kindDef(p.kind).top > 0;
 }
 
+/** How high the floor it stands on is: the office's, or the deck's for a piece upstairs. */
+export function pieceY(p: Piece): number {
+  return levelY(p.level);
+}
+
+/** Whether a kind can go upstairs: not what the office has one of, what's for playing with, or the ticker. */
+export function canGoUp(kind: FurnitureKind): boolean {
+  const k = kindDef(kind);
+  return !k.fixed && k.group !== 'Play' && kind !== 'ticker';
+}
+
+/**
+ * How high it reaches above the floor it's on, for whether it fits under a deck or a loft's roof: what
+ * hangs from the ceiling over the office floor reaches all the way up, a painting to the top of its frame.
+ */
+export function pieceTop(p: Piece): number {
+  const k = kindDef(p.kind);
+  if (k.overhead && !p.level) return Infinity;
+  if (k.hangs) return (p.lift ?? PAINTING.lift) + hangSize(p).h / 2;
+  return k.top * pieceScale(p);
+}
+
 /** How far a round piece reaches from its middle. */
 export function pieceRadius(p: Piece): number {
   return (kindDef(p.kind).r ?? 0) * pieceScale(p);
@@ -275,29 +327,35 @@ export function pieceBox(p: Piece): Box {
     const r = pieceRadius(p);
     return { minX: p.x - r, maxX: p.x + r, minZ: p.z - r, maxZ: p.z + r };
   }
+  // What hangs is on the wall's face, and takes the floor from there out: as wide as its frame.
+  if (k.hangs) return turnedBox(p.x, p.z, p.rotY, hangSize(p).w, k.d ?? 0.08, (k.d ?? 0.08) / 2);
   return turnedBox(p.x, p.z, p.rotY, k.w ?? 1, k.d ?? 1);
 }
 
-/** What you bump into of it, and how high that is (see Collider); none for what lies flat on the floor. */
-export function pieceCollider(p: Piece): (Box & { top: number }) | undefined {
+/**
+ * What you bump into of it, and how high that is (see Collider); none for what lies flat on the floor.
+ * A piece upstairs starts at its own floor (`bottom`), so whoever's under the deck walks under it.
+ */
+export function pieceCollider(p: Piece): (Box & { top: number; bottom?: number }) | undefined {
   const k = kindDef(p.kind);
   if (!k.top) return undefined;
-  const top = k.top * pieceScale(p);
-  if (k.solid) return { ...turnedBox(p.x, p.z, p.rotY, k.solid.w, k.solid.d, k.solid.z), top };
-  return { ...pieceBox(p), top };
+  const y = pieceY(p);
+  const top = y + k.top * pieceScale(p);
+  const box = k.solid ? turnedBox(p.x, p.z, p.rotY, k.solid.w, k.solid.d, k.solid.z) : pieceBox(p);
+  return { ...box, top, ...(y ? { bottom: y } : {}) };
 }
 
 /** In the way into the back office (see WING): put away while the floor's built out, as the plants there always were. */
 export function pieceAway(p: Piece, wing: number): boolean {
-  return wing > 0 && p.x > WING.minX && p.z < FLOOR.minZ + 1.5;
+  return !p.level && wing > 0 && p.x > WING.minX && p.z < FLOOR.minZ + 1.5;
 }
 
-/** What's in the way of whoever walks the floor (see shared/nav.ts), built out `wing` rows. */
+/** What's in the way of whoever walks the floor (see shared/nav.ts), built out `wing` rows. What's upstairs isn't: the way round is the office floor's. */
 export function furnitureObstacles(pieces: readonly Piece[], wing = 0): { rects: [number, number, number, number][]; circles: [number, number, number][] } {
   const rects: [number, number, number, number][] = [];
   const circles: [number, number, number][] = [];
   for (const p of pieces) {
-    if (!isSolid(p) || pieceAway(p, wing)) continue;
+    if (!isSolid(p) || p.level || pieceAway(p, wing)) continue;
     if (isRound(p)) circles.push([p.x, p.z, pieceRadius(p)]);
     else {
       const b = pieceBox(p);
@@ -324,7 +382,7 @@ export function pieceSeat(p: Piece): SeatDef | undefined {
     id: p.id,
     label: s.label,
     x: p.x + Math.sin(p.rotY) * front,
-    y: 0,
+    y: pieceY(p),
     z: p.z + Math.cos(p.rotY) * front,
     rotY: p.rotY + (s.turn ?? 0),
     places: s.places,
@@ -344,10 +402,11 @@ export function furnitureSeats(pieces: readonly Piece[], wing = 0): SeatDef[] {
 /**
  * The seat called `id` on a floor with this furniture, up on the roof or down on the floor: the
  * furniture's own, else one of the office's that isn't furniture (the loft's, the balcony's, the roof's).
- * The loft's go with the loft: a floor whose `room` is all one level has none of them.
+ * The loft's are the boss's office's: a floor whose `room` hasn't one (it's all one level, it has the big
+ * mezzanine, or its loft is an empty room) has none of them.
  */
 export function floorSeat(pieces: readonly Piece[], wing: number, id: string, room: RoomOptions = {}): SeatDef | undefined {
-  if (LOFT_SEATS.has(id) && !hasLoft(room)) return undefined;
+  if (LOFT_SEATS.has(id) && !hasBoss(room)) return undefined;
   return furnitureSeats(pieces, wing).find((s) => s.id === id) ?? (DEFAULT_SEAT_IDS.has(id) ? undefined : SEATING_BY_ID.get(id));
 }
 
@@ -417,7 +476,8 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
       if (Math.abs(rotY - quarter * QUARTER) > 0.001) return `Turn the ${k.label.toLowerCase()} in quarter turns`;
       rotY = (quarter % 4) * QUARTER;
     } else rotY = tidy(rotY);
-    const piece: Piece = { id: r.id, kind, x: tidy(round(r.x as number, GRID)), z: tidy(round(r.z as number, GRID)), rotY };
+    const grid = k.hangs ? HANG_GRID : GRID;
+    const piece: Piece = { id: r.id, kind, x: tidy(round(r.x as number, grid)), z: tidy(round(r.z as number, grid)), rotY };
     if (k.color) {
       const color = typeof r.color === 'string' ? r.color.toLowerCase() : k.color;
       piece.color = COLOR.test(color) ? color : k.color;
@@ -427,7 +487,19 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
       piece.scale = tidy(round(Math.max(PIECE_SCALE.min, Math.min(PIECE_SCALE.max, scale)), GRID));
     }
     if (k.text !== undefined) piece.text = cleanPieceText(r.text) || k.text;
-    if (k.plays && typeof r.media === 'string' && (r.media === WATCH_MEDIA || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
+    // A file of the floor's own; a screen that plays can follow the floor's channels instead, which a picture can't.
+    if ((k.plays || k.shows) && typeof r.media === 'string' && ((k.plays && r.media === WATCH_MEDIA) || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
+    if (r.level === 1 && canGoUp(kind)) piece.level = 1;
+    if (k.shows) {
+      const num = (v: unknown, or: number) => (typeof v === 'number' && Number.isFinite(v) ? v : or);
+      piece.frame = Number.isInteger(r.frame) && (r.frame as number) >= 0 && (r.frame as number) < FRAMES.length ? (r.frame as number) : PAINTING.frame;
+      piece.size = tidy(round(Math.max(PICTURE_MIN, Math.min(PICTURE_MAX, num(r.size, PAINTING.size))), HANG_GRID));
+      const aspect = num(r.aspect, PAINTING.aspect);
+      piece.aspect = aspect > 0 ? Math.max(0.2, Math.min(5, aspect)) : PAINTING.aspect;
+      // Its frame's bottom edge stays off the floor it hangs over (upstairs, that's the ceiling of the room below).
+      const least = Math.ceil((hangSize(piece).h / 2 + LIFT.clear) / GRID - 1e-9) * GRID;
+      piece.lift = tidy(Math.max(least, round(Math.max(LIFT.min, Math.min(LIFT.max, num(r.lift, PAINTING.lift))), GRID)));
+    }
     // One of each of what the office comes with, under its own name, and where the office hangs it if it's on a wall.
     if (k.fixed && piece.id !== kind) return `There is only one ${k.label.toLowerCase()}`;
     const hung = PINNED.get(kind);

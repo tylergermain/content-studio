@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import type { WallId } from '../../../shared/decor';
+import type { WallId, WallRect } from '../../../shared/decor';
 import type { Collider, DeskView, Interactable, OfficeHandles } from '../types';
 import type { Looks } from './materials';
 import type { Door } from './shell';
@@ -9,6 +9,14 @@ import type { Door } from './shell';
 // into the site (the floor as it stands so far) and hands back what it gives the office to reach it
 // by (see OfficeHandles), what it does each frame and what it does when you change floors.
 
+/**
+ * A stretch of wall a fixture marked as taken (see Site.wall). One that's `off` isn't counted: its
+ * fixture is put away on this floor, and pictures can hang where it was (see Office.fixtures).
+ */
+export interface WallMark extends WallRect {
+  off?: boolean;
+}
+
 /** The floor as it's being built: what a fixture builds into, and what the ones before it built. */
 export interface Site {
   /** The floor's own group, what's in the way on it, and what there is to use on it. */
@@ -17,9 +25,10 @@ export interface Site {
   readonly interactables: Interactable[];
   /**
    * Marks a stretch of wall `w` wide and `h` high, centered `u` along it and `y` up, as taken (a board,
-   * a window, a door), so pictures don't hang over it (see Office.fixtures).
+   * a window, a door), so pictures don't hang over it (see Office.fixtures). It hands back the mark,
+   * for a fixture a floor can do without to switch off with the rest of it (see WallMark.off).
    */
-  wall(wall: WallId, u: number, y: number, w: number, h: number): void;
+  wall(wall: WallId, u: number, y: number, w: number, h: number): WallMark;
   /** What each floor paints its own way (see Office.setLook). */
   readonly looks: Looks;
   /** The floor's planks, which the back office's floor is laid with too. */
@@ -62,3 +71,15 @@ export type Fixture<K extends keyof OfficeHandles = never, S extends Site = Site
 
 /** The fields of Office fixture `F` gives it (see Built.handle). Any fixture at all is a Fixture (giving nothing, as far as it's known). */
 export type Gives<F> = F extends (site: never) => { handle?: infer H } ? keyof NonNullable<H> : never;
+
+/**
+ * Puts `items` in `list` (those that aren't in it), or takes them out of it: how a fixture a floor can
+ * do without adds and removes what's in the way and what there is to use of it.
+ */
+export function keep<T>(list: T[], items: readonly T[], there: boolean) {
+  for (const item of items) {
+    const i = list.indexOf(item);
+    if (there && i < 0) list.push(item);
+    else if (!there && i >= 0) list.splice(i, 1);
+  }
+}

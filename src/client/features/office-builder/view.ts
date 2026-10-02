@@ -1,13 +1,15 @@
 /**
  * The builder's view of the floor: a camera up over the room that you pan, turn and zoom, with the
  * ceiling (and, cut away, the tops of the walls) out of its way, a grid on the floor, and the outline
- * under whatever you've picked up.
+ * under whatever you've picked up. It looks at one level at a time: the office floor, or upstairs
+ * (see levels.ts), where the floor it works on is the deck's.
  */
 import * as THREE from 'three';
 import { FLOOR, WALL_HEIGHT } from '../../../shared/layout';
 import type { Box } from '../../../shared/furniture';
+import type { Area } from '../../../shared/mezzanine';
 
-/** How high the room's drawn up to: all of it but the ceiling, or cut away at head height to see in over the walls. */
+/** How high the room's drawn up to: all of it but the ceiling, or cut away at head height (over the level's own floor) to see in over the walls. */
 const CUT = { walls: 2.7, ceiling: WALL_HEIGHT - 0.02 } as const;
 const PITCH = { min: 0.4, max: 1.5 } as const;
 const DIST = { min: 7, max: 75 } as const;
@@ -23,6 +25,8 @@ export class BuilderCamera {
   yaw = 0;
   pitch = 0.95;
   dist = 42;
+  /** How high the floor it looks at is: the office's, or a deck's. */
+  private y = 0;
   private readonly ray = new THREE.Raycaster();
   private readonly floor = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
   private readonly hit = new THREE.Vector3();
@@ -36,9 +40,15 @@ export class BuilderCamera {
     this.pitch = clamp(this.pitch, PITCH.min, PITCH.max);
     this.dist = clamp(this.dist, DIST.min, DIST.max);
     const flat = Math.cos(this.pitch) * this.dist;
-    this.camera.position.set(this.x + Math.sin(this.yaw) * flat, Math.sin(this.pitch) * this.dist, this.z + Math.cos(this.yaw) * flat);
-    this.camera.lookAt(this.x, 0, this.z);
+    this.camera.position.set(this.x + Math.sin(this.yaw) * flat, this.y + Math.sin(this.pitch) * this.dist, this.z + Math.cos(this.yaw) * flat);
+    this.camera.lookAt(this.x, this.y, this.z);
     this.camera.updateMatrixWorld();
+  }
+
+  /** Looks at the floor `y` up from now on: what's dragged is dragged over that one. */
+  setLevel(y: number) {
+    this.y = y;
+    this.floor.constant = -y;
   }
 
   /** Slides it over the floor: `right` and `ahead` in meters, the way the screen has them. */
@@ -54,7 +64,7 @@ export class BuilderCamera {
     return this.ray;
   }
 
-  /** Where on the floor a point on the screen is, or null where it's the sky. */
+  /** Where on the floor it looks at a point on the screen is, or null where it's the sky. */
   floorAt(e: { clientX: number; clientY: number }, el: HTMLElement): { x: number; z: number } | null {
     const at = this.rayAt(e, el).ray.intersectPlane(this.floor, this.hit);
     return at ? { x: at.x, z: at.z } : null;
@@ -106,20 +116,35 @@ class Outline {
   }
 }
 
-/** What the builder draws on the floor: a meter grid, and the outlines under what you point at and what you picked. */
+/** Meter lines over `area`, with its edge. */
+function gridOver(area: Area): THREE.BufferGeometry {
+  const lines: number[] = [];
+  const xs = new Set([area.minX, area.maxX]);
+  const zs = new Set([area.minZ, area.maxZ]);
+  for (let x = Math.ceil(area.minX); x <= area.maxX; x++) xs.add(x);
+  for (let z = Math.ceil(area.minZ); z <= area.maxZ; z++) zs.add(z);
+  for (const x of xs) lines.push(x, 0, area.minZ, x, 0, area.maxZ);
+  for (const z of zs) lines.push(area.minX, 0, z, area.maxX, 0, z);
+  return new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(lines, 3));
+}
+
+/** What the builder draws on the floor it's working on: a meter grid, and the outlines under what you point at and what you picked. */
 export class BuilderGizmo {
   readonly group = new THREE.Group();
   private readonly picked = new Outline(0.3);
   private readonly pointed = new Outline(0.12);
   private readonly cut = new THREE.Plane(new THREE.Vector3(0, -1, 0), CUT.walls);
+  private readonly grid: THREE.LineSegments;
+  /** How high the floor being worked on is, and whether the walls are cut away over it. */
+  private y = 0;
+  private walls = true;
+  /** The stretch of floor the grid's drawn over, as text: it's only drawn again when that changes. */
+  private over = JSON.stringify(FLOOR);
 
   constructor() {
-    const lines: number[] = [];
-    for (let x = Math.ceil(FLOOR.minX); x <= FLOOR.maxX; x++) lines.push(x, 0, FLOOR.minZ, x, 0, FLOOR.maxZ);
-    for (let z = Math.ceil(FLOOR.minZ); z <= FLOOR.maxZ; z++) lines.push(FLOOR.minX, 0, z, FLOOR.maxX, 0, z);
-    const grid = new THREE.LineSegments(new THREE.BufferGeometry().setAttribute('position', new THREE.Float32BufferAttribute(lines, 3)), new THREE.LineBasicMaterial({ color: '#2b2d42', transparent: true, opacity: 0.13, depthWrite: false, fog: false }));
-    grid.position.y = 0.045;
-    this.group.add(grid, this.pointed.group, this.picked.group);
+    this.grid = new THREE.LineSegments(gridOver(FLOOR), new THREE.LineBasicMaterial({ color: '#2b2d42', transparent: true, opacity: 0.13, depthWrite: false, fog: false }));
+    this.grid.position.y = 0.045;
+    this.group.add(this.grid, this.pointed.group, this.picked.group);
   }
 
   /** The outline under what's picked: red where it can't stand. */
@@ -132,9 +157,26 @@ export class BuilderGizmo {
     this.pointed.show(box, radius, COLORS.hover, 0.055);
   }
 
-  /** How high the room's drawn up to, for the renderer to clip at: the walls cut away, or just the ceiling. */
+  /** Works on the floor `y` up: the grid and the outlines lie on it, over `area` (the deck's own floor, upstairs; the whole room, with none). */
+  setLevel(y: number, area: Area = FLOOR) {
+    this.y = y;
+    this.group.position.y = y;
+    this.cut.constant = this.cutAt();
+    const over = JSON.stringify(area);
+    if (over === this.over) return;
+    this.over = over;
+    this.grid.geometry.dispose();
+    this.grid.geometry = gridOver(area);
+  }
+
+  private cutAt(): number {
+    return this.walls ? Math.min(CUT.ceiling, this.y + CUT.walls) : CUT.ceiling;
+  }
+
+  /** How high the room's drawn up to, for the renderer to clip at: the walls cut away over the floor being worked on, or just the ceiling. */
   clip(walls: boolean): THREE.Plane {
-    this.cut.constant = walls ? CUT.walls : CUT.ceiling;
+    this.walls = walls;
+    this.cut.constant = this.cutAt();
     return this.cut;
   }
 

@@ -200,9 +200,11 @@ export class Hanger {
     const cur = this.cur;
     if (!cur) return;
     this.raycaster.setFromCamera(this.player.view === 'first' ? new THREE.Vector2(0, 0) : this.mouse, this.camera);
-    const hit = aimAtWall(this.raycaster.ray);
+    // The walls as the floor you're on has them: its upstairs cuts the ones it meets in two.
+    const room = this.office.room.get();
+    const hit = aimAtWall(this.raycaster.ray, undefined, room);
     const { w, h } = pictureSize(cur.size, cur.shape);
-    const on = hit && clampToWall(hit.wall, hit.u, hit.y, w, h);
+    const on = hit && clampToWall(hit.wall, hit.u, hit.y, w, h, room);
     if (!hit || !on) {
       this.at = null;
       this.ghost.hide();

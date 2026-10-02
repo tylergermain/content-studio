@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { DESK_SIZE } from '../../../shared/layout';
 import { kindDef, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
+import { DECOR_BUILDERS } from './furniture-decor';
 import { DARK_WOOD, legs, placeholder, type BuiltPiece, type Builders } from './furniture-kit';
 import { PLAY_BUILDERS } from './furniture-play';
 import { ROOMS_BUILDERS } from './furniture-rooms';
@@ -227,6 +228,7 @@ const BUILDERS: Builders = {
   'floor-lamp': (_p, color) => floorLamp(color),
   sign: (p, color) => sign(color, p.text ?? kindDef(p.kind).text ?? ''),
   ...ROOMS_BUILDERS,
+  ...DECOR_BUILDERS,
   ...STUDIO_BUILDERS,
   ...SCREENS_BUILDERS,
   ...TICKER_BUILDERS,
@@ -234,8 +236,10 @@ const BUILDERS: Builders = {
 };
 
 /**
- * Lets go of what a piece was built with that was its own: its shapes, and a sign's letters. A model's
- * shapes are shared with every other copy of it (see piece() in world/models.ts), so they're never let go of.
+ * Lets go of what a piece was built with that was its own: its shapes, a sign's letters, and a
+ * painting's picture (`userData.own`: the material is its own, the image on it is everyone's who shows
+ * it, see world/frames.ts). A model's shapes are shared with every other copy of it (see piece() in
+ * world/models.ts), so they're never let go of.
  */
 export function disposePiece(group: THREE.Object3D) {
   group.traverse((o) => {
@@ -246,6 +250,6 @@ export function disposePiece(group: THREE.Object3D) {
       const mat = m.material as THREE.MeshBasicMaterial;
       mat.map?.dispose();
       mat.dispose();
-    }
+    } else if (m.userData.own) (m.material as THREE.Material).dispose();
   });
 }

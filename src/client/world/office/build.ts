@@ -1,5 +1,4 @@
 import * as THREE from 'three';
-import type { WallRect } from '../../../shared/decor';
 import type { FloorPalette } from '../../../shared/floors';
 import { street } from '../outside';
 import { cars } from '../../features/cars/world';
@@ -23,18 +22,21 @@ import { boards, clearOfStairs, lamps, machineMonitor, nightLights, tv } from '.
 import { furniture } from './furnish';
 import { roomOptions } from './room-options';
 import { plug, walls, type Door } from './shell';
+import { panelling } from './panelling';
 import { balcony } from './balcony';
 import { downstairs } from './ground';
 import { wing } from './wing';
 import { beanbags, desks, kiosks } from './seats';
 import { meetingRoom } from './meeting-room';
 import { loft } from './loft';
+import { bossOffice } from './boss-office';
 import { bossDesk } from '../../features/boss-desk/world';
-import type { Fixture, Gives, Site } from './fixture';
+import { mezzanine } from './mezzanine';
+import type { Fixture, Gives, Site, WallMark } from './fixture';
 
 // The office floor, put together from its fixtures (see fixture.ts): the room and its walls, the desks
-// and everything else in it, the balcony, the loft and the meeting room under it, the back office, and
-// the street, the garage and the rest of the building round it.
+// and everything else in it, the balcony, the upstairs (the corner loft or the big mezzanine) and the
+// meeting room under it, the back office, and the street, the garage and the rest of the building round it.
 
 /**
  * The office floor's fixtures, in the order they're built: which is the order everything in the floor
@@ -46,6 +48,8 @@ function floorPlan() {
     stack,
     nightLights,
     walls,
+    // Wood on the walls a floor has panelled, behind everything that hangs on them.
+    panelling,
     balcony,
     tee,
     ...downstairs(cars, street, green, scenic),
@@ -67,8 +71,12 @@ function floorPlan() {
     lamps,
     wing,
     signs,
+    // Upstairs: the corner loft and what makes it the boss's office, or the big mezzanine. A floor has
+    // one of the two or neither, and the meeting room stands under either.
     loft,
+    bossOffice,
     bossDesk,
+    mezzanine,
     meetingRoom,
     elevator,
     garageLift,
@@ -87,7 +95,7 @@ export function buildOffice(): Office {
   const group = new THREE.Group();
   const colliders: Collider[] = [];
   const interactables: Interactable[] = [];
-  const walls: WallRect[] = [];
+  const walls: WallMark[] = [];
   // What each floor paints its own way (see setLook): the walls, their trim, the planks.
   const looks: Looks = { wall: toonUnique(PALETTE.wall), trim: toonUnique(PALETTE.wallTrim), planks: [] };
   // The floor's planks, which the stack lays the floor with (and the back office its own).
@@ -102,7 +110,11 @@ export function buildOffice(): Office {
     group,
     colliders,
     interactables,
-    wall: (wall, u, y, w, h) => void walls.push({ wall, u0: u - w / 2, u1: u + w / 2, y0: y - h / 2, y1: y + h / 2 }),
+    wall: (wall, u, y, w, h) => {
+      const mark: WallMark = { wall, u0: u - w / 2, u1: u + w / 2, y0: y - h / 2, y1: y + h / 2 };
+      walls.push(mark);
+      return mark;
+    },
     looks,
     planks,
     desks,
@@ -162,5 +174,5 @@ export function buildOffice(): Office {
     for (const u of updates) u(t, dt);
   };
 
-  return { ...(given as OfficeHandles), group, colliders, interactables, desks, fixtures: () => walls, setLook, setLevel, update };
+  return { ...(given as OfficeHandles), group, colliders, interactables, desks, fixtures: () => walls.filter((w) => !w.off), setLook, setLevel, update };
 }

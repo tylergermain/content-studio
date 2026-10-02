@@ -1,7 +1,7 @@
 import { execFileSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, readdirSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { FLOOR_PALETTES, MAX_FLOORS, normalizeRepo, sameRepo } from '../shared/floors.js';
+import { MAX_FLOORS, STOCK_PALETTES, normalizeRepo, sameRepo } from '../shared/floors.js';
 import type { CloneProgress, ProjectsDirState, RepoChoice } from '../shared/protocol.js';
 import { CloneRun, dropLog, whyCloneFailed, type CloneEnd, type CloneRunOptions } from './clone.js';
 import { gh } from './github.js';
@@ -427,8 +427,8 @@ export class Building {
     for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
     // The first look nobody has, so floors side by side never match; then round again.
     const used = new Set([...this.defs, ...this.pending()].map((d) => d.palette));
-    const free = FLOOR_PALETTES.findIndex((_, i) => !used.has(i));
-    const palette = free >= 0 ? free : (this.defs.length + this.cloning.size) % FLOOR_PALETTES.length;
+    const free = Array.from({ length: STOCK_PALETTES }, (_, i) => i).find((i) => !used.has(i));
+    const palette = free ?? (this.defs.length + this.cloning.size) % STOCK_PALETTES;
     return { id, name, repo, dir, palette, addedBy: by, addedAt: Date.now() };
   }
 

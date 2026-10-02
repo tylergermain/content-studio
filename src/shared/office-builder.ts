@@ -3,9 +3,11 @@
 // it again before it's saved (server/floorplan.ts).
 
 import { DESKS, DESK_SIZE, FLOOR, type DeskDef } from './layout.js';
-import { DEFAULT_FURNITURE, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, type Box, type Piece } from './furniture.js';
+import { DEFAULT_FURNITURE, canGoUp, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, pieceTop, type Box, type Piece } from './furniture.js';
 import type { RoomOptions } from './floorplan.js';
-import { fixedIn, keepClearIn } from './office-fixed.js';
+import { BIG, HEADROOM, deckOf, hasKitchen, mezzanineOf } from './mezzanine.js';
+import { fixedIn, keepClearIn, keepClearUp } from './office-fixed.js';
+import { faceUnder, wallFaces, type WallFace } from './wall-faces.js';
 
 export interface DeskPose {
   x: number;
@@ -101,6 +103,42 @@ const standingPiece = (p: Piece): Standing => {
   return { label, as: `the ${label.toLowerCase()}`, box: pieceBox(p), ...(isRound(p) ? { round: { x: p.x, z: p.z, r: pieceRadius(p) } } : {}) };
 };
 
+const within = (b: Box, a: Box) => b.minX >= a.minX - SLACK && b.maxX <= a.maxX + SLACK && b.minZ >= a.minZ - SLACK && b.maxZ <= a.maxZ + SLACK;
+
+/** Why a piece upstairs (`level: 1`) can't be where it is in a room like `room`, whatever else is up there; or nothing. */
+function misplacedUp(p: Piece, s: Standing, room: RoomOptions): string | undefined {
+  const deck = deckOf(room);
+  if (!deck) return `${s.label} is upstairs, and this floor is all one level`;
+  if (!deck.floor) return `${s.label} is upstairs, where the boss's office is`;
+  if (!canGoUp(p.kind)) return `The ${s.label.toLowerCase()} only stands on the office floor`;
+  if (!within(s.box, deck.floor)) return `${s.label} must stay on the mezzanine`;
+  if (isSolid(p)) for (const f of keepClearUp(room)) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} would block ${f.what}`;
+  if (pieceTop(p) > deck.height - 0.05) return `${s.label} is too tall for the ${deck.kind === 'big' ? 'mezzanine' : 'loft'}`;
+  return undefined;
+}
+
+/**
+ * Why the piece `p` can't be where it is in a room like `room`, whatever other furniture there is; or
+ * nothing. Upstairs it has to be on a deck that has room for it; down on the office floor it keeps off
+ * what's built in (only when it's solid: a rug goes under anything) and fits under the big mezzanine
+ * where it's under it; and what hangs has to be on one of `faces`, the walls of its own level.
+ */
+function pieceProblem(p: Piece, s: Standing, room: RoomOptions, faces: readonly WallFace[]): string | undefined {
+  if (p.level) {
+    const why = misplacedUp(p, s, room);
+    if (why) return why;
+  } else {
+    const why = isSolid(p) ? misplaced(s, room) : outside(s.box) ? `${s.label} must stay inside the room` : undefined;
+    if (why) return why;
+    if (mezzanineOf(room) === 'big' && overlaps(s.box, BIG) && pieceTop(p) > HEADROOM - 0.02) {
+      const k = kindDef(p.kind);
+      return k.overhead || k.hangs ? `${s.label} hangs too high to go under the mezzanine` : `${s.label} is too tall to stand under the mezzanine`;
+    }
+  }
+  if (kindDef(p.kind).hangs && !faceUnder(p, faces)) return `${s.label} needs a wall to hang on`;
+  return undefined;
+}
+
 /** The desk poses in `raw`, each on the grid and a quarter turn, or why they won't do. */
 function cleanDesks(raw: unknown): DeskLayout | string {
   if (raw === undefined) return {};
@@ -123,22 +161,21 @@ function cleanDesks(raw: unknown): DeskLayout | string {
  * What's wrong with where things stand, by the id of each desk or piece that's somewhere it can't be:
  * off the floor, on something built in, in a doorway, or on top of something else. Rugs lie under
  * anything, as long as they're in the room. `room` is the floor's own (see RoomOptions): the office's
- * as it comes, when it isn't said.
+ * as it comes, when it isn't said. What's upstairs is checked against the room's deck, and only gets in
+ * the way of what else is up there.
  */
 export function layoutProblems(layout: OfficeLayout, room: RoomOptions = {}): Map<string, string> {
   const problems = new Map<string, string>();
-  const desks = layoutDesks(layout.desks).map((d) => ({ id: d.id, s: standingDesk(d) }));
-  const pieces = layout.furniture.map((p) => ({ id: p.id, s: standingPiece(p), solid: isSolid(p) }));
+  const desks = layoutDesks(layout.desks).map((d) => ({ id: d.id, s: standingDesk(d), solid: true, level: 0 }));
+  const pieces = layout.furniture.map((p) => ({ id: p.id, s: standingPiece(p), solid: isSolid(p), level: p.level ?? 0, p }));
+  const hung = layout.furniture.some((p) => kindDef(p.kind).hangs);
+  const faces = hung ? [wallFaces(layout.furniture, 0, room), wallFaces(layout.furniture, 1, room)] : [[], []];
   for (const d of desks) {
     const why = misplaced(d.s, room);
     if (why) problems.set(d.id, why);
   }
   for (const p of pieces) {
-    if (!p.solid) {
-      if (outside(p.s.box)) problems.set(p.id, `${p.s.label} must stay inside the room`);
-      continue;
-    }
-    const why = misplaced(p.s, room);
+    const why = pieceProblem(p.p, p.s, room, faces[p.level]);
     if (why) problems.set(p.id, why);
   }
   const solid = [...desks, ...pieces.filter((p) => p.solid)];
@@ -146,7 +183,7 @@ export function layoutProblems(layout: OfficeLayout, room: RoomOptions = {}): Ma
     for (let j = i + 1; j < solid.length; j++) {
       const a = solid[i];
       const b = solid[j];
-      if (!touching(a.s, b.s)) continue;
+      if (a.level !== b.level || !touching(a.s, b.s)) continue;
       if (!problems.has(a.id)) problems.set(a.id, `${a.s.label} overlaps ${b.s.as}`);
       if (!problems.has(b.id)) problems.set(b.id, `${b.s.label} overlaps ${a.s.as}`);
     }
@@ -163,26 +200,42 @@ export function problemAt(layout: OfficeLayout, id: string, room: RoomOptions = 
   const piece = desk ? undefined : layout.furniture.find((p) => p.id === id);
   if (!desk && !piece) return undefined;
   const s = desk ? standingDesk(desk) : standingPiece(piece!);
-  if (piece && !isSolid(piece)) {
-    return outside(s.box) ? `${s.label} must stay inside the room` : undefined;
-  }
-  const why = misplaced(s, room);
-  if (why) return why;
-  for (const other of [...layoutDesks(layout.desks).filter((d) => d.id !== id).map(standingDesk), ...layout.furniture.filter((p) => p.id !== id && isSolid(p)).map(standingPiece)]) {
-    if (touching(s, other)) return `${s.label} overlaps ${other.as}`;
+  const level = piece?.level ?? 0;
+  const why = piece ? pieceProblem(piece, s, room, kindDef(piece.kind).hangs ? wallFaces(layout.furniture, level, room) : []) : misplaced(s, room);
+  if (why || (piece && !isSolid(piece))) return why;
+  const others = [...(level ? [] : layoutDesks(layout.desks).filter((d) => d.id !== id).map(standingDesk)), ...layout.furniture.filter((p) => p.id !== id && isSolid(p) && (p.level ?? 0) === level).map(standingPiece)];
+  for (const other of others) if (touching(s, other)) return `${s.label} overlaps ${other.as}`;
+  return undefined;
+}
+
+/**
+ * Why a floor arranged like `layout` can't go from the room `was` to the room `next`: the first thing
+ * that's somewhere it can't be in the new one and was fine in the old, with what has to be cleared
+ * first (upstairs, when it's a piece up there whose deck is going; the floor where the kitchen comes
+ * back; else the floor where a mezzanine's stairs and posts go). Nothing, if it can. For whoever's
+ * changing the room (the builder, and the office when it saves), so the reason names what changed.
+ */
+export function structureProblem(layout: OfficeLayout, was: RoomOptions, next: RoomOptions): string | undefined {
+  const before = layoutProblems(layout, was);
+  let dry: Map<string, string> | undefined;
+  for (const [id, why] of layoutProblems(layout, next)) {
+    if (before.has(id)) continue;
+    if (layout.furniture.find((p) => p.id === id)?.level) return `Clear upstairs first: ${why}`;
+    // The kitchen's doing, if it's fine in the same room without one.
+    if (hasKitchen(next) && !hasKitchen(was) && !(dry ??= layoutProblems(layout, { ...next, kitchen: false })).has(id)) return `Clear the floor for the kitchen first: ${why}`;
+    return `Clear the floor for the mezzanine first: ${why}`;
   }
   return undefined;
 }
 
 /**
- * Why a floor arranged like `layout` can't have the mezzanine (back): what stands where its stairs or
- * its posts go, which is fine on a floor that's all one level. Nothing, if it can. For whoever's
- * turning it back on (the builder, and the office when it saves), so the reason names the mezzanine.
+ * Why a floor arranged like `layout` can't have its mezzanine (back): what stands where its stairs or
+ * its posts go, which is fine on a floor that's all one level. Nothing, if it can. The room's own
+ * mezzanine, or the corner loft for one that's all one level.
  */
 export function mezzanineProblem(layout: OfficeLayout, room: RoomOptions = {}): string | undefined {
-  const flat = layoutProblems(layout, { ...room, loft: false });
-  for (const [id, why] of layoutProblems(layout, { ...room, loft: true })) if (!flat.has(id)) return `Clear the floor for the mezzanine first: ${why}`;
-  return undefined;
+  const kind = mezzanineOf(room);
+  return structureProblem(layout, { ...room, mezzanine: 'none' }, { ...room, mezzanine: kind === 'none' ? 'corner' : kind });
 }
 
 /**

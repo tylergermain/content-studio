@@ -1,9 +1,9 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { floorSeat, type Piece } from '../shared/furniture.js';
-import { layoutFurniture, mezzanineProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
-import { hasLoft } from '../shared/office-fixed.js';
-import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type RoomOptions } from '../shared/floorplan.js';
+import { layoutFurniture, structureProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
+import { structureKey } from '../shared/mezzanine.js';
+import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type FloorRoom } from '../shared/floorplan.js';
 import { DESK_BY_ID, WING, type SeatDef } from '../shared/layout.js';
 
 /**
@@ -28,11 +28,11 @@ export class FloorPlanStore {
   }
 
   /** How the floor's arranged now, and the room it's in, for whoever gets round it (the dog): not copies, so not to be changed. */
-  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; room: Required<RoomOptions>; revision: number } {
+  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; room: FloorRoom; revision: number } {
     return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), room: roomOf(this.plan), revision: this.plan.layoutRevision ?? 0 };
   }
 
-  /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without one. */
+  /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without the boss's office. */
   seat(id: string): SeatDef | undefined {
     return floorSeat(layoutFurniture(this.plan), this.plan.wing, id, roomOf(this.plan));
   }
@@ -76,7 +76,8 @@ export class FloorPlanStore {
   /**
    * Saves the floor as the office builder arranged it: its desks, its furniture, its paint and its room
    * (the layout's checked against the room it's saved with: furniture can stand where the stairs were
-   * on a floor that's all one level, and has to be off them before the mezzanine comes back). `revision`
+   * on a floor that's all one level, and has to be off them before the mezzanine comes back; what's
+   * upstairs has to come down before its deck goes). `revision`
    * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
    * (`taken`) stays where it is. Why it couldn't, or nothing.
    */
@@ -85,9 +86,14 @@ export class FloorPlanStore {
     const room = cleanRoom(raw.room);
     const layout = validateLayout(raw.desks, raw.furniture, room);
     if (typeof layout === 'string') {
-      // Bringing the mezzanine back to a floor that was all one level: what's in its way says so.
-      const flat = hasLoft(room) && !hasLoft(this.plan.room) ? validateLayout(raw.desks, raw.furniture, { ...room, loft: false }) : undefined;
-      return (typeof flat === 'object' && mezzanineProblem(flat, room)) || layout;
+      // The room itself is changing (a mezzanine coming or going, the kitchen back) and the layout was
+      // fine in the one it has: what's in the new one's way says which, and what to clear first.
+      const had = this.plan.room ?? {};
+      if (structureKey(room) !== structureKey(had)) {
+        const under = validateLayout(raw.desks, raw.furniture, had);
+        if (typeof under === 'object') return structureProblem(under, had, room) ?? layout;
+      }
+      return layout;
     }
     const before = this.plan.desks ?? {};
     const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);

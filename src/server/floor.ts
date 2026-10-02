@@ -311,7 +311,7 @@ export class Floor {
       },
     );
 
-    this.decor = new Decor(dataDir);
+    this.decor = new Decor(dataDir, () => this.plan.layoutNow().room);
     this.jukebox = new Jukebox(dataDir);
     this.whiteboard = new Whiteboard(dataDir);
     this.ready = this.workers.start();

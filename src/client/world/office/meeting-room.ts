@@ -41,7 +41,7 @@ function buildMeetingSeat(def: DeskDef, index: number): DeskView {
  * The meeting room under the loft: glass walls from the loft's posts round to the outside walls, a
  * sliding glass door facing the lounge, a long table with its chairs (MEETING_SEATS), a board on the
  * back wall for the meeting's output and a sign by the door for how it's going. Every floor has it,
- * the ones with no loft too (see RoomOptions.loft): there it's a glass room open to the ceiling, its
+ * the ones with no loft too (see RoomOptions.mezzanine): there it's a glass room open to the ceiling, its
  * walls capped with a rail (`room` says which).
  */
 export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], interactables: Interactable[], desks: Map<string, DeskView>, doors: Door[], night: NightParts, room: RoomView): { board: THREE.Mesh; sign: THREE.Mesh } {
@@ -187,7 +187,7 @@ export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], inte
   cap(lip * 2, RAIL, R.maxZ - R.minZ - lip, R.minX, H + RAIL / 2, (R.minZ + lip + R.maxZ) / 2);
   for (const dx of LIGHTS) cap(0.14, RAIL - 0.01, R.maxZ - R.minZ - lip, top.x + dx, H + RAIL / 2, (R.minZ + lip + R.maxZ) / 2);
   group.add(open);
-  room.on((r) => (open.visible = !r.loft));
+  room.on((r) => (open.visible = r.mezzanine === 'none'));
   return { board: face, sign };
 }
 

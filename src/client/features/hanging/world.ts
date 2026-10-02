@@ -1,204 +1,14 @@
 import * as THREE from 'three';
-import { FRAMES, FRAME_BORDER, WALLS, frameRect, mediaLink, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
-import { FLOOR, LOFT } from '../../../shared/layout';
+import { FRAME_BORDER, WALLS, frameRect, wallFloor, wallPose, wallTop, type Decoration, type WallId, type WallRect } from '../../../shared/decor';
+import type { RoomOptions } from '../../../shared/floorplan';
+import { FLOOR } from '../../../shared/layout';
+import { DECK_Y, deckOf } from '../../../shared/mezzanine';
 import type { Interactable } from '../../world/types';
-import { toon } from '../../world/toon';
+import { brokenTexture, buildFrame, disposeFrame, flat, loadPicture, prunePictures, showTexture, type PictureMesh } from '../../world/frames';
 
-// ---- Pictures -------------------------------------------------------------------------------------
-
-export interface Picture {
-  url: string;
-  texture: THREE.CanvasTexture;
-  /** The image's width / height. */
-  aspect: number;
-  /** An object URL of the full-size image, for showing it in the page. */
-  src: string;
-}
-
-/** A wall picture never needs more pixels than this, and big photos would eat GPU memory. */
-const MAX_TEXTURE = 1024;
-const pictures = new Map<string, Promise<Picture>>();
-const holds = new Map<string, number>();
-
-/** The office fetches images for us, so a picture shows up whatever its host allows. */
-export function imageUrl(url: string): string {
-  // One of a floor's own pictures comes from its media folder (see mediaLink).
-  const own = mediaLink(url);
-  if (own) return `/api/media?floor=${encodeURIComponent(own.floor)}&name=${encodeURIComponent(own.name)}`;
-  return `/api/image?url=${encodeURIComponent(url)}`;
-}
-
-async function fetchPicture(url: string): Promise<Picture> {
-  let res: Response;
-  try {
-    res = await fetch(imageUrl(url));
-  } catch {
-    throw new Error("Couldn't reach the office to load that image");
-  }
-  if (!res.ok) {
-    let error = `The office couldn't load that image (${res.status})`;
-    try {
-      error = (await res.json()).error ?? error;
-    } catch {
-      // not JSON
-    }
-    throw new Error(error);
-  }
-  const src = URL.createObjectURL(await res.blob());
-  try {
-    const img = new Image();
-    img.src = src;
-    await img.decode();
-    // An SVG without a size reports 0×0.
-    const iw = img.naturalWidth || MAX_TEXTURE;
-    const ih = img.naturalHeight || MAX_TEXTURE;
-    const k = Math.min(1, MAX_TEXTURE / Math.max(iw, ih));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(iw * k));
-    canvas.height = Math.max(1, Math.round(ih * k));
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.anisotropy = 8;
-    return { url, texture, aspect: iw / ih, src };
-  } catch {
-    URL.revokeObjectURL(src);
-    throw new Error("Your browser can't show that image");
-  }
-}
-
-/** Loads an image once for everything that shows it. Failures aren't kept, so asking again retries. */
-export function loadPicture(url: string): Promise<Picture> {
-  let p = pictures.get(url);
-  if (!p) {
-    const fresh = fetchPicture(url);
-    fresh.catch(() => {
-      if (pictures.get(url) === fresh) pictures.delete(url);
-    });
-    pictures.set(url, fresh);
-    p = fresh;
-  }
-  return p;
-}
-
-/** Keeps a picture loaded while something besides the walls shows it. Call the result to let go. */
-export function holdPicture(url: string): () => void {
-  holds.set(url, (holds.get(url) ?? 0) + 1);
-  let held = true;
-  return () => {
-    if (!held) return;
-    held = false;
-    const n = (holds.get(url) ?? 1) - 1;
-    if (n > 0) holds.set(url, n);
-    else holds.delete(url);
-  };
-}
-
-/** Frees the pictures nothing shows anymore. */
-function prunePictures(onWalls: Set<string>) {
-  for (const [url, p] of pictures) {
-    if (onWalls.has(url) || holds.has(url)) continue;
-    pictures.delete(url);
-    p.then(
-      (pic) => {
-        pic.texture.dispose();
-        URL.revokeObjectURL(pic.src);
-      },
-      () => {},
-    );
-  }
-}
-
-function notice(text: string, bg: string, fg: string): THREE.CanvasTexture {
-  const c = document.createElement('canvas');
-  c.width = 512;
-  c.height = 384;
-  const g = c.getContext('2d')!;
-  g.fillStyle = bg;
-  g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = fg;
-  g.textAlign = 'center';
-  g.textBaseline = 'middle';
-  g.font = '800 44px Nunito, ui-rounded, system-ui, sans-serif';
-  g.fillText(text, c.width / 2, c.height / 2);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
-}
-
-let loadingTex: THREE.CanvasTexture | null = null;
-let brokenTex: THREE.CanvasTexture | null = null;
-const loadingTexture = () => (loadingTex ??= notice('🖼️ Loading…', '#e9ecef', '#7a6f65'));
-export const brokenTexture = () => (brokenTex ??= notice('⚠️ Image unavailable', '#ffd6e0', '#2b2d42'));
-
-// ---- Frames ---------------------------------------------------------------------------------------
-
-/** How far the frame stands off the wall; the picture sits recessed inside it. */
-const FRAME_DEPTH = 0.06;
-
-type PictureMesh = THREE.Mesh<THREE.PlaneGeometry, THREE.MeshBasicMaterial>;
-
-/** A flat material the cartoon outline pass leaves alone. */
-function flat(params: THREE.MeshBasicMaterialParameters): THREE.MeshBasicMaterial {
-  const m = new THREE.MeshBasicMaterial(params);
-  m.userData.outlineParameters = { visible: false };
-  return m;
-}
-
-function frameGeometry(w: number, h: number): THREE.ExtrudeGeometry {
-  const ow = w / 2 + FRAME_BORDER;
-  const oh = h / 2 + FRAME_BORDER;
-  const shape = new THREE.Shape().moveTo(-ow, -oh).lineTo(ow, -oh).lineTo(ow, oh).lineTo(-ow, oh).lineTo(-ow, -oh);
-  const iw = w / 2;
-  const ih = h / 2;
-  shape.holes.push(new THREE.Path().moveTo(-iw, -ih).lineTo(-iw, ih).lineTo(iw, ih).lineTo(iw, -ih).lineTo(-iw, -ih));
-  return new THREE.ExtrudeGeometry(shape, { depth: FRAME_DEPTH, bevelEnabled: false });
-}
-
-/** A framed w×h picture facing +z, its back against z = 0. It shows "Loading…" until given a texture. */
-function buildFrame(w: number, h: number, frame: number): { group: THREE.Group; picture: PictureMesh } {
-  const group = new THREE.Group();
-  const color = (FRAMES[frame] ?? FRAMES[0]).color;
-  // With no frame the picture's straight on the wall, see-through where it is: a logo, lettering.
-  if (color) {
-    const border = new THREE.Mesh(frameGeometry(w, h), toon(color));
-    border.receiveShadow = true;
-    group.add(border);
-  }
-  const picture: PictureMesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h), flat(color ? { map: loadingTexture() } : { map: loadingTexture(), transparent: true, alphaTest: 0.04 }));
-  picture.position.z = color ? FRAME_DEPTH * 0.35 : 0.004;
-  group.add(picture);
-  return { group, picture };
-}
-
-/** Shows an image of `aspect` on a picture, cropped to fill it (like CSS object-fit: cover). */
-function showTexture(picture: PictureMesh, texture: THREE.Texture, aspect: number) {
-  const { width, height } = picture.geometry.parameters;
-  const shape = width / height;
-  const fx = aspect > shape ? shape / aspect : 1;
-  const fy = aspect > shape ? 1 : aspect / shape;
-  const uv = picture.geometry.attributes.uv;
-  // A one-segment plane's corners, in order: top left, top right, bottom left, bottom right.
-  [
-    [0, 1],
-    [1, 1],
-    [0, 0],
-    [1, 0],
-  ].forEach(([u, v], i) => uv.setXY(i, 0.5 + (u - 0.5) * fx, 0.5 + (v - 0.5) * fy));
-  uv.needsUpdate = true;
-  picture.material.map = texture;
-  picture.material.needsUpdate = true;
-}
-
-function disposeFrame(group: THREE.Group) {
-  group.traverse((o) => {
-    const m = o as THREE.Mesh;
-    if (!m.isMesh) return;
-    m.geometry.dispose();
-    // Frame borders use shared toon materials; only the picture's material is its own.
-    if (m.material instanceof THREE.MeshBasicMaterial) m.material.dispose();
-  });
-}
+// The pictures on the walls, and the one you're about to hang. The images themselves and the frames
+// they're in are the world's (world/frames.ts); what the rest of the feature takes of those, it takes from here.
+export { brokenTexture, holdPicture, imageUrl, loadPicture, type Picture } from '../../world/frames';
 
 function placeOnWall(group: THREE.Object3D, wall: WallId, u: number, y: number, out = 0.005) {
   const p = wallPose(wall, u, y, out);
@@ -223,7 +33,8 @@ export class Gallery {
   private frames = new Map<string, FrameView>();
   private hidden: string | null = null;
 
-  sync(items: Decoration[]) {
+  /** Shows the pictures the floor has, on a floor with this room: one hung over an upstairs is looked at from up there. */
+  sync(items: Decoration[], room: RoomOptions = {}) {
     const seen = new Set<string>();
     for (const d of items) {
       seen.add(d.id);
@@ -242,6 +53,7 @@ export class Gallery {
       const front = wallPose(d.wall, d.u, 0, 1.4);
       v.it.x = front.x;
       v.it.z = front.z;
+      v.it.y = wallFloor(d.wall, d.u, d.y, room);
     }
     for (const [id, v] of this.frames) {
       if (seen.has(id)) continue;
@@ -344,18 +156,22 @@ export class Ghost {
   }
 }
 
-/** Where a ray from inside the room first meets a wall, within `maxDist` meters (the whole room by default). */
-export function aimAtWall(ray: THREE.Ray, maxDist = 60): { wall: WallId; u: number; y: number } | null {
+/**
+ * Where a ray from inside the room first meets a wall, within `maxDist` meters (the whole room by
+ * default), on a floor with this room: its upstairs is in the way, and says how high each wall goes.
+ */
+export function aimAtWall(ray: THREE.Ray, maxDist = 60, room: RoomOptions = {}): { wall: WallId; u: number; y: number } | null {
   const o = ray.origin;
   const d = ray.direction;
   // Only from inside: out on the balcony or down on the street, the walls face the other way.
   if (o.x < FLOOR.minX || o.x > FLOOR.maxX || o.z < FLOOR.minZ || o.z > FLOOR.maxZ || o.y < 0) return null;
-  // The loft's floor hides whatever is past it, from above or below.
-  if (d.y !== 0) {
-    const t = (LOFT.y - 0.12 - o.y) / d.y;
+  // The upstairs floor (the loft's, the big mezzanine's) hides whatever is past it, from above or below.
+  const slab = deckOf(room)?.slab;
+  if (slab && d.y !== 0) {
+    const t = (DECK_Y - 0.12 - o.y) / d.y;
     const x = o.x + d.x * t;
     const z = o.z + d.z * t;
-    if (t > 0 && x > LOFT.minX && x < LOFT.maxX && z > LOFT.minZ && z < LOFT.maxZ) maxDist = Math.min(maxDist, t);
+    if (t > 0 && x > slab.minX && x < slab.maxX && z > slab.minZ && z < slab.maxZ) maxDist = Math.min(maxDist, t);
   }
   const hits: [WallId, number][] = [];
   if (d.z < 0) hits.push(['north', (FLOOR.minZ - o.z) / d.z]);
@@ -368,7 +184,7 @@ export function aimAtWall(ray: THREE.Ray, maxDist = 60): { wall: WallId; u: numb
     if (!(t > 0 && t < bestT)) continue;
     const y = o.y + d.y * t;
     const u = wall === 'north' || wall === 'south' ? o.x + d.x * t : o.z + d.z * t;
-    if (y < 0 || u < WALLS[wall].min || u > WALLS[wall].max || y > wallTop(wall, u)) continue;
+    if (y < 0 || u < WALLS[wall].min || u > WALLS[wall].max || y > wallTop(wall, u, room)) continue;
     best = { wall, u, y };
     bestT = t;
   }

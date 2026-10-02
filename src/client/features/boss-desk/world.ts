@@ -9,7 +9,7 @@ import { BOSS_DESK, GUEST_SEATS, hasBossDesk } from './desk';
 
 // The guests' side of the boss's desk: two chairs across it, turned in toward it, and a second monitor
 // back to back with the boss's, facing them. The desk itself, the boss's chair and the boss's monitor
-// are the loft's (world/office/loft.ts); what the two monitors show is screens.ts.
+// are the boss's office's (world/office/boss-office.ts); what the two monitors show is screens.ts.
 
 declare module '../../world/types' {
   interface OfficeHandles {

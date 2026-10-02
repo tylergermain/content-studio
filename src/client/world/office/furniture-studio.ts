@@ -114,13 +114,18 @@ function neonLetters(text: string, color: string): THREE.Mesh {
   return letters;
 }
 
+/** What a part of a model that isn't there is painted: nothing draws it, and it casts no shadow. */
+const UNSEEN = new THREE.MeshBasicMaterial({ visible: false });
+
 /**
  * A neon sign hung at head height: a dark board on two wires from the ceiling, a lit tube round it and
  * `text` in lit letters on it, all in `color`. It hangs at the front of its footprint, so put where a
- * wall stands it lies on the wall's face.
+ * wall stands it lies on the wall's face. The wires are as long as the office is high (they're the
+ * model's only Steel): upstairs, where the ceiling is nearer, a sign is `wired` to nothing and only its
+ * board is there, on the wall behind it.
  */
-function neonSign(color: string, text: string): THREE.Group {
-  const g = studio('neon', { Neon: lit(color) });
+function neonSign(color: string, text: string, wired: boolean): THREE.Group {
+  const g = studio('neon', { Neon: lit(color), ...(wired ? {} : { Steel: UNSEEN }) });
   const letters = neonLetters(text, color);
   letters.position.set(0, NEON.y, NEON.z);
   g.add(letters);
@@ -139,7 +144,7 @@ export const STUDIO_BUILDERS: Builders = {
   'lounge-chair': (_p, color) => studio('lounge_chair', { Cloth: toon(color) }),
   stool: (_p, color) => studio('stool', { Cloth: toon(color) }),
   credenza: (_p, color) => studio('credenza', { Cabinet: toon(color) }),
-  neon: (p, color) => neonSign(color, p.text ?? kindDef(p.kind).text ?? ''),
+  neon: (p, color) => neonSign(color, p.text ?? kindDef(p.kind).text ?? '', !p.level),
   // The plants that came with the studio are built beside this file.
   ...GREENERY_BUILDERS,
 };

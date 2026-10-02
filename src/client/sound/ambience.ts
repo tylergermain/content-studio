@@ -29,6 +29,8 @@ export function startRoomTone(a: AudioCore) {
 /** The kitchen's fridge, humming away. */
 export class Fridge {
   private fridge: { gain: GainNode; on: boolean; next: number } | null = null;
+  /** The floor you're on has no kitchen (see OfficeSound.setKitchen): no fridge, so no hum and no clunk. */
+  quiet = false;
 
   constructor(private readonly a: AudioCore) {}
 
@@ -56,7 +58,15 @@ export class Fridge {
   /** The compressor kicks on for a while, then clunks off. */
   tickFridge(now: number) {
     const f = this.fridge;
-    if (!f || now < f.next) return;
+    if (!f) return;
+    if (this.quiet) {
+      // Whatever it was doing, it stops, and it doesn't start again the moment there's a kitchen.
+      if (f.on) f.gain.gain.setTargetAtTime(0, now, 0.1);
+      f.on = false;
+      if (f.next < now + 3) f.next = now + rand(3, 12);
+      return;
+    }
+    if (now < f.next) return;
     f.on = !f.on;
     f.gain.gain.setTargetAtTime(f.on ? 0.06 : 0, now, f.on ? 0.6 : 0.3);
     f.next = now + (f.on ? rand(25, 50) : rand(20, 45));

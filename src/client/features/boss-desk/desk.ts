@@ -1,10 +1,12 @@
+import type { RoomOptions } from '../../../shared/floorplan';
 import { LOFT } from '../../../shared/layout';
+import { hasBoss } from '../../../shared/mezzanine';
 
 // The boss's desk, up in the loft: the boss's chair on one side, two guest chairs across it, and a
 // monitor facing each side. This is the part with no 3D and no page in it: where the desk stands, who
 // counts as sitting at it, and the rules for what its monitors show (tests/boss-desk.test.ts).
 
-/** Where the desk stands, the middle of its top's footprint on the loft's floor (as world/office/loft.ts builds it). */
+/** Where the desk stands, the middle of its top's footprint on the loft's floor (as world/office/boss-office.ts builds it). */
 export const BOSS_DESK = { x: (LOFT.minX + LOFT.maxX) / 2 + 0.5, y: LOFT.y, z: (LOFT.minZ + LOFT.maxZ) / 2 - 0.3 } as const;
 
 /** The boss's chair (see SEATING), and what a peer's `seat` says while someone's in it. */
@@ -19,11 +21,12 @@ export type DeskRole = 'boss' | 'guest';
 export type ShareKind = 'screen' | 'game';
 
 /**
- * Whether a floor with this room has the boss's desk at all. Today it goes with the mezzanine, which a
- * room that doesn't say has. Everything that shows or runs the desk asks here, not the room itself.
+ * Whether a floor with this room has the boss's desk at all. It goes with the boss's office: the corner
+ * loft's, which a room that doesn't say has, and one that's all one level, has the big mezzanine or
+ * keeps its loft empty hasn't. Everything that shows or runs the desk asks here, not the room itself.
  */
-export function hasBossDesk(room: { loft?: boolean }): boolean {
-  return room.loft !== false;
+export function hasBossDesk(room: RoomOptions): boolean {
+  return hasBoss(room);
 }
 
 /** The side of the desk the seat called `seatId` is on, or null for any other seat. */

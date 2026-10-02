@@ -134,12 +134,14 @@ declare module '../../world/types' {
 /** The basketball hoop, on the west wall between the exit door and the kitchen. */
 export const hoop: Fixture<'hoop'> = (site) => {
   const built = buildHoop();
-  site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
-  // A floor has the hoop or it doesn't (the office builder takes it down and puts it back): with it go what you bump into of it, and the ball.
+  const mark = site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
+  // A floor has the hoop or it doesn't (the office builder takes it down and puts it back): with it go what you bump into
+  // of it, the ball, and its stretch of wall, which pictures can hang on while it's down.
   site.get('furniture').adopt('hoop', {
     group: built.group,
     moved: (p) => {
       built.away = !p;
+      mark.off = !p;
       for (const c of built.colliders) {
         const i = site.colliders.indexOf(c);
         if (!p && i >= 0) site.colliders.splice(i, 1);

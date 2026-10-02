@@ -127,15 +127,15 @@ export const lamps: Fixture = (site) => {
 };
 
 /**
- * Pictures stay clear of the stairs (step by step, so they can hang above them) and of what's on the
- * loft's walls upstairs, as buildLoft places it: the couch and the sign.
+ * Pictures stay clear of the corner loft's stairs, step by step, so they can hang above them. On a
+ * floor without that loft the stairs are put away, and the wall they ran along is free.
  */
 export const clearOfStairs: Fixture = (site) => {
   const run = (STAIRS.toX - STAIRS.fromX) / STAIRS.steps;
   const rise = LOFT.y / STAIRS.steps;
-  for (let i = 1; i <= STAIRS.steps; i++) site.wall('south', STAIRS.fromX + (i - 0.5) * run, (i * rise) / 2, run, i * rise);
-  const loftZ = (LOFT.minZ + LOFT.maxZ) / 2;
-  site.wall('east', loftZ, LOFT.y + 0.5, 2.4, 1);
-  site.wall('south', LOFT.maxX - 3, LOFT.y + 1.9, 2.6, 0.6);
+  const marks = Array.from({ length: STAIRS.steps }, (_, i) => site.wall('south', STAIRS.fromX + (i + 0.5) * run, ((i + 1) * rise) / 2, run, (i + 1) * rise));
+  site.get('room').on((room) => {
+    for (const mark of marks) mark.off = room.mezzanine !== 'corner';
+  });
   return {};
 };

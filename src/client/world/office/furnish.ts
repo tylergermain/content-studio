@@ -1,5 +1,6 @@
 import * as THREE from 'three';
-import { DEFAULT_FURNITURE, kindDef, pieceAway, pieceCollider, pieceRadius, pieceScale, pieceSeat, type FurnitureKind, type Piece } from '../../../shared/furniture';
+import { DEFAULT_FURNITURE, kindDef, pieceAway, pieceCollider, pieceRadius, pieceScale, pieceSeat, pieceY, type FurnitureKind, type Piece } from '../../../shared/furniture';
+import { PAINTING } from '../../../shared/hangings';
 import type { Collider, Interactable } from '../types';
 import type { Fixture } from './fixture';
 import { buildPiece, disposePiece } from './furniture';
@@ -8,7 +9,9 @@ import type { ScreenMesh } from './furniture-kit';
 // The furniture on the floor: the lounge, the rugs, the plants and whatever else the office builder
 // put there (see shared/furniture.ts). It's built as the office comes, and then stands wherever the
 // floor you're on has it (see features/office-builder), a piece at a time: what moved is moved, what's
-// new is built, what's gone is taken away.
+// new is built, what's gone is taken away. A piece with `level: 1` stands upstairs, on the floor's loft
+// or mezzanine (see pieceY): what you bump into of it starts at that floor, and what you sit on or use
+// of it is up there.
 
 /** A piece of furniture as it stands on the floor. */
 export interface PieceView {
@@ -22,7 +25,10 @@ export interface PieceView {
   play?: Interactable;
   /** What you watch it by, when it has a screen that plays the floor's videos (see KindDef.plays, and features/screens). */
   watch?: Interactable;
-  /** Its screen: a team desk's monitor (features/workstation), a video screen's face (features/screens). */
+  /**
+   * Its screen: a team desk's monitor (features/workstation), a video screen's face (features/screens),
+   * a painting's picture (features/hanging). It's a new one whenever the piece is built again (see rebuilt).
+   */
   screen?: ScreenMesh;
   /** A stock ticker's faces (features/studio), and the part of a punching bag that swings (features/playthings). */
   ticker?: ScreenMesh[];
@@ -78,8 +84,15 @@ function noOutline(obj: THREE.Object3D) {
   });
 }
 
-/** Whether a piece has to be built again to look like `next`: its paint or what it says changed. */
-const rebuilt = (was: Piece, next: Piece) => was.kind !== next.kind || was.color !== next.color || was.text !== next.text;
+/** What a painting is built to: its frame, its size and shape, and how high it hangs (each its own, or what a painting has until it's set). */
+const hung = (p: Piece) => (kindDef(p.kind).shows ? [p.frame ?? PAINTING.frame, p.size ?? PAINTING.size, p.aspect ?? PAINTING.aspect, p.lift ?? PAINTING.lift].join('|') : '');
+
+/**
+ * Whether a piece has to be built again to look like `next`: its paint or what it says changed, the
+ * floor it's on (a neon sign upstairs hangs on no wires), or what a painting is built to. Not its
+ * picture: whoever shows that swaps the image on the same canvas (see PieceView.screen).
+ */
+const rebuilt = (was: Piece, next: Piece) => was.kind !== next.kind || was.color !== next.color || was.text !== next.text || was.level !== next.level || hung(was) !== hung(next);
 
 export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
   const views = new Map<string, PieceView>();
@@ -149,7 +162,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     // what it was is how a new color or new words are noticed (see rebuilt).
     v.piece = { ...p };
     v.away = pieceAway(p, wing);
-    v.group.position.set(p.x, 0, p.z);
+    v.group.position.set(p.x, pieceY(p), p.z);
     v.group.rotation.y = p.rotY;
     v.group.scale.setScalar(pieceScale(p));
     v.group.visible = !v.away;
@@ -157,7 +170,11 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     const box = v.away ? undefined : pieceCollider(p);
     if (box) {
       if (!v.collider) site.colliders.push((v.collider = { ...box }));
-      else Object.assign(v.collider, box);
+      else {
+        Object.assign(v.collider, box);
+        // Only a piece upstairs has a floor of its own to start at (see pieceCollider): on the office floor it keeps none.
+        v.collider.bottom = box.bottom;
+      }
     } else if (v.collider) {
       drop(site.colliders, v.collider);
       v.collider = undefined;
@@ -180,7 +197,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     // Something to play with: walk up to its front.
     const k = kindDef(p.kind);
     if (k.play && k.use && !v.away) {
-      const at = { x: p.x + Math.sin(p.rotY) * k.use.z, z: p.z + Math.cos(p.rotY) * k.use.z, radius: k.use.radius };
+      const at = { x: p.x + Math.sin(p.rotY) * k.use.z, y: pieceY(p), z: p.z + Math.cos(p.rotY) * k.use.z, radius: k.use.radius };
       if (!v.play) site.interactables.push((v.play = { kind: 'plaything', pieceId: p.id, ...at }));
       else Object.assign(v.play, at);
       v.group.userData.interact = v.play;
@@ -193,7 +210,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     // A screen that plays: walk up to its front, or look at it, to watch what's on it.
     if (k.plays && !v.away) {
       const use = k.use ?? { z: (k.d ?? 0) / 2 + 1, radius: 1.9 };
-      const at = { x: p.x + Math.sin(p.rotY) * use.z, z: p.z + Math.cos(p.rotY) * use.z, radius: use.radius };
+      const at = { x: p.x + Math.sin(p.rotY) * use.z, y: pieceY(p), z: p.z + Math.cos(p.rotY) * use.z, radius: use.radius };
       if (!v.watch) site.interactables.push((v.watch = { kind: 'screen', pieceId: p.id, ...at }));
       else Object.assign(v.watch, at);
       v.group.userData.interact = v.watch;

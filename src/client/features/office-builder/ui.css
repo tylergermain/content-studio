@@ -24,6 +24,24 @@ body.building #hud > :not(#toasts):not(#conn) { visibility: hidden; }
 .ob-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .ob-gap { width: 6px; }
 
+/* The level being worked on, under the bar: there on a floor with an upstairs to furnish. */
+.ob-levels { top: 74px; left: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 10px; max-width: calc(100% - 560px); padding: 5px; border-radius: var(--r-lg); }
+.ob-levels[hidden] { display: none; }
+.ob-levels .ob-seg { min-width: 190px; }
+.ob-levels .ob-seg button { padding: 6px 14px; font-size: 13px; }
+.ob-levels .ob-note { padding: 0 2px; white-space: nowrap; }
+.ob-levels .btn { padding: 5px 11px; font-size: 13px; border-radius: var(--r-sm); }
+
+/* A row of choices of which one is on (or, in a group, which are): the one that's on is raised off the track. */
+.ob-seg { display: flex; gap: 2px; padding: 2px; background: var(--wash); border-radius: var(--r-md); }
+.ob-seg.tall { flex-direction: column; }
+.ob-seg button { flex: 1; min-width: 0; padding: 5px 8px; font: inherit; font-size: 12px; font-weight: 500; color: var(--ink); background: none; border: 0; border-radius: var(--r-sm); cursor: pointer; white-space: nowrap; transition: background-color .15s var(--ease), box-shadow .15s var(--ease); }
+.ob-seg.tall button { padding: 6px 10px; text-align: left; }
+.ob-seg button:hover { background: var(--wash); }
+.ob-seg button.on { background: var(--control); box-shadow: var(--shadow-1); font-weight: 600; }
+.ob-seg button:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 1px; }
+.ob-seg button:disabled { opacity: .5; cursor: default; }
+
 /* The catalog, down the left, and what's picked, on the right. */
 .ob-catalog, .ob-inspector { top: 82px; bottom: 74px; width: 252px; padding: 14px; overflow-y: auto; }
 .ob-catalog { left: 12px; }
@@ -33,6 +51,7 @@ body.building #hud > :not(#toasts):not(#conn) { visibility: hidden; }
 .ob-card { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px 8px; font: inherit; font-size: 12px; font-weight: 500; color: var(--ink); background: var(--surface); border: 1px solid var(--hairline); border-radius: 12px; box-shadow: var(--shadow-1); cursor: grab; touch-action: none; user-select: none; }
 .ob-card:hover { background: #fff; }
 .ob-card:active { cursor: grabbing; transform: scale(.97); }
+.ob-card:disabled { opacity: .4; cursor: default; transform: none; }
 
 .ob-picked { display: flex; align-items: center; gap: 10px; }
 .ob-picked h3 { overflow-wrap: anywhere; }
@@ -50,11 +69,29 @@ body.building #hud > :not(#toasts):not(#conn) { visibility: hidden; }
 .ob-custom::-webkit-color-swatch-wrapper { padding: 0; }
 .ob-custom::-webkit-color-swatch { border: 0; opacity: 0; }
 .ob-custom::-moz-color-swatch { border: 0; opacity: 0; }
+.ob-swatch.none { background: repeating-linear-gradient(135deg, var(--control) 0 5px, var(--wash-2) 5px 6px); }
+.ob-swatch:disabled { opacity: .5; cursor: default; }
+
+/* A painting's pictures to pick from (hang-ui.ts): each shown whole, so a scene reads wide and a portrait tall. */
+.ob-pics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; max-height: 236px; overflow-y: auto; padding: 3px; margin: -3px; }
+.ob-pic { display: flex; align-items: center; justify-content: center; aspect-ratio: 1; min-width: 0; padding: 4px; font: inherit; font-size: 11px; font-weight: 500; color: var(--muted); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-sm); cursor: pointer; }
+.ob-pic img { max-width: 100%; max-height: 100%; object-fit: contain; border-radius: 3px; box-shadow: var(--shadow-1); pointer-events: none; }
+.ob-pic:hover { background: var(--control); }
+.ob-pic.on { outline: 2px solid var(--accent); outline-offset: 1px; }
+.ob-pic:disabled { opacity: .5; cursor: default; }
+.ob-pic.broken img { visibility: hidden; }
+.ob-note[hidden] { display: none; }
+.ob-measure { display: flex; justify-content: space-between; gap: 8px; }
+.ob-measure output { font-weight: 400; color: var(--muted); font-variant-numeric: tabular-nums; }
 
 .ob-paints { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
 .ob-paint { height: 30px; padding: 0; font: inherit; font-size: 11px; font-weight: 600; color: var(--ink); background: var(--surface); border: 0; border-radius: var(--r-sm); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .12); cursor: pointer; }
 .ob-paint.on { outline: 2px solid var(--accent); outline-offset: 1px; }
 .ob-back { display: flex; flex-direction: column; gap: 8px; }
+/* One of the room's choices (room-ui.ts): its name, the choice, and a line about what's chosen. */
+.ob-part { display: flex; flex-direction: column; gap: 5px; }
+.ob-part + .ob-part { margin-top: 4px; }
+.ob-part-name { font-size: 12px; font-weight: 500; }
 
 .ob-keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 10px; margin: 0; font-size: 12px; font-weight: 400; align-items: baseline; }
 .ob-keys dt { font-weight: 600; white-space: nowrap; }
@@ -71,5 +108,6 @@ body.building #hud > :not(#toasts):not(#conn) { visibility: hidden; }
 @media (max-width: 900px) {
   .ob-catalog, .ob-inspector { width: 200px; }
   .ob-status { max-width: calc(100% - 24px); }
+  .ob-levels { max-width: calc(100% - 440px); flex-wrap: wrap; justify-content: center; }
   .ob-tools .ob-gap { display: none; }
 }
