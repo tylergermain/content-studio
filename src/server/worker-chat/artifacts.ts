@@ -5,7 +5,7 @@ import type { ChatArtifact } from '../../shared/worker-chat.js';
 const TYPES: Record<string, string> = { '.png':'image/png', '.jpg':'image/jpeg', '.jpeg':'image/jpeg', '.webp':'image/webp', '.gif':'image/gif', '.svg':'image/svg+xml', '.mp4':'video/mp4', '.webm':'video/webm', '.mov':'video/quicktime', '.mp3':'audio/mpeg', '.wav':'audio/wav', '.pdf':'application/pdf', '.html':'text/html', '.htm':'text/html', '.md':'text/plain', '.txt':'text/plain', '.json':'text/plain', '.csv':'text/plain' };
 export const artifactType = (file: string) => TYPES[path.extname(file).toLowerCase()];
 export function publicArtifact(file: string): boolean {
-  return !!artifactType(file) && !path.isAbsolute(file) && file.split(/[\\/]/).every(p => p && p !== '..' && !p.startsWith('.') && !/^(node_modules|vendor|credentials?|secrets?|auth|tokens?)$/i.test(p)) && !/(?:credentials|secret|api[-_]?key|auth[-_]?state)/i.test(path.basename(file));
+  return !!artifactType(file) && !path.isAbsolute(file) && file.split(/[\\/]/).every(p => p && p !== '..' && !p.startsWith('.') && !/^(node_modules|vendor|credentials?|secrets?|auth|tokens?)$/i.test(p)) && !/(?:credentials|secret|api[-_]?key|auth[-_]?state|^mcp\.local\.json$)/i.test(path.basename(file));
 }
 export async function artifactPath(root: string, file: string): Promise<string | undefined> {
   if (!publicArtifact(file)) return;
