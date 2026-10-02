@@ -402,3 +402,5 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## License
 
 [MIT](LICENSE)
+
+Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
