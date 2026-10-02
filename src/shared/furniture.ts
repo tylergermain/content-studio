@@ -11,6 +11,7 @@ import { HOOP } from './hoop.js';
 import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
 import { hasBoss, levelY } from './mezzanine.js';
 import { LOFT_SEATS } from './office-fixed.js';
+import { hasSteps, stepsSeats } from './steps.js';
 
 export type FurnitureGroup = 'Work' | 'Rooms' | 'Seating' | 'Tables' | 'Plants' | 'Play' | 'Decor';
 
@@ -105,6 +106,8 @@ export const FURNITURE = {
   'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554', wall: true },
   // A frame to walk through, with the room's name over it: what a row of walls leaves a gap for.
   doorway: { label: 'Doorway', icon: '🚪', group: 'Rooms', w: 1.2, d: 0.14, top: 0, color: '#fff6ea', text: 'Office' },
+  // A slatted panel hung low from the ceiling on rods, with a light under it: a soffit over a way in, a few side by side. Nothing's in the way under it.
+  'ceiling-panel': { label: 'Ceiling panel', icon: '🔳', group: 'Rooms', w: 2.4, d: 2.4, top: 0, color: '#7a5236', overhead: true },
   table: { label: 'Table', icon: '🟫', group: 'Tables', w: 2.4, d: 1.1, top: 0.76, color: '#c98b5a' },
   'standing-table': { label: 'Standing table', icon: '🍸', group: 'Tables', r: 0.5, top: 1.05, color: '#c98b5a' },
   'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46 },
@@ -279,10 +282,10 @@ export function pieceY(p: Piece): number {
   return levelY(p.level);
 }
 
-/** Whether a kind can go upstairs: not what the office has one of, what's for playing with, or the ticker. */
+/** Whether a kind can go upstairs: not what the office has one of, what's for playing with, or what hangs from the office's own ceiling (the ticker, a ceiling panel). */
 export function canGoUp(kind: FurnitureKind): boolean {
   const k = kindDef(kind);
-  return !k.fixed && k.group !== 'Play' && kind !== 'ticker';
+  return !k.fixed && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel';
 }
 
 /**
@@ -401,13 +404,19 @@ export function furnitureSeats(pieces: readonly Piece[], wing = 0): SeatDef[] {
 
 /**
  * The seat called `id` on a floor with this furniture, up on the roof or down on the floor: the
- * furniture's own, else one of the office's that isn't furniture (the loft's, the balcony's, the roof's).
+ * furniture's own, else one of the Steps' benches on a floor that has them, else one of the office's
+ * that isn't furniture (the loft's, the balcony's, the roof's).
  * The loft's are the boss's office's: a floor whose `room` hasn't one (it's all one level, it has the big
  * mezzanine, or its loft is an empty room) has none of them.
  */
 export function floorSeat(pieces: readonly Piece[], wing: number, id: string, room: RoomOptions = {}): SeatDef | undefined {
   if (LOFT_SEATS.has(id) && !hasBoss(room)) return undefined;
-  return furnitureSeats(pieces, wing).find((s) => s.id === id) ?? (DEFAULT_SEAT_IDS.has(id) ? undefined : SEATING_BY_ID.get(id));
+  const own = furnitureSeats(pieces, wing).find((s) => s.id === id);
+  if (own) return own;
+  // The Steps' only where the floor has them, whatever a browser has stood in SEATING for the floor it shows (see setFloorSeats).
+  const tier = stepsSeats().find((s) => s.id === id);
+  if (tier) return hasSteps(room) ? tier : undefined;
+  return DEFAULT_SEAT_IDS.has(id) ? undefined : SEATING_BY_ID.get(id);
 }
 
 /** The furniture seats SEATING has now (see setFloorSeats). */

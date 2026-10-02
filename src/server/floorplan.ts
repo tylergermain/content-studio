@@ -4,7 +4,8 @@ import { floorSeat, type Piece } from '../shared/furniture.js';
 import { layoutFurniture, structureProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
 import { structureKey } from '../shared/mezzanine.js';
 import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type FloorRoom } from '../shared/floorplan.js';
-import { DESK_BY_ID, WING, type SeatDef } from '../shared/layout.js';
+import { DESK_BY_ID, MEETING_SEATS, WING, type SeatDef } from '../shared/layout.js';
+import { meetingOf } from '../shared/meeting-place.js';
 
 /**
  * A floor's own layout: the signs over its desks, how far its back office is built out, and where its
@@ -79,7 +80,8 @@ export class FloorPlanStore {
    * on a floor that's all one level, and has to be off them before the mezzanine comes back; what's
    * upstairs has to come down before its deck goes). `revision`
    * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
-   * (`taken`) stays where it is. Why it couldn't, or nothing.
+   * (`taken`) stays where it is, and so does the meeting place while anyone's sat at it for a meeting.
+   * Why it couldn't, or nothing.
    */
   layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown; room?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
     if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reload it in the builder';
@@ -98,6 +100,8 @@ export class FloorPlanStore {
     const before = this.plan.desks ?? {};
     const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
     for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
+    // The meeting's seats are the meeting place's: it doesn't move out from under whoever's in one.
+    if (meetingOf(room) !== meetingOf(this.plan.room) && MEETING_SEATS.some((d) => taken(d.id))) return 'Clear the meeting room before moving the meeting place';
     const look = cleanLook(raw.look);
     const { look: _was, room: _had, ...rest } = this.plan;
     const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), ...(Object.keys(room).length ? { room } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };

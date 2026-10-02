@@ -7,6 +7,7 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { FloorPlanStore } from '../src/server/floorplan.js';
+import { ROOM_DEFAULTS } from '../src/shared/floorplan.js';
 import { DEFAULT_FURNITURE, FURNITURE_KINDS, MAX_PIECES, canGoUp, cleanFurniture, furnitureObstacles, furnitureSeats, kindDef, pieceAway, pieceCollider, pieceSeat, pieceTop, pieceY, type Piece } from '../src/shared/furniture.js';
 import { DECK_Y } from '../src/shared/mezzanine.js';
 import { starterRooms } from '../src/shared/mezzanine-rooms.js';
@@ -43,13 +44,13 @@ test('a piece upstairs stands on the deck: what you bump into starts there, and 
   assert.equal(pieceAway(down('sofa', 15, -12), 1), true);
 });
 
-test('upstairs is for furniture: not what the office has one of, what is played with, or the ticker', () => {
+test('upstairs is for furniture: not what the office has one of, what is played with, or what hangs from its ceiling', () => {
   for (const kind of FURNITURE_KINDS) {
     const k = kindDef(kind);
-    assert.equal(canGoUp(kind), !k.fixed && k.group !== 'Play' && kind !== 'ticker', kind);
+    assert.equal(canGoUp(kind), !k.fixed && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel', kind);
   }
   assert.ok(canGoUp('sofa') && canGoUp('wall') && canGoUp('painting') && canGoUp('doorway') && canGoUp('neon') && canGoUp('team-desk'));
-  assert.ok(!canGoUp('whiteboard') && !canGoUp('trampoline') && !canGoUp('ticker') && !canGoUp('hoop') && !canGoUp('jukebox'));
+  assert.ok(!canGoUp('whiteboard') && !canGoUp('trampoline') && !canGoUp('ticker') && !canGoUp('hoop') && !canGoUp('jukebox') && !canGoUp('ceiling-panel'));
 
   const clean = cleanFurniture([
     { ...up('sofa', 0, 9), id: 'a' },
@@ -58,6 +59,7 @@ test('upstairs is for furniture: not what the office has one of, what is played 
     { id: 'whiteboard', kind: 'whiteboard', x: 5.4, z: -5.4, rotY: 0, level: 1 },
     { ...up('trampoline', 3, 9), id: 'd' },
     { ...up('ticker', 0, 0), id: 'e' },
+    { ...up('ceiling-panel', 6, 9), id: 'f' },
   ]) as Piece[];
   assert.equal(clean[0].level, 1);
   for (const p of clean.slice(1)) assert.equal('level' in p, false, p.kind);
@@ -71,7 +73,7 @@ test('how high things reach, for whether they fit under a deck', () => {
   assert.equal(pieceTop(down('rug', 0, 0)), 0);
   assert.ok(Math.abs(pieceTop({ ...down('palm', 0, 0), scale: 1.5 }) - 0.9) < 1e-9);
   // What hangs from the ceiling over the office floor goes all the way up; upstairs a neon is on its wall.
-  for (const kind of ['ticker', 'neon', 'hoop'] as const) assert.equal(pieceTop(down(kind, 0, 0)), Infinity, kind);
+  for (const kind of ['ticker', 'neon', 'hoop', 'ceiling-panel'] as const) assert.equal(pieceTop(down(kind, 0, 0)), Infinity, kind);
   assert.equal(pieceTop(up('neon', 0, 9)), 0);
   assert.equal(pieceTop(down('wall-screen', 0, 0)), 0, 'a wall screen hangs at eye level');
 });
@@ -203,7 +205,7 @@ test('a floor saves a big mezzanine with rooms upstairs, and reads it back after
     assert.equal(plan.layout({ desks: {}, furniture: [...defaults()], room }, 0, free), 'Clear the floor for the mezzanine first: Basketball hoop hangs too high to go under the mezzanine');
     assert.equal(plan.layout({ desks: {}, furniture, room }, 0, free), undefined);
     assert.deepEqual(plan.state().room, room);
-    assert.deepEqual(plan.layoutNow().room, { tees: 1, mezzanine: 'big', boss: false, kitchen: false, panels: ['south'], wood: 'oak' });
+    assert.deepEqual(plan.layoutNow().room, { ...ROOM_DEFAULTS, mezzanine: 'big', boss: false, kitchen: false, panels: ['south'] });
     assert.equal(plan.seat('up-sofa')?.y, 3);
     assert.equal(plan.seat('boss-chair'), undefined, "no boss's office on this floor");
 

@@ -6,6 +6,8 @@
 
 import type { RoomOptions } from './floorplan.js';
 import { FLOOR, LOFT, STAIRS, WALL_HEIGHT } from './layout.js';
+import { meetingOf } from './meeting-place.js';
+import { hasSteps } from './steps.js';
 
 export type MezzanineKind = 'none' | 'corner' | 'big';
 
@@ -36,9 +38,14 @@ export const POST_R = 0.14;
 export const BIG = { minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: 5.2, maxZ: FLOOR.maxZ } as const;
 /**
  * Its stairs, each flight out in the open and climbing south to the deck's north edge: `steps` steps
- * from the office floor at `fromZ` up to the deck at `toZ`.
+ * from the office floor at `fromZ` up to the deck at `toZ`. Every floor with the deck has the first,
+ * by the fire pole; the second, at the west end, is only for a floor that asks for two (see flightsOf,
+ * and bigFlights for the ones a room has), which makes the deck a way through rather than a way up.
  */
-export const BIG_FLIGHTS: readonly { minX: number; maxX: number; fromZ: number; toZ: number; steps: number }[] = [{ minX: 3.9, maxX: 5.7, fromZ: -0.8, toZ: 5.2, steps: 15 }];
+export const BIG_FLIGHTS: readonly { minX: number; maxX: number; fromZ: number; toZ: number; steps: number }[] = [
+  { minX: 3.9, maxX: 5.7, fromZ: -0.8, toZ: 5.2, steps: 15 },
+  { minX: -15.3, maxX: -13.5, fromZ: -0.8, toZ: 5.2, steps: 15 },
+];
 /** Its posts, in a row under where the rooms' fronts stand: clear of every desk's chair and the way in to it. */
 export const BIG_POSTS: readonly (readonly [x: number, z: number])[] = [-15.5, -10.6, -4.9, 0.2, 3.6, 8.6, 14.4].map((x) => [x, 6.9] as const);
 
@@ -88,9 +95,24 @@ export function hasKitchen(room: RoomOptions = {}): boolean {
   return room.kitchen !== false;
 }
 
-/** What of a room changes the floor itself (what's built in, and where there is to walk): two rooms with the same key are the same floor to get round. */
+/** How many flights of stairs go up to the room's big mezzanine: one, unless it asks for the second. (One too for any other upstairs: the loft has its own.) */
+export function flightsOf(room: RoomOptions = {}): 1 | 2 {
+  return mezzanineOf(room) === 'big' && room.flights === 2 ? 2 : 1;
+}
+
+/** The big mezzanine's flights a room like `room` has, of BIG_FLIGHTS. */
+export function bigFlights(room: RoomOptions = {}): typeof BIG_FLIGHTS {
+  return BIG_FLIGHTS.slice(0, flightsOf(room));
+}
+
+/**
+ * What of a room changes the floor itself (what's built in, and where there is to walk): two rooms
+ * with the same key are the same floor to get round. Its upstairs and how many flights go up to it,
+ * the boss's office, the kitchen, where its workers meet and the Steps; not its paint, its tees or
+ * what hangs under its ceiling.
+ */
 export function structureKey(room: RoomOptions = {}): string {
-  return `${mezzanineOf(room)}|${hasBoss(room) ? 'b' : '-'}|${hasKitchen(room) ? 'k' : '-'}`;
+  return `${mezzanineOf(room)}|${hasBoss(room) ? 'b' : '-'}|${hasKitchen(room) ? 'k' : '-'}|${meetingOf(room)}|${hasSteps(room) ? 's' : '-'}|${flightsOf(room)}`;
 }
 
 /** How high the floor a piece on `level` stands on is: 1 is upstairs. */
@@ -115,29 +137,32 @@ const CORNER: Deck = { kind: 'corner', slab: CORNER_SLAB, height: LOFT.height, f
 /** Inside the loft's glass, once the boss's office is out of it. */
 const CORNER_EMPTY: Deck = { ...CORNER, floor: { minX: LOFT.minX + 0.12, maxX: LOFT.maxX, minZ: LOFT.minZ + 0.12, maxZ: LOFT.maxZ } };
 
-const BIG_DECK: Deck = {
-  kind: 'big',
-  slab: BIG,
-  // Up to the rail along its open edge.
-  floor: { ...BIG, minZ: BIG.minZ + RAIL },
-  height: WALL_HEIGHT - DECK_Y,
-  flights: BIG_FLIGHTS.map((f) => {
-    const x = (f.minX + f.maxX) / 2;
-    return {
-      rect: { minX: f.minX - FENCE, maxX: f.maxX + FENCE, minZ: f.fromZ, maxZ: f.toZ },
-      foot: { minX: f.minX, maxX: f.maxX, minZ: f.fromZ - 1.2, maxZ: f.fromZ },
-      top: { minX: f.minX, maxX: f.maxX, minZ: f.toZ, maxZ: f.toZ + 1.3 },
-      footAt: { x, z: f.fromZ - 0.6 },
-      topAt: { x, z: f.toZ + 0.6 },
-    };
+/** The big mezzanine with one flight up to it, and with both. */
+const BIG_DECKS = ([1, 2] as const).map(
+  (flights): Deck => ({
+    kind: 'big',
+    slab: BIG,
+    // Up to the rail along its open edge.
+    floor: { ...BIG, minZ: BIG.minZ + RAIL },
+    height: WALL_HEIGHT - DECK_Y,
+    flights: BIG_FLIGHTS.slice(0, flights).map((f) => {
+      const x = (f.minX + f.maxX) / 2;
+      return {
+        rect: { minX: f.minX - FENCE, maxX: f.maxX + FENCE, minZ: f.fromZ, maxZ: f.toZ },
+        foot: { minX: f.minX, maxX: f.maxX, minZ: f.fromZ - 1.2, maxZ: f.fromZ },
+        top: { minX: f.minX, maxX: f.maxX, minZ: f.toZ, maxZ: f.toZ + 1.3 },
+        footAt: { x, z: f.fromZ - 0.6 },
+        topAt: { x, z: f.toZ + 0.6 },
+      };
+    }),
+    posts: BIG_POSTS,
   }),
-  posts: BIG_POSTS,
-};
+);
 
 /** The room's upstairs, or nothing on a floor that's all one level. The same object every time for the same structure. */
 export function deckOf(room: RoomOptions = {}): Deck | undefined {
   const kind = mezzanineOf(room);
-  if (kind === 'big') return BIG_DECK;
+  if (kind === 'big') return BIG_DECKS[flightsOf(room) - 1];
   if (kind === 'corner') return hasBoss(room) ? CORNER : CORNER_EMPTY;
   return undefined;
 }
@@ -151,12 +176,14 @@ export function onDeck(room: RoomOptions, x: number, z: number, pad = 0): boolea
 /**
  * Everything you bump into of the big mezzanine, for the office that builds it and the tests that walk
  * it: its slab (overhead from the office floor), its posts, each flight's steps and the fences either
- * side of them, and the rail along its open edge, which stops only where a flight arrives.
+ * side of them, and the rail along its open edge, which stops only where a flight arrives. With the
+ * flights a room like `room` has: the one, when it doesn't say.
  */
-export function deckSolids(): Solid[] {
+export function deckSolids(room: RoomOptions = {}): Solid[] {
+  const flights = bigFlights(room);
   const solids: Solid[] = [{ ...BIG, bottom: HEADROOM, top: DECK_Y }];
   for (const [x, z] of BIG_POSTS) solids.push({ minX: x - POST_R, maxX: x + POST_R, minZ: z - POST_R, maxZ: z + POST_R, top: HEADROOM });
-  for (const f of BIG_FLIGHTS) {
+  for (const f of flights) {
     const run = (f.toZ - f.fromZ) / f.steps;
     const rise = DECK_Y / f.steps;
     // Solid from the floor up, like the loft's: nobody walks under a step.
@@ -165,7 +192,7 @@ export function deckSolids(): Solid[] {
   }
   // The rail runs in the gaps between the flights, wall to wall.
   let from: number = BIG.minX;
-  for (const f of [...BIG_FLIGHTS].sort((a, b) => a.minX - b.minX)) {
+  for (const f of [...flights].sort((a, b) => a.minX - b.minX)) {
     if (f.minX > from) solids.push({ minX: from, maxX: f.minX, minZ: BIG.minZ, maxZ: BIG.minZ + RAIL, bottom: DECK_Y, top: 99 });
     from = f.maxX;
   }

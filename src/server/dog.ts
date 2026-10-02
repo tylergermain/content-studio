@@ -5,6 +5,7 @@ import { cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBree
 import { deskPoint, officeNav, type Pt } from '../shared/nav.js';
 import type { RoomOptions } from '../shared/floorplan.js';
 import type { Piece } from '../shared/furniture.js';
+import { meetingSeats } from '../shared/meeting-place.js';
 import { layoutDesks, type DeskLayout } from '../shared/office-builder.js';
 import { builtDesks } from '../shared/layout.js';
 import type { PeerInfo, WorkerInfo } from '../shared/protocol.js';
@@ -88,8 +89,9 @@ export class Dog {
     this.breed = d.breed;
     this.file = path.join(dataDir, 'dog.json');
     this.name = this.load() ?? d.name;
-    // Lying on the rug when the office opens, and up and about a few seconds later.
-    const spot = pick(LOUNGE);
+    // Lying on the rug when the office opens, and up and about a few seconds later. (Beside whatever the
+    // floor has built where the rug would be: the Steps, a stage's table.)
+    const spot = this.navigation().nearestWalkable(pick(LOUNGE));
     this.leg = { path: [spot], speed: 0, act: 'lie', face: Math.PI / 2 + rand(-0.6, 0.6), start: Date.now() - 60_000 };
     this.wake(rand(3000, 8000));
   }
@@ -297,9 +299,10 @@ export class Dog {
     }
     return this.navGrid;
   }
-  /** A seat as this floor has it: a desk the builder moved is where it stands now. */
+  /** A seat as this floor has it: a desk the builder moved is where it stands now, and a meeting seat is at the floor's own meeting place. */
   private desk(id: string): DeskDef {
-    return layoutDesks(this.env.layout?.().desks).find((d) => d.id === id) ?? DESK_BY_ID.get(id)!;
+    const layout = this.env.layout?.();
+    return layoutDesks(layout?.desks).find((d) => d.id === id) ?? meetingSeats(layout?.room).find((d) => d.id === id) ?? DESK_BY_ID.get(id)!;
   }
 
   private nap(w: WorkerInfo) {

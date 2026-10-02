@@ -6,11 +6,12 @@ import { mesh, roundedBox, textPlane, toon, toonUnique } from '../toon';
 import type { Interactable } from '../types';
 import type { Fixture } from './fixture';
 import { PALETTE } from './materials';
-import { pendant, wallBoard } from './props';
+import { wallBoard } from './props';
 
 // The room itself, past its walls and its seats: what the sky lights and darkens, the boards on the
-// walls, the TV and the machine's monitor, and the lamps. What stands on its floor (the lounge, the
-// rugs, the plants) is furniture, which the office builder arranges: see furnish.ts.
+// walls, and the TV and the machine's monitor. What stands on its floor (the lounge, the rugs, the
+// plants) is furniture, which the office builder arranges: see furnish.ts. What hangs under its
+// ceiling, the lamps with it, is ceiling.ts.
 
 declare module '../types' {
   interface OfficeHandles {
@@ -105,25 +106,6 @@ export const machineMonitor: Fixture<'machineScreen'> = (site) => {
   site.group.add(monitor);
   site.wall('west', MACHINE_MONITOR.z, MACHINE_MONITOR.y, MACHINE_MONITOR.width + 0.2, MACHINE_MONITOR.height + 0.2);
   return { handle: { machineScreen } };
-};
-
-/** Ceiling lamps (cartoon pendants), hung on long cords down from the high ceiling. */
-export const lamps: Fixture = (site) => {
-  const night = site.get('night');
-  const lampY = 4.05;
-  for (const [x, z] of [
-    [-10.5, -4],
-    [-1.5, -4],
-    [-10.5, 4],
-    [-1.5, 4],
-    [13, 0],
-  ]) {
-    const lamp = pendant(WALL_HEIGHT - lampY);
-    lamp.position.set(x, lampY, z);
-    site.group.add(lamp);
-    night.halos.push({ at: new THREE.Vector3(x, lampY - 0.12, z), size: 1.3, color: '#ffe08a' });
-  }
-  return {};
 };
 
 /**

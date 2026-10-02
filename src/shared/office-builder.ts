@@ -2,11 +2,13 @@
 // stand on an office floor. The browser checks a layout as it's dragged about, and the server checks
 // it again before it's saved (server/floorplan.ts).
 
-import { DESKS, DESK_SIZE, FLOOR, type DeskDef } from './layout.js';
+import { DESKS, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, FLOOR, type DeskDef } from './layout.js';
 import { DEFAULT_FURNITURE, canGoUp, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, pieceTop, type Box, type Piece } from './furniture.js';
 import type { RoomOptions } from './floorplan.js';
+import { meetingOf } from './meeting-place.js';
 import { BIG, HEADROOM, deckOf, hasKitchen, mezzanineOf } from './mezzanine.js';
 import { fixedIn, keepClearIn, keepClearUp } from './office-fixed.js';
+import { hasSteps } from './steps.js';
 import { faceUnder, wallFaces, type WallFace } from './wall-faces.js';
 
 export interface DeskPose {
@@ -118,10 +120,24 @@ function misplacedUp(p: Piece, s: Standing, room: RoomOptions): string | undefin
 }
 
 /**
+ * Why a ceiling panel can't hang where it is in a room like `room`; or nothing. It's on rods from the
+ * office's own ceiling, so nothing built in may be in between: not the corner loft's floor (the big
+ * mezzanine's is everything's business, see pieceProblem), a flight of stairs or the elevator's shaft.
+ */
+function hungThrough(s: Standing, room: RoomOptions): string | undefined {
+  const deck = deckOf(room);
+  if (deck?.kind === 'corner' && overlaps(s.box, deck.slab)) return `${s.label} hangs too high to go under the loft`;
+  if (deck?.flights.some((f) => overlaps(s.box, f.rect))) return `${s.label} is in the way of the stairs`;
+  if (overlaps(s.box, { minX: ELEVATOR.x - ELEVATOR.width / 2, maxX: ELEVATOR.x + ELEVATOR.width / 2, minZ: FLOOR.minZ, maxZ: ELEVATOR_FRONT })) return `${s.label} is in the way of the elevator`;
+  return undefined;
+}
+
+/**
  * Why the piece `p` can't be where it is in a room like `room`, whatever other furniture there is; or
  * nothing. Upstairs it has to be on a deck that has room for it; down on the office floor it keeps off
  * what's built in (only when it's solid: a rug goes under anything) and fits under the big mezzanine
- * where it's under it; and what hangs has to be on one of `faces`, the walls of its own level.
+ * where it's under it; a ceiling panel has a clear run up to the ceiling; and what hangs has to be on
+ * one of `faces`, the walls of its own level.
  */
 function pieceProblem(p: Piece, s: Standing, room: RoomOptions, faces: readonly WallFace[]): string | undefined {
   if (p.level) {
@@ -134,6 +150,8 @@ function pieceProblem(p: Piece, s: Standing, room: RoomOptions, faces: readonly 
       const k = kindDef(p.kind);
       return k.overhead || k.hangs ? `${s.label} hangs too high to go under the mezzanine` : `${s.label} is too tall to stand under the mezzanine`;
     }
+    const through = p.kind === 'ceiling-panel' ? hungThrough(s, room) : undefined;
+    if (through) return through;
   }
   if (kindDef(p.kind).hangs && !faceUnder(p, faces)) return `${s.label} needs a wall to hang on`;
   return undefined;
@@ -212,17 +230,25 @@ export function problemAt(layout: OfficeLayout, id: string, room: RoomOptions = 
  * Why a floor arranged like `layout` can't go from the room `was` to the room `next`: the first thing
  * that's somewhere it can't be in the new one and was fine in the old, with what has to be cleared
  * first (upstairs, when it's a piece up there whose deck is going; the floor where the kitchen comes
- * back; else the floor where a mezzanine's stairs and posts go). Nothing, if it can. For whoever's
- * changing the room (the builder, and the office when it saves), so the reason names what changed.
+ * back, where the meeting place moves to or where the Steps go; else the floor where a mezzanine's
+ * stairs and posts go). Nothing, if it can. For whoever's changing the room (the builder, and the
+ * office when it saves), so the reason names what changed.
  */
 export function structureProblem(layout: OfficeLayout, was: RoomOptions, next: RoomOptions): string | undefined {
   const before = layoutProblems(layout, was);
-  let dry: Map<string, string> | undefined;
+  // Whether `id` is fine in the new room with one thing left as it was: that one thing's doing, then.
+  const dry = new Map<string, Map<string, string>>();
+  const without = (what: string, id: string, room: RoomOptions) => {
+    let problems = dry.get(what);
+    if (!problems) dry.set(what, (problems = layoutProblems(layout, room)));
+    return !problems.has(id);
+  };
   for (const [id, why] of layoutProblems(layout, next)) {
     if (before.has(id)) continue;
     if (layout.furniture.find((p) => p.id === id)?.level) return `Clear upstairs first: ${why}`;
-    // The kitchen's doing, if it's fine in the same room without one.
-    if (hasKitchen(next) && !hasKitchen(was) && !(dry ??= layoutProblems(layout, { ...next, kitchen: false })).has(id)) return `Clear the floor for the kitchen first: ${why}`;
+    if (hasKitchen(next) && !hasKitchen(was) && without('kitchen', id, { ...next, kitchen: false })) return `Clear the floor for the kitchen first: ${why}`;
+    if (meetingOf(next) !== meetingOf(was) && without('meeting', id, { ...next, meeting: meetingOf(was) })) return `Clear the floor for the meeting place first: ${why}`;
+    if (hasSteps(next) && !hasSteps(was) && without('steps', id, { ...next, steps: false })) return `Clear the floor for the Steps first: ${why}`;
     return `Clear the floor for the mezzanine first: ${why}`;
   }
   return undefined;

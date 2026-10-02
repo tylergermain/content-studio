@@ -73,8 +73,8 @@ export interface BuilderActions {
   reset(): void;
   walls(): void;
   paint(look: number | undefined): void;
-  /** Changes some of the room's own fittings (see RoomOptions). */
-  room(patch: RoomOptions): void;
+  /** Changes some of the room's own fittings (see RoomOptions). Why it couldn't, or nothing. */
+  room(patch: RoomOptions): string | undefined;
   /** Works on the office floor, or (1) upstairs. */
   level(to: Level): void;
   /** Moves the picked piece to the other level. */
@@ -285,7 +285,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
       h('button.ob-paint', { type: 'button', class: look === undefined ? 'on' : '', title: 'The floor’s own paint', onclick: () => act.paint(undefined) }, 'Own'),
       ...FLOOR_PALETTES.map((f, i) => h('button.ob-paint', { type: 'button', class: look === i ? 'on' : '', title: f.name, 'aria-label': f.name, style: `background:linear-gradient(135deg, ${f.wall} 50%, ${f.floor} 50%);border-color:${f.trim}`, onclick: () => act.paint(i) })),
     );
-    structure.render(state.room(), pending);
+    structure.render(state.room(), pending, s.text);
     const wing = store.floorPlan.wing;
     backOffice.replaceChildren(
       h('p.ob-note', {}, `${16 + wing * 2} desks, with room for ${(WING.rows - wing) * 2} more through the north wall. This applies straight away.`),

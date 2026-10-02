@@ -3,9 +3,11 @@ import assert from 'node:assert/strict';
 import { store } from '../src/client/state/index.js';
 import { whereabouts } from '../src/client/ui/whereabouts.js';
 import { EMPTY_PLAN } from '../src/shared/floorplan.js';
+import { DEFAULT_FURNITURE, furnitureSeats, setFloorSeats } from '../src/shared/furniture.js';
 import { DANCE_FLOOR, ROOF_TABLES } from '../src/shared/layout.js';
 import type { PeerInfo } from '../src/shared/protocol.js';
 import { ROOF } from '../src/shared/rooftop.js';
+import { STEPS, STEPS_TOP, stepsSeats } from '../src/shared/steps.js';
 
 function peer(x: number, z: number, floor?: string, y = 0): PeerInfo {
   return { id: 'p', name: 'P', color: '#fff', look: { skin: 0, hair: 0, style: 0 }, x, y, z, rotY: 0, moving: false, voice: false, muted: false, sharing: false, floor };
@@ -84,6 +86,72 @@ test("someone upstairs on another floor is upstairs: that floor's room isn't kno
     assert.equal(whereabouts(peer(14, 10, 'mine', 3)), undefined);
     // The roof has no rooms of the office's, whoever's floor it's over.
     assert.equal(whereabouts(peer(14, 10, ROOF, 3)), undefined);
+  } finally {
+    store.floor = was.floor;
+    store.floorPlan = was.plan;
+  }
+});
+
+test("where a floor's workers meet goes by its own name, and the corner is the meeting room only where the glass room is", () => {
+  const corner = peer(14, 10, 'agent-office');
+  // The glass room, as the office comes: said or not.
+  for (const room of [{}, { meeting: 'room' as const }, { steps: true }]) assert.equal(whereabouts(corner, undefined, room), '🤝 in the meeting room');
+  // The stage is across the front of the lounge, and the corner is floor like any other.
+  const forum = { meeting: 'forum' } as const;
+  assert.equal(whereabouts(corner, undefined, forum), undefined);
+  assert.equal(whereabouts(peer(16.5, 0, 'agent-office'), undefined, forum), '🎤 on the stage');
+  assert.equal(whereabouts(peer(14, -2.5, 'agent-office'), undefined, forum), '🎤 on the stage');
+  assert.equal(whereabouts(peer(16.5, 4, 'agent-office'), undefined, forum), undefined);
+  assert.equal(whereabouts(peer(16.5, 0, 'agent-office'), undefined, {}), undefined);
+  // The anchor desk is out in the newsroom.
+  const desk = { mezzanine: 'big', meeting: 'desk' } as const;
+  assert.equal(whereabouts(corner, undefined, desk), undefined);
+  assert.equal(whereabouts(peer(-3.9, -7, 'agent-office'), undefined, desk), '🎥 at the anchor desk');
+  assert.equal(whereabouts(peer(-3.9, -5.2, 'agent-office'), undefined, desk), '🎥 at the anchor desk');
+  assert.equal(whereabouts(peer(-3.9, -3.9, 'agent-office'), undefined, desk), undefined);
+  assert.equal(whereabouts(peer(-3.9, -7, 'agent-office'), undefined, {}), undefined);
+  // Up on the deck over that corner is still upstairs.
+  assert.equal(whereabouts(peer(14, 10, 'agent-office', 3), undefined, desk), '⬆️ upstairs');
+});
+
+test('on the Steps is on the Steps: stood on a tier or sat on one, on a floor that has them', () => {
+  const steps = { mezzanine: 'none', meeting: 'forum', steps: true } as const;
+  // Down in front of the bottom tier, up on the top one, and in between.
+  assert.equal(whereabouts(peer(13.2, 0, 'agent-office', STEPS.rise), undefined, steps), '🏟️ on the Steps');
+  assert.equal(whereabouts(peer(9.4, -3, 'agent-office', STEPS_TOP), undefined, steps), '🏟️ on the Steps');
+  assert.equal(whereabouts(peer(11, 4, 'agent-office', 3 * STEPS.rise), undefined, steps), '🏟️ on the Steps');
+  // Past their side walls and behind their back wall is the office floor; in front of them is the stage.
+  assert.equal(whereabouts(peer(11, 5, 'agent-office'), undefined, steps), undefined);
+  assert.equal(whereabouts(peer(8.5, 0, 'agent-office'), undefined, steps), undefined);
+  assert.equal(whereabouts(peer(14, 0, 'agent-office'), undefined, steps), '🎤 on the stage');
+  // The same spot on a floor without them is the lounge, which has no words of its own.
+  for (const room of [{}, { meeting: 'forum' as const }]) assert.equal(whereabouts(peer(11, 0, 'agent-office'), undefined, room), undefined);
+
+  // Sat on a tier: the floor you're on stands the Steps' benches among its seats (see features/office-builder/sync.ts).
+  const sat = { ...peer(11.05, 0, 'agent-office', 3 * STEPS.rise), seat: 'steps-4:1' };
+  assert.equal(whereabouts(sat, undefined, steps), '🏟️ on the Steps');
+  setFloorSeats(stepsSeats());
+  try {
+    assert.equal(whereabouts(sat, undefined, steps), '🏟️ on the Steps');
+    assert.equal(whereabouts({ ...sat, seat: 'steps-1:2' }, undefined, steps), '🏟️ on the Steps');
+  } finally {
+    setFloorSeats(furnitureSeats(DEFAULT_FURNITURE));
+  }
+});
+
+test("on another floor, whose room isn't known, there's no saying who's on the Steps or at which meeting place", () => {
+  const was = { floor: store.floor, plan: store.floorPlan };
+  try {
+    store.floor = 'mine';
+    store.floorPlan = { ...EMPTY_PLAN, room: { mezzanine: 'none', meeting: 'forum', steps: true } };
+    // On your own floor it's the plan's room.
+    assert.equal(whereabouts(peer(11, 0, 'mine', 3 * STEPS.rise)), '🏟️ on the Steps');
+    assert.equal(whereabouts(peer(16.5, 0, 'mine')), '🎤 on the stage');
+    assert.equal(whereabouts(peer(14, 10, 'mine')), undefined);
+    // On theirs, the same spots are the office as it comes: nothing there, and the corner is the meeting room.
+    assert.equal(whereabouts(peer(11, 0, 'theirs', 3 * STEPS.rise)), undefined);
+    assert.equal(whereabouts(peer(16.5, 0, 'theirs')), undefined);
+    assert.equal(whereabouts(peer(14, 10, 'theirs')), '🤝 in the meeting room');
   } finally {
     store.floor = was.floor;
     store.floorPlan = was.plan;

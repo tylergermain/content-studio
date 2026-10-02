@@ -267,7 +267,14 @@ export function createBuildMode(ctx: Ctx, sync: LayoutSync, deps: BuildDeps) {
           draft.edit((d) => (look === undefined ? delete d.look : (d.look = look)));
           show();
         },
-        room: (patch) => !pending && (say(draft.setRoom(patch), 'warn'), show()),
+        // Why the room couldn't change, for the panel to say under the choice it was (room-ui.ts).
+        room(patch) {
+          if (pending) return undefined;
+          const why = draft.setRoom(patch);
+          say(why, 'warn');
+          show();
+          return why;
+        },
         ...levels.act,
         expand: () => net.send({ t: 'floor.expand' }),
         shrink: () => net.send({ t: 'floor.shrink' }),

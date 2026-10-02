@@ -4,6 +4,7 @@
  * and the meeting room's two. What E does at each is defined with it.
  */
 import type * as THREE from 'three';
+import { meetingPlace } from '../../../shared/meeting-place';
 import type { GhIssue } from '../../../shared/protocol';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, boardHint, hintTitle, key, onE } from '../../core/hint';
@@ -12,6 +13,7 @@ import { openBoard } from '../../ui/boards';
 import { inProgress } from '../../ui/github/progress';
 import type { BoardActions } from '../../ui/github/prompts';
 import { clip } from '../../ui/dom';
+import { meetingName } from '../../ui/meeting';
 import { openIssue } from '../../ui/pull';
 import { openServices } from '../../ui/services';
 import { BoardTexture, QueueBoardTexture, ServicesBoardTexture } from './world';
@@ -141,11 +143,25 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   // The machine monitor on the west wall.
   const machineTex = new MachineTexture();
   mountBoard(office.machineScreen, machineTex.texture, () => machineTex.render(store.machine), ['machine']);
-  // The meeting room: its output as it's written on the back wall, and how it's going on the door.
+  // The meeting place: its output as it's written on its board, and how it's going on its sign. A free
+  // one names the place the floor's workers meet at (RoomOptions.meeting), so both follow the room.
+  const meetingAt = () => {
+    const place = meetingPlace(office.room.get());
+    return { title: place.title, name: meetingName(place) };
+  };
   const meetingBoardTex = new MeetingBoardTexture();
-  mountBoard(office.meetingBoard, meetingBoardTex.texture, () => meetingBoardTex.render(store.meeting), ['meeting']);
+  const renderMeetingBoard = () => meetingBoardTex.render(store.meeting, meetingAt());
+  mountBoard(office.meetingBoard, meetingBoardTex.texture, renderMeetingBoard, ['meeting']);
   const meetingSignTex = new MeetingSignTexture();
-  mountBoard(office.meetingSign, meetingSignTex.texture, () => meetingSignTex.render(store.meeting), ['meeting']);
+  const renderMeetingSign = () => meetingSignTex.render(store.meeting, meetingAt());
+  mountBoard(office.meetingSign, meetingSignTex.texture, renderMeetingSign, ['meeting']);
+  let meetsAt = office.room.get().meeting;
+  office.room.on((room) => {
+    if (room.meeting === meetsAt) return;
+    meetsAt = room.meeting;
+    renderMeetingBoard();
+    renderMeetingSign();
+  });
   /** Puts every board's texture up on `w`'s boards. */
   function dressBoards(w: World) {
     // A floor's own board hangs in place of the GitHub one (see features/studio).

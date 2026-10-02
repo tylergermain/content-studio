@@ -324,6 +324,101 @@ test('walks up and down the big mezzanine’s stairs, under its rail, and not of
   assert.ok(player.pos.x > flight.minX && player.pos.y >= 1.6, `stepped off the side of the stairs at ${player.pos.toArray()}`);
 });
 
+test('a floor with two flights: up and down the west one at a walk and a sprint, between fences that hold, and the rail shut there on a floor with one', (t) => {
+  const TWO = { mezzanine: 'big', flights: 2 } as const;
+  // The room's walls round it: the deck runs up to the south one, this flight stands by the west one, and you come down it toward the north one.
+  const walls: Collider[] = [
+    { minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: FLOOR.maxZ, maxZ: FLOOR.maxZ + 0.3, top: 99 },
+    { minX: FLOOR.minX - 0.3, maxX: FLOOR.minX, minZ: FLOOR.minZ, maxZ: FLOOR.maxZ, top: 99 },
+    { minX: FLOOR.minX, maxX: FLOOR.maxX, minZ: FLOOR.minZ - 0.3, maxZ: FLOOR.minZ, top: 99 },
+  ];
+  const flight = BIG_FLIGHTS[1];
+  const x = (flight.minX + flight.maxX) / 2;
+  assert.deepEqual([x, flight.fromZ - 0.7], [-14.4, -1.5]);
+  for (const sprint of [false, true]) {
+    const { player, keys, frames } = controller(t, [...deckSolids(TWO), ...walls]);
+    const run = (code: string) => {
+      keys(...(sprint ? [code, 'ShiftLeft'] : [code]));
+      frames(sprint ? 30 : 300, sprint ? 0.05 : 1 / 60);
+    };
+    const how = sprint ? 'at a sprint' : 'at a walk';
+    player.pos.set(x, 0, flight.fromZ - 0.7);
+    run('KeyS');
+    assert.ok(player.pos.z > BIG.minZ + 0.1, `stuck climbing ${how} at ${player.pos.toArray()}`);
+    assert.equal(player.pos.y, DECK_Y);
+    // Straight up between the fences: never pushed sideways off the steps.
+    assert.equal(player.pos.x, x);
+    run('KeyW');
+    assert.ok(player.pos.z < flight.fromZ, `stuck descending ${how} at ${player.pos.toArray()}`);
+    assert.equal(player.pos.y, 0);
+  }
+
+  const { player, keys, frames } = controller(t, [...deckSolids(TWO), ...walls]);
+  // The first flight is still there, and still goes up.
+  const first = BIG_FLIGHTS[0];
+  player.pos.set((first.minX + first.maxX) / 2, 0, first.fromZ - 0.7);
+  keys('KeyS', 'ShiftLeft');
+  frames(24, 0.05);
+  assert.ok(player.pos.z > BIG.minZ + 0.1, `stuck on the first flight at ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, DECK_Y);
+  // Along the deck from the top of one flight to the top of the other, and down that one: a way through.
+  player.pos.z = BIG.minZ + 0.8;
+  keys('KeyA', 'ShiftLeft');
+  frames(80, 0.05);
+  assert.ok(player.pos.x < flight.minX, `didn't get along the deck: ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, DECK_Y);
+  player.pos.x = x;
+  keys('KeyW');
+  frames(300);
+  assert.ok(player.pos.z < flight.fromZ, `didn't come down the west flight: ${player.pos.toArray()}`);
+  assert.equal(player.pos.y, 0);
+
+  // Its fences: nobody walks into the steps from either side, the wall's side too.
+  for (const [from, code] of [[flight.maxX + 1.4, 'KeyA'], [flight.minX - 1.4, 'KeyD']] as const) {
+    player.pos.set(from, 0, 2);
+    player.vy = 0;
+    keys(code);
+    frames(120);
+    const out = code === 'KeyA' ? player.pos.x > flight.maxX + 0.1 : player.pos.x < flight.minX - 0.1;
+    assert.ok(out, `walked into the side of the west stairs at ${player.pos.toArray()}`);
+    assert.equal(player.pos.y, 0);
+  }
+  // And nobody steps off one, part of the way up.
+  for (const code of ['KeyA', 'KeyD']) {
+    player.pos.set(x, 1.6, 2.2);
+    player.vy = 0;
+    player.grounded = true;
+    keys(code);
+    frames(60);
+    assert.ok(player.pos.x > flight.minX && player.pos.x < flight.maxX && player.pos.y >= 1.6, `${code} stepped off the side of the west stairs at ${player.pos.toArray()}`);
+  }
+  // The rail runs either side of where it arrives: a step along the deck from its top, you're stopped at the edge.
+  for (const at of [flight.minX - 1, flight.maxX + 1]) {
+    player.pos.set(at, DECK_Y, 7);
+    player.vy = 0;
+    player.grounded = true;
+    keys('KeyW');
+    frames(120);
+    assert.ok(player.pos.z > BIG.minZ + 0.1, `walked off the deck beside the west flight at ${player.pos.toArray()}`);
+    assert.equal(player.pos.y, DECK_Y);
+  }
+
+  // A floor with the one flight has no way down there: the rail is shut, and the floor under it is open.
+  const one = controller(t, [...deckSolids({ mezzanine: 'big' }), ...walls]);
+  one.player.pos.set(x, DECK_Y, 7);
+  one.player.grounded = true;
+  one.keys('KeyW');
+  one.frames(120);
+  assert.ok(one.player.pos.z > BIG.minZ + 0.1, `walked off the deck where the west flight would be at ${one.player.pos.toArray()}`);
+  assert.equal(one.player.pos.y, DECK_Y);
+  one.player.pos.set(x, 0, flight.fromZ - 0.7);
+  one.player.vy = 0;
+  one.keys('KeyS');
+  one.frames(300);
+  assert.ok(one.player.pos.z > 6, `something stands where the west flight would be at ${one.player.pos.toArray()}`);
+  assert.equal(one.player.pos.y, 0);
+});
+
 test('a post of the big mezzanine doesn’t trap whoever is standing against it', (t) => {
   const { player, keys, frames } = controller(t, deckSolids());
   const [px, pz] = BIG_POSTS[3];

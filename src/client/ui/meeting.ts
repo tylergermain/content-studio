@@ -1,4 +1,5 @@
 import './meeting.css';
+import { meetingPlace, type MeetingPlace } from '../../shared/meeting-place';
 import { MEETING_PATTERNS, MEETING_PATTERN_IDS, fixedRounds, meetingSpend, meetingStage, outputProblem, slugify } from '../../shared/meetings';
 import { fmtTokens, type Meeting, type MeetingPattern, type MeetingTurn } from '../../shared/protocol';
 import type { Net } from '../net';
@@ -30,6 +31,11 @@ export function issueMeeting(n: number, title: string): MeetingPreset {
   return { issue: n, title: `#${n} ${title}`, prompt: officePrompt('issue.meeting', issueVars({ number: n, title })) };
 }
 
+/** A meeting place in a sentence ("the meeting room", "the stage"): what its `where` says without its icon and its "in". */
+export const meetingName = (place: Pick<MeetingPlace, 'where'>) => place.where.replace(/^\S+ \S+ /, '');
+/** Where the floor you're on holds its meetings (see RoomOptions.meeting): the glass room, the stage or the anchor desk. */
+const place = () => meetingPlace(store.floorPlan.room);
+
 const PART_LABEL: Record<MeetingTurn['state'], string> = { waiting: '⏳ up next', sent: '📨 handed over', working: '💬 on it', done: '✅ written' };
 
 /**
@@ -39,16 +45,16 @@ const PART_LABEL: Record<MeetingTurn['state'], string> = { waiting: '⏳ up next
  */
 export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingPreset) {
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
-  const title = h('h2', {}, '🤝 Meeting room');
+  const title = h('h2', {}, place().title);
   const body = h('div.body.meeting');
   const foot = h('footer');
-  const el = h('div.modal.meeting-window', { role: 'dialog', 'aria-label': 'Meeting room' }, h('header', {}, title, close), body, foot);
+  const el = h('div.modal.meeting-window', { role: 'dialog', 'aria-label': place().title.replace(/^\S+ /, '') }, h('header', {}, title, close), body, foot);
   let view: 'status' | 'form' = preset || !store.meeting.current ? 'form' : 'status';
   let form: ReturnType<typeof meetingForm> | null = null;
   const render = () => {
     if (view === 'status' && store.meeting.current) {
       form = null;
-      title.textContent = '🤝 Meeting room';
+      title.textContent = place().title;
       renderStatus(store.meeting.current, body, foot, net, actions, () => {
         view = 'form';
         render();
@@ -67,7 +73,7 @@ export function openMeeting(net: Net, actions: MeetingActions, preset?: MeetingP
     form.refresh();
   };
   const offs = [store.on('meeting', render), store.on('workers', () => view === 'status' && render()), store.on('pulls', () => form?.refresh())];
-  const modal: Modal = openModal(el, { doing: '🤝 at the meeting room', onClose: () => offs.forEach((off) => off()) });
+  const modal: Modal = openModal(el, { doing: `🤝 at ${meetingName(place())}`, onClose: () => offs.forEach((off) => off()) });
   close.addEventListener('click', () => modal.close());
   render();
 }
@@ -259,7 +265,7 @@ function meetingForm(net: Net, preset: MeetingPreset | undefined, done: () => vo
       model: provider.model(),
       effort: provider.effort(),
     });
-    toast(`🤝 Calling the ${def().label} meeting: the workers are heading for the meeting room`);
+    toast(`🤝 Calling the ${def().label} meeting: the workers are heading for ${meetingName(place())}`);
     done();
   };
   bodyEl.addEventListener('submit', (e) => {

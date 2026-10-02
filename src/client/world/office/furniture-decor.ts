@@ -2,15 +2,17 @@ import * as THREE from 'three';
 import { FRAMES, FRAME_BORDER, pictureSize } from '../../../shared/decor';
 import { kindDef, type Piece } from '../../../shared/furniture';
 import { PAINTING } from '../../../shared/hangings';
+import { WALL_HEIGHT } from '../../../shared/layout';
 import { blankTexture, buildFrame, showTexture } from '../frames';
 import { mesh, textPlane, toon } from '../toon';
-import type { Builders, BuiltPiece } from './furniture-kit';
+import { BLACK, type Builders, type BuiltPiece } from './furniture-kit';
 import { box } from './materials';
 
 // The furniture's builders for what makes a room of a stretch of wall (see furniture.ts, and
-// shared/furniture.ts for what each kind is and how much floor it takes): a painting on it, and the
-// doorway through it. Both are built in code: a painting is one of the office's frames (world/frames.ts),
-// and a doorway is a few boxes the size of the walls in rooms.glb, which it stands in a row with.
+// shared/furniture.ts for what each kind is and how much floor it takes): a painting on it, the
+// doorway through it, and a panel of ceiling to hang low over it. All are built in code: a painting is
+// one of the office's frames (world/frames.ts), a doorway is a few boxes the size of the walls in
+// rooms.glb, which it stands in a row with, and a ceiling panel is slats on rods.
 
 /** How far a painting's frame stands off its wall: what the pictures people hang do (features/hanging), clear of a wall's wood. */
 const OFF_WALL = 0.005;
@@ -93,7 +95,37 @@ function doorway(color: string, text: string): THREE.Group {
   return g;
 }
 
+/**
+ * A ceiling panel (the `ceiling-panel` kind's footprint): how low its slats hang and where its top is,
+ * how many slats across it and how wide and deep each is, how far in from its edges its rods are (a
+ * quarter of its width, so a soffit of several hangs on one even grid of them), and how big the light
+ * in its middle is. It clears a wall from rooms.glb (2.6 high) by a hair.
+ */
+const PANEL = { w: 2.4, y: 2.62, top: 2.7, slats: 12, slat: { w: 0.13, h: 0.055 }, rods: 0.6, light: 0.28 } as const;
+
+/**
+ * A ceiling panel: timber slats in its paint (`color`) under a dark backing, hung low from the office's
+ * own ceiling on four rods, with a flat light set in its middle like the ones under a deck. A few side
+ * by side make a soffit: the slats run front to back, a gap's width in from each side, so one panel's
+ * carry on across the next. Nothing of it is in the way (see KindDef.overhead).
+ */
+function ceilingPanel(color: string): THREE.Group {
+  const g = new THREE.Group();
+  const { w, y, top, slat } = PANEL;
+  const timber = toon(color);
+  const pitch = w / PANEL.slats;
+  for (let i = 0; i < PANEL.slats; i++) g.add(mesh(box(slat.w, slat.h, w), timber, -w / 2 + (i + 0.5) * pitch, y + slat.h / 2, 0, false));
+  // What the gaps between them show: the backing they're fixed under, which is what throws its shadow.
+  g.add(mesh(box(w, top - y - slat.h, w), toon(shade(color, 0.45)), 0, (y + slat.h + top) / 2, 0));
+  const steel = toon(BLACK);
+  for (const sx of [-1, 1]) for (const sz of [-1, 1]) g.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, WALL_HEIGHT - top, 6), steel, sx * (w / 2 - PANEL.rods), (top + WALL_HEIGHT) / 2, sz * (w / 2 - PANEL.rods), false));
+  // The light, let into the slats and a finger's width proud of them.
+  g.add(mesh(new THREE.CylinderGeometry(PANEL.light, PANEL.light, 0.03, 24), toon('#fff7d6', { emissive: '#ffe08a' }), 0, y - 0.002, 0, false));
+  return g;
+}
+
 export const DECOR_BUILDERS: Builders = {
   painting: (p) => painting(p),
   doorway: (p, color) => doorway(color, p.text ?? kindDef(p.kind).text ?? ''),
+  'ceiling-panel': (_p, color) => ceilingPanel(color),
 };

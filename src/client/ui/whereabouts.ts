@@ -1,13 +1,18 @@
 import { roomOf, type RoomOptions } from '../../shared/floorplan';
 import { BALCONY, DANCE_FLOOR, FIRE_PIT, FLOOR, MEETING_ROOM, ROOF_BAR, ROOF_TABLES, SEATING_BY_ID, STAGE, WING, inWing, seatAt } from '../../shared/layout';
+import { meetingPlace } from '../../shared/meeting-place';
 import { DECK_Y, hasBoss, onDeck } from '../../shared/mezzanine';
 import type { PeerInfo } from '../../shared/protocol';
 import { ROOF } from '../../shared/rooftop';
+import { hasSteps, onSteps, stepsSeats } from '../../shared/steps';
 import { CARS, type CarSeat } from '../../shared/garage';
 import { store } from '../state';
 
 /** Every upstairs a floor can have: where someone up off the floor may be standing, on a floor whose room isn't known. */
 const ANY_DECK: readonly RoomOptions[] = [{ mezzanine: 'corner' }, { mezzanine: 'big' }];
+/** The Steps are a place of their own, whether you're sat on a tier or stood on one. */
+const ON_STEPS = '🏟️ on the Steps';
+const STEPS_SEATS: ReadonlySet<string> = new Set(stepsSeats().map((s) => s.id));
 
 /**
  * What a teammate is up to, for the line under their name tag and in the sidebar: whatever they have
@@ -15,9 +20,10 @@ const ANY_DECK: readonly RoomOptions[] = [{ mezzanine: 'corner' }, { mezzanine: 
  * the balcony", "🛋️ on the couch", "🏎️ driving the Orange Lambo"). Nothing while they're just walking around
  * the office.
  *
- * `room` is their floor's room (its upstairs, and whether that's the boss's office), which is only
- * known for the floor you're on: of someone up off the floor anywhere else, all there is to say is
- * that they're upstairs.
+ * `room` is their floor's room (its upstairs, and whether that's the boss's office; where its workers
+ * meet; whether it has the Steps), which is only known for the floor you're on. Of someone anywhere
+ * else, all there is to say is that they're upstairs when they're up off the floor, and in the meeting
+ * room when they're in the corner the office comes with one in.
  */
 export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, room: RoomOptions | undefined = store.onMyFloor(p) ? roomOf(store.floorPlan) : undefined): string | undefined {
   if (p.doing) return p.doing;
@@ -32,6 +38,7 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, r
   const place = p.seat ? seatAt(p.seat) : undefined;
   const seat = place && SEATING_BY_ID.get(place.seatId);
   if (seat) {
+    if (STEPS_SEATS.has(seat.id)) return ON_STEPS;
     // "🛋️ Couch" -> "🛋️ on the couch".
     const [icon, ...name] = seat.label.split(' ');
     return `${icon} ${seat.game ? 'in' : 'on'} the ${name.join(' ').toLowerCase()}`;
@@ -49,8 +56,13 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, r
     if (!onDeck(room, p.x, p.z)) return undefined;
     return hasBoss(room) ? "👔 in the boss's office" : '⬆️ upstairs';
   }
-  if (p.x > MEETING_ROOM.minX && p.z > MEETING_ROOM.minZ) return '🤝 in the meeting room';
-  return undefined;
+  if (!room) return p.x > MEETING_ROOM.minX && p.z > MEETING_ROOM.minZ ? '🤝 in the meeting room' : undefined;
+  // Up on a tier of the Steps, or down between their walls.
+  if (hasSteps(room) && onSteps(p.x, p.z)) return ON_STEPS;
+  // Where the floor's workers meet: the glass room, the stage or the anchor desk, each by its own name.
+  const meeting = meetingPlace(room);
+  const [minX, maxX, minZ, maxZ] = meeting.area;
+  return p.x > minX && p.x <= maxX && p.z > minZ && p.z <= maxZ ? meeting.where : undefined;
 }
 
 /** Somewhere on the rooftop bar worth saying they are, standing up. */

@@ -3,8 +3,10 @@
 // builder keeps the furniture off them and out of the doorways (shared/office-builder.ts).
 
 import type { RoomOptions } from './floorplan.js';
-import { BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, FLOOR, KIOSK, LADDER, LOFT, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, POLE, POLES, SEATING, STATIONS, type DeskDef } from './layout.js';
+import { BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, FLOOR, KIOSK, LADDER, LOFT, POLE, POLES, SEATING, STATIONS, type DeskDef } from './layout.js';
+import { meetingPlace, meetingSeats } from './meeting-place.js';
 import { POST_R, deckOf, hasKitchen, mezzanineOf, structureKey, type Area } from './mezzanine.js';
+import { STEPS_RECT, hasSteps } from './steps.js';
 
 export type Rect = [minX: number, maxX: number, minZ: number, maxZ: number];
 export type Circle = [x: number, z: number, radius: number];
@@ -71,21 +73,20 @@ function build(room: RoomOptions): Fixed {
       what: `the ${k.label.toLowerCase()}'s kiosk`,
     });
   }
-  // The meeting room (under the loft, where there is one): its glass walls, with the doorway in the
-  // north one, and the table with its chairs, as world/office/meeting-room.ts puts them.
-  const meeting = MEETING_ROOM;
-  const G = 0.06;
-  rects.push({ rect: [meeting.minX - G, meeting.minX + G, meeting.minZ - G, meeting.maxZ], what: "the meeting room's glass" });
-  rects.push({ rect: [meeting.minX - G, meeting.door.x0, meeting.minZ - G, meeting.minZ + G], what: "the meeting room's glass" });
-  rects.push({ rect: [meeting.door.x1, meeting.maxX, meeting.minZ - G, meeting.minZ + G], what: "the meeting room's glass" });
-  const t = MEETING_TABLE;
-  rects.push({ rect: [t.x - t.width / 2, t.x + t.width / 2, t.z - t.depth / 2, t.z + t.depth / 2], what: 'the meeting table' });
+  // Where the floor's workers meet (see shared/meeting-place.ts). As the office comes that's the meeting
+  // room (under the loft, where there is one): its glass walls, with the doorway in the north one, and
+  // the table with its chairs, as world/office/meeting-room.ts puts them. Elsewhere it's the stage's
+  // table or the anchor desk, with whatever stands with it.
+  rects.push(...meetingPlace(room).fixed);
   // Chairs tucked in at the table: just the middle of each, so there's a way round behind them, between
   // their backs and the glass (or the back wall), which is one cell wide.
-  for (const d of MEETING_SEATS) {
+  for (const d of meetingSeats(room)) {
     const [cx, cz] = point(d, 0, 0.85);
     circles.push({ circle: [cx, cz, 0.18], what: 'a meeting chair' });
   }
+  // The Steps, on a floor that has them: the whole block, tiers and walls, for whoever walks the floor
+  // by its grid (the workers, the dog and the goat stay down on it).
+  if (hasSteps(room)) rects.push({ rect: STEPS_RECT, what: 'the Steps' });
   return { rects, circles };
 }
 
@@ -109,7 +110,8 @@ function clear(room: RoomOptions): FixedRect[] {
     { rect: [FLOOR.minX, FLOOR.minX + 1.3, EXIT_DOOR.u - EXIT_DOOR.width / 2 - 0.2, EXIT_DOOR.u + EXIT_DOOR.width / 2 + 0.2], what: 'the exit door' },
     { rect: [BALCONY_DOOR.u - BALCONY_DOOR.width / 2, BALCONY_DOOR.u + BALCONY_DOOR.width / 2, FLOOR.maxZ - 1.3, FLOOR.maxZ], what: 'the balcony doors' },
     ...(deckOf(room)?.flights ?? []).map((f) => ({ rect: rectOf(f.foot), what: 'the foot of the stairs' })),
-    { rect: [MEETING_ROOM.door.x0, MEETING_ROOM.door.x1, MEETING_ROOM.minZ - 1, MEETING_ROOM.minZ + 1], what: "the meeting room's door" },
+    // What the meeting place needs clear: the glass room's door, the floor in front of the stage's board.
+    ...meetingPlace(room).clear,
     ...(hasKitchen(room) ? [{ rect: [-17, -10.75, 10.7, 11.7] as Rect, what: 'the kitchen counter' }] : []),
     { rect: [FLOOR.minX + 0.3, FLOOR.minX + 1.2, LADDER.z - 0.6, LADDER.z + 0.6], what: 'the ladder' },
     ...STATIONS.map((k) => {

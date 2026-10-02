@@ -18,7 +18,8 @@ import { kitchen } from '../kitchen';
 import { signs } from '../desksigns';
 import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '../types';
 import { PALETTE, floorTexture, paintPlanks, type Looks } from './materials';
-import { boards, clearOfStairs, lamps, machineMonitor, nightLights, tv } from './room';
+import { boards, clearOfStairs, machineMonitor, nightLights, tv } from './room';
+import { ceiling, lamps } from './ceiling';
 import { furniture } from './furnish';
 import { roomOptions } from './room-options';
 import { plug, walls, type Door } from './shell';
@@ -28,6 +29,7 @@ import { downstairs } from './ground';
 import { wing } from './wing';
 import { beanbags, desks, kiosks } from './seats';
 import { meetingRoom } from './meeting-room';
+import { steps } from './steps';
 import { loft } from './loft';
 import { bossOffice } from './boss-office';
 import { bossDesk } from '../../features/boss-desk/world';
@@ -67,8 +69,12 @@ function floorPlan() {
     jukebox,
     cabinet,
     bookshelf,
+    // The Steps across the lounge, on a floor that has them instead of its couch.
+    steps,
     kitchen,
+    // The pendants, and what a floor hangs under its ceiling with them: beams, banners or a lighting grid.
     lamps,
+    ceiling,
     wing,
     signs,
     // Upstairs: the corner loft and what makes it the boss's office, or the big mezzanine. A floor has

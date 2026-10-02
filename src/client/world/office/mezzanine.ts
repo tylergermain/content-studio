@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR, WALL_T, WINDOWS } from '../../../shared/layout';
-import { BIG, BIG_FLIGHTS, BIG_POSTS, DECK_SLAB, DECK_Y, HEADROOM, deckSolids, onDeck } from '../../../shared/mezzanine';
+import { BIG, BIG_POSTS, DECK_SLAB, DECK_Y, HEADROOM, bigFlights, deckSolids, onDeck } from '../../../shared/mezzanine';
 import { mergeByMaterial, mesh, toon } from '../toon';
 import type { Collider } from '../types';
 import { keep, type Fixture } from './fixture';
@@ -31,8 +31,18 @@ const LIGHTS: readonly (readonly [number, number])[] = [
   [15.5, 6.9],
 ];
 
-/** The big mezzanine as it's built: all of it in a group of its own, with what's in the way of it. */
-export function buildMezzanine(looks: Looks): { group: THREE.Group; colliders: Collider[] } {
+/** The deck's stairs and the rail between them, for a floor with one flight or with both, and what's in the way of the whole deck then. */
+interface Ways {
+  group: THREE.Object3D;
+  colliders: Collider[];
+}
+
+/**
+ * The big mezzanine as it's built: all of it in a group of its own. `ways` is what goes by how many
+ * flights the floor has (see RoomOptions.flights), built both ways: the one flight first, shown, and
+ * both, put away.
+ */
+export function buildMezzanine(looks: Looks): { group: THREE.Group; ways: readonly Ways[] } {
   const group = new THREE.Group();
   const { minX, maxX, minZ, maxZ } = BIG;
   const w = maxX - minX;
@@ -63,57 +73,66 @@ export function buildMezzanine(looks: Looks): { group: THREE.Group; colliders: C
   // The posts under it.
   for (const [x, z] of BIG_POSTS) parts.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, HEADROOM, 12), looks.trim, x, HEADROOM / 2, z));
 
-  // Each flight of stairs: a solid run of steps like the loft's, but out in the open, so it has a
-  // handrail on both sides.
-  for (const f of BIG_FLIGHTS) {
-    const sw = f.maxX - f.minX;
-    const run = (f.toZ - f.fromZ) / f.steps;
-    const rise = DECK_Y / f.steps;
-    const profile = new THREE.Shape();
-    profile.moveTo(0, 0);
-    for (let i = 0; i < f.steps; i++) {
-      profile.lineTo(i * run, (i + 1) * rise - 0.04);
-      profile.lineTo((i + 1) * run, (i + 1) * rise - 0.04);
+  // Its stairs and its rail, for a floor with the one flight and for one with both.
+  const ways = ([1, 2] as const).map((flights): Ways => {
+    const room = { ...ROOM, flights };
+    const parts = new THREE.Group();
+    // Each flight of stairs: a solid run of steps like the loft's, but out in the open, so it has a
+    // handrail on both sides.
+    for (const f of bigFlights(room)) {
+      const sw = f.maxX - f.minX;
+      const run = (f.toZ - f.fromZ) / f.steps;
+      const rise = DECK_Y / f.steps;
+      const profile = new THREE.Shape();
+      profile.moveTo(0, 0);
+      for (let i = 0; i < f.steps; i++) {
+        profile.lineTo(i * run, (i + 1) * rise - 0.04);
+        profile.lineTo((i + 1) * run, (i + 1) * rise - 0.04);
+      }
+      profile.lineTo(f.toZ - f.fromZ, 0);
+      profile.closePath();
+      // Drawn climbing along x and extruded along z: turned a quarter, it climbs south from its east side.
+      const wedge = mesh(new THREE.ExtrudeGeometry(profile, { depth: sw, bevelEnabled: false }), looks.wall, f.maxX, 0, f.fromZ);
+      wedge.rotation.y = -Math.PI / 2;
+      parts.add(wedge);
+      const mid = (f.minX + f.maxX) / 2;
+      for (let i = 1; i <= f.steps; i++) parts.add(mesh(box(sw, 0.06, run + 0.04), woodMat, mid, i * rise - 0.03, f.fromZ + (i - 0.5) * run - 0.02, false));
+      const railH = 0.9;
+      const z0 = f.fromZ + 0.5 * run;
+      const z1 = f.fromZ + (f.steps - 0.5) * run;
+      for (const x of [f.minX + 0.06, f.maxX - 0.06]) {
+        for (let i = 1; i <= f.steps; i += 2) parts.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, railH, 6), inkMat, x, i * rise + railH / 2, f.fromZ + (i - 0.5) * run, false));
+        const handrail = mesh(box(0.07, 0.07, Math.hypot(z1 - z0, (z1 - z0) * (rise / run)) + 0.1), woodMat, x, (rise + DECK_Y) / 2 + railH, (z0 + z1) / 2, false);
+        handrail.rotation.x = -Math.atan2(rise, run);
+        parts.add(handrail);
+      }
     }
-    profile.lineTo(f.toZ - f.fromZ, 0);
-    profile.closePath();
-    // Drawn climbing along x and extruded along z: turned a quarter, it climbs south from its east side.
-    const wedge = mesh(new THREE.ExtrudeGeometry(profile, { depth: sw, bevelEnabled: false }), looks.wall, f.maxX, 0, f.fromZ);
-    wedge.rotation.y = -Math.PI / 2;
-    parts.add(wedge);
-    const mid = (f.minX + f.maxX) / 2;
-    for (let i = 1; i <= f.steps; i++) parts.add(mesh(box(sw, 0.06, run + 0.04), woodMat, mid, i * rise - 0.03, f.fromZ + (i - 0.5) * run - 0.02, false));
-    const railH = 0.9;
-    const z0 = f.fromZ + 0.5 * run;
-    const z1 = f.fromZ + (f.steps - 0.5) * run;
-    for (const x of [f.minX + 0.06, f.maxX - 0.06]) {
-      for (let i = 1; i <= f.steps; i += 2) parts.add(mesh(new THREE.CylinderGeometry(0.03, 0.03, railH, 6), inkMat, x, i * rise + railH / 2, f.fromZ + (i - 0.5) * run, false));
-      const handrail = mesh(box(0.07, 0.07, Math.hypot(z1 - z0, (z1 - z0) * (rise / run)) + 0.1), woodMat, x, (rise + DECK_Y) / 2 + railH, (z0 + z1) / 2, false);
-      handrail.rotation.x = -Math.atan2(rise, run);
-      parts.add(handrail);
-    }
-  }
 
-  // What's in the way of it is the shared list (the tests walk the same one): the slab overhead, the
-  // posts, the steps and the fences either side of them, and the rail.
-  const colliders: Collider[] = deckSolids();
+    // What's in the way of it is the shared list (the tests walk the same one): the slab overhead, the
+    // posts, the steps and the fences either side of them, and the rail.
+    const colliders: Collider[] = deckSolids(room);
 
-  // The rail along the open edge, drawn where the list has it: glass under a wood top rail, in every
-  // stretch between the flights.
-  for (const c of colliders) {
-    if (c.bottom !== DECK_Y) continue;
-    const len = c.maxX - c.minX;
-    const z = (c.minZ + c.maxZ) / 2;
-    const n = Math.max(1, Math.round(len / 2));
-    for (let i = 0; i < n; i++) {
-      const pane = glassPane(len / n - 0.06, RAIL_H - 0.16);
-      pane.position.set(c.minX + (i + 0.5) * (len / n), DECK_Y + RAIL_H / 2, z);
-      parts.add(pane);
+    // The rail along the open edge, drawn where the list has it: glass under a wood top rail, in every
+    // stretch between the flights.
+    for (const c of colliders) {
+      if (c.bottom !== DECK_Y) continue;
+      const len = c.maxX - c.minX;
+      const z = (c.minZ + c.maxZ) / 2;
+      const n = Math.max(1, Math.round(len / 2));
+      for (let i = 0; i < n; i++) {
+        const pane = glassPane(len / n - 0.06, RAIL_H - 0.16);
+        pane.position.set(c.minX + (i + 0.5) * (len / n), DECK_Y + RAIL_H / 2, z);
+        parts.add(pane);
+      }
+      for (let i = 0; i <= n; i++) parts.add(mesh(box(0.06, RAIL_H, 0.06), inkMat, clamp(c.minX + i * (len / n), c.minX + 0.03, c.maxX - 0.03), DECK_Y + RAIL_H / 2, z, false));
+      parts.add(mesh(box(len, 0.06, 0.08), inkMat, (c.minX + c.maxX) / 2, DECK_Y + 0.03, z, false));
+      parts.add(mesh(box(len, 0.07, 0.1), woodMat, (c.minX + c.maxX) / 2, DECK_Y + RAIL_H, z, false));
     }
-    for (let i = 0; i <= n; i++) parts.add(mesh(box(0.06, RAIL_H, 0.06), inkMat, clamp(c.minX + i * (len / n), c.minX + 0.03, c.maxX - 0.03), DECK_Y + RAIL_H / 2, z, false));
-    parts.add(mesh(box(len, 0.06, 0.08), inkMat, (c.minX + c.maxX) / 2, DECK_Y + 0.03, z, false));
-    parts.add(mesh(box(len, 0.07, 0.1), woodMat, (c.minX + c.maxX) / 2, DECK_Y + RAIL_H, z, false));
-  }
+    const merged = mergeByMaterial(parts);
+    merged.visible = flights === 1;
+    group.add(merged);
+    return { group: merged, colliders };
+  });
 
   // The low windows in the wall behind it are taller than the room under it: their heads are above its
   // floor. Each gets a top panel in its frame's white, from just under the slab up to its head, so from
@@ -140,7 +159,7 @@ export function buildMezzanine(looks: Looks): { group: THREE.Group; colliders: C
   for (const [x, z] of LIGHTS) parts.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 20), toon('#fff7d6', { emissive: '#ffe08a' }), x, HEADROOM - 0.02, z, false));
 
   group.add(mergeByMaterial(parts));
-  return { group, colliders };
+  return { group, ways };
 }
 
 /**
@@ -154,16 +173,19 @@ export const mezzanine: Fixture = (site) => {
   const y = DECK_Y + SKIRTING / 2;
   const along = (BIG.minZ + BIG.maxZ) / 2;
   const marks = [site.wall('south', (BIG.minX + BIG.maxX) / 2, y, BIG.maxX - BIG.minX, SKIRTING), site.wall('east', along, y, BIG.maxZ - BIG.minZ, SKIRTING), site.wall('west', along, y, BIG.maxZ - BIG.minZ, SKIRTING)];
-  let there = false;
+  /** Which of its ways the floor has now: none, on a floor without the deck. */
+  let shown: Ways | undefined;
   built.group.visible = false;
   for (const mark of marks) mark.off = true;
   site.get('room').on((room) => {
-    const big = room.mezzanine === 'big';
-    if (big === there) return;
-    there = big;
-    built.group.visible = there;
-    keep(site.colliders, built.colliders, there);
-    for (const mark of marks) mark.off = !there;
+    const way = room.mezzanine === 'big' ? built.ways[room.flights - 1] : undefined;
+    if (way === shown) return;
+    if (shown) keep(site.colliders, shown.colliders, false);
+    if (way) keep(site.colliders, way.colliders, true);
+    for (const w of built.ways) w.group.visible = w === (way ?? built.ways[0]);
+    shown = way;
+    built.group.visible = !!way;
+    for (const mark of marks) mark.off = !way;
   });
   return { group: built.group };
 };
