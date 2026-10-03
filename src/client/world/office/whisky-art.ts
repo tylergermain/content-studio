@@ -1,5 +1,5 @@
 import type * as THREE from 'three';
-import { canvasTexture, house, labelFace, stroke } from './whisky-label';
+import { GOLD, canvasTexture, house, insetLabel, labelFace, stroke } from './whisky-label';
 
 // The Macallan Litha's box, as it stands at the end of the whisky cabinet (see furniture-whisky.ts):
 // our own painting in the spirit of its artwork, round its left side, its front and its right side
@@ -7,7 +7,8 @@ import { canvasTexture, house, labelFace, stroke } from './whisky-label';
 // Spain warm on the left, in rose and apricot under an orange sun, with a white horse whose red mane
 // streams out behind it and berries hanging in the branches; Scotland cool on the right, indigo and
 // violet under a crescent moon and stars, with a peacock trailing its tail, blue feathers falling and
-// the distillery's house lit up in the hills. The label sits on the front, as the bottle's does.
+// the distillery's house lit up in the hills. The label sits on the front, as the bottle's does. The
+// bottle wears the same painting all the way round it (bottleWrap, below).
 
 type C = CanvasRenderingContext2D;
 
@@ -316,37 +317,160 @@ function paint(c: C) {
   labelFace(c, lx, 70, lw, lh, { corners: false });
 }
 
-/** How far round the bottle its label goes (build_whisky.py's BOTTLE), and how much of that is the cream label in the middle. */
-const BAND_DEGREES = 180;
-const CREAM_DEGREES = 92;
+// ---- The bottle's wrap -----------------------------------------------------------------------------
+//
+// The same painting all the way round the bottle, as a panorama: the tree's trunk up the front with its
+// branches out over both sides, Spain on the left (the sun, the berries, the white horse looking in)
+// and Scotland on the right (the moon and stars, the feathers, the peacock looking back at it), the
+// house in the hills round the back, and the waves along the foot. The cream label is a smaller panel
+// inset at the front, over the trunk, so whichever way you look at the bottle you see the art.
 
 /**
- * The bottle's label, 640 across the band and 520 up it (its shape on the glass: half way round a
- * bottle 0.108 across, 0.14 high). The cream label in the middle, the 92 degrees of it that face you,
- * its words kept to the middle of that; and the box's painting round the glass either side of it, the
- * warm half on the left and the night on the right, so the bottle wears the Litha's art too.
+ * The wrap's canvas: round the bottle (u, from the back, round the left, the front at the middle and
+ * the right) and up it (0.194 tall on a bottle 0.1096 across: about as many pixels to the centimetre
+ * either way), and the label panel inset at the front.
  */
-function bottleLabel(c: C) {
-  const w = 640;
-  const h = 520;
+export const WRAP = { w: 1280, h: 720 } as const;
+export const PANEL = { w: 200, y0: 66, y1: 432 } as const;
+const MID = WRAP.w / 2;
+
+/** Draws `draw` (made for the box's canvas) scaled by `s`, with its point `from` landing at `to` on the wrap. */
+function placed(c: C, from: [number, number], to: [number, number], s: number, draw: (c: C) => void) {
   c.save();
-  c.scale(w / W, h / H);
-  scene(c);
+  c.translate(to[0], to[1]);
+  c.scale(s, s);
+  c.translate(-from[0], -from[1]);
+  draw(c);
   c.restore();
-  const cream = w * (CREAM_DEGREES / BAND_DEGREES);
-  const x = (w - cream) / 2;
-  // A thin gold edge between the painting and the label.
-  c.fillStyle = '#b8975a';
-  c.fillRect(x - 3, 0, cream + 6, h);
-  labelFace(c, x, 0, cream, h, { scale: h / 626, most: cream * 0.86 });
+}
+
+/** Warm on the left, the night on the right, meeting behind the label, and dusk round the back where the wrap's two ends meet. */
+function wrapSky(c: C) {
+  const { w, h } = WRAP;
+  const warm = c.createLinearGradient(0, 0, 0, h);
+  warm.addColorStop(0, '#b4576b');
+  warm.addColorStop(0.5, '#df7b67');
+  warm.addColorStop(0.85, '#f2a865');
+  c.fillStyle = warm;
+  c.fillRect(0, 0, w, h);
+  const cool = c.createLinearGradient(0, 0, 0, h);
+  cool.addColorStop(0, '#1f2160');
+  cool.addColorStop(0.55, '#33317f');
+  cool.addColorStop(1, '#202a63');
+  c.fillStyle = cool;
+  c.beginPath();
+  c.moveTo(MID + 30, 0);
+  c.bezierCurveTo(MID - 20, h * 0.35, MID + 40, h * 0.65, MID, h);
+  c.lineTo(w, h);
+  c.lineTo(w, 0);
+  c.closePath();
+  c.fill();
+  // Dusk round the back, the same at both ends, so the seam doesn't show: thin slices fading in.
+  const dusk = c.createLinearGradient(0, 0, 0, h);
+  dusk.addColorStop(0, '#4a2c6a');
+  dusk.addColorStop(0.6, '#7a4a7e');
+  dusk.addColorStop(1, '#8a5470');
+  c.fillStyle = dusk;
+  const fade = 170;
+  for (let i = 0; i < fade; i += 5) {
+    c.globalAlpha = (1 - i / fade) ** 1.5;
+    c.fillRect(i, 0, 5, h);
+    c.fillRect(w - i - 5, 0, 5, h);
+  }
+  c.globalAlpha = 1;
+  // Stars over Scotland, and a few round the back.
+  c.fillStyle = '#fff6e0';
+  for (let i = 0; i < 60; i++) {
+    const x = MID + 40 + ((i * 137.5) % (w - MID - 30));
+    const y = 12 + ((i * 61.8 * 7) % (h * 0.5));
+    c.globalAlpha = 0.5 + ((i * 13) % 10) / 20;
+    c.beginPath();
+    c.arc(x % w, y, i % 7 === 0 ? 2.4 : 1.2, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.globalAlpha = 1;
+}
+
+/** The tree: its trunk up the front, under the label, and its branches out round both sides. */
+function wrapTree(c: C) {
+  c.fillStyle = '#7d2a3c';
+  stroke(c, [[MID + 4, WRAP.h], [MID - 10, 560], [MID + 12, 300], [MID - 4, 120], [MID + 6, 30]], 70, 0.12);
+  const branches: [number, number][][] = [
+    [[MID, 70], [560, 40], [440, 52], [300, 16], [190, 30]],
+    [[MID, 120], [540, 140], [420, 190], [280, 176], [150, 220]],
+    [[MID, 60], [730, 34], [850, 54], [990, 14], [1100, 30]],
+    [[MID, 112], [750, 136], [870, 188], [1010, 172], [1140, 214]],
+  ];
+  for (const b of branches) stroke(c, b, 18, 0.6);
+}
+
+/** The bottle's wrap: the painting all the way round, and the label inset at the front. */
+function bottleWrap(c: C) {
+  wrapSky(c);
+  sun(c, 420, 230, 44);
+  moon(c, 868, 226, 40);
+  // The house lit up in the hills, round the back on the Scottish side.
+  c.fillStyle = '#18204a';
+  c.beginPath();
+  c.ellipse(1110, 610, 150, 46, 0, Math.PI, 0);
+  c.fill();
+  house(c, 1112, 588, 92, '#f6d58a');
+  wrapTree(c);
+  for (const [x, y] of [[560, 66], [470, 70], [380, 44], [300, 40], [520, 160], [410, 206], [300, 196], [200, 232], [120, 54]] as const) placed(c, [0, 0], [x, y], 0.62, (c) => berries(c, 0, 0));
+  ([
+    [770, 340, 44, 0.5, '#5b74e6'],
+    [1000, 300, 50, 0.9, '#4059c9'],
+    [1080, 420, 40, -0.2, '#6f86ff'],
+    [940, 100, 42, 0.3, '#5b74e6'],
+    [1190, 120, 46, -0.6, '#6f86ff'],
+    [1230, 330, 38, 1.2, '#8ea2ff'],
+  ] as const).forEach(([x, y, len, turn, color]) => feather(c, x, y, len, turn, color));
+  // The horse on the left of the label, looking in toward it, its mane streaming out behind; the
+  // peacock on the right, looking back, its tail trailing round toward the back.
+  // (The horse's neck runs down into the waves, and the peacock's tail trails over them.)
+  placed(c, [636, 530], [MID - PANEL.w / 2 - 10, 332], 0.85, horse);
+  wrapWaves(c);
+  placed(c, [592, 560], [MID + PANEL.w / 2 + 12, 270], 0.8, peacock);
+  // The label, inset at the front over the trunk: a gold edge, a soft shadow and the label itself.
+  const x = MID - PANEL.w / 2;
+  const lh = PANEL.y1 - PANEL.y0;
+  c.save();
+  c.shadowColor = 'rgba(30,14,24,0.5)';
+  c.shadowBlur = 14;
+  c.shadowOffsetY = 4;
+  c.fillStyle = GOLD;
+  c.fillRect(x - 4, PANEL.y0 - 4, PANEL.w + 8, lh + 8);
+  c.restore();
+  insetLabel(c, x, PANEL.y0, PANEL.w, lh);
+}
+
+/** Waves along the foot of the wrap, all the way round: a whole number of them, so they meet at the back. */
+function wrapWaves(c: C) {
+  const { w, h } = WRAP;
+  const rows: [string, number, number, number][] = [
+    ['#e8853c', 588, 13, 0],
+    ['#f3c35a', 620, 11, 1.4],
+    ['#2a9d8f', 652, 10, 2.6],
+    ['#d8566b', 684, 8, 0.8],
+  ];
+  const k = (Math.PI * 2 * 9) / w;
+  for (const [color, y, amp, phase] of rows) {
+    c.fillStyle = color;
+    c.beginPath();
+    c.moveTo(0, h);
+    for (let x = 0; x <= w; x += 8) c.lineTo(x, y + Math.sin(x * k + phase) * amp);
+    c.lineTo(w, h);
+    c.closePath();
+    c.fill();
+  }
 }
 
 let artTex: THREE.CanvasTexture | null = null;
-let labelTex: THREE.CanvasTexture | null = null;
+let wrapTex: THREE.CanvasTexture | null = null;
 
-/** The bottle's label, with the art round it, drawn once for every cabinet. */
-export function labelTexture(): THREE.CanvasTexture {
-  return (labelTex ??= canvasTexture(640, 520, bottleLabel));
+/** The bottle's wrap, the art all round it and the label inset at the front, drawn once for every cabinet. */
+export function wrapTexture(): THREE.CanvasTexture {
+  return (wrapTex ??= canvasTexture(WRAP.w, WRAP.h, bottleWrap));
 }
 
 /** The box's artwork, drawn once for every cabinet. */

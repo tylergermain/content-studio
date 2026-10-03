@@ -13,22 +13,27 @@ Headless, from the repo root (`-- --shots` also writes a review sheet):
 The root is `whisky_cabinet`, standing on the floor at the origin under the middle of its kind's
 footprint (1.2 by 0.45), its doors toward the office's +z. Hung under it, each its own object:
 
-    whisky_label              the bottle's front label, a band round the glass, UV mapped 0 to 1
-                              across it (left to right as you face it) and up it: the office draws
-                              the label on a canvas and lays it on (whisky-label.ts)
-    whisky_crest              the 1824 crest on the bottle's shoulder, mapped the same way
+    whisky_label              the bottle's wrap, a band all the way round the glass, UV mapped 0 to 1
+                              round it (from the back, left to right as you face it, its middle at
+                              the front) and up it: the office paints the Litha's artwork on a canvas
+                              with the cream label inset at the front, and lays it on (whisky-art.ts)
+    whisky_crest              the 1824 crest on the bottle's shoulder, round its front, mapped the
+                              same way
     whisky_box_art            the box's left side, front and right side, one wrap mapped 0 to 1 round
                               them from the back of the left side to the back of the right side
     whisky_decanter           the decanter, its origin under the middle of its base: the office lifts
                               and tips it to pour
       whisky_stopper          its stopper, its origin under it, lifted off while it pours
+      whisky_decanter_whisky  the whisky in it, its origin under the decanter's foot: the office
+                              hides it while the decanter is tipped, and a stream pours instead
     whisky_glass_0 .. _3      the glasses, each with its origin under the middle of its base
       whisky_glass_N_dram     the whisky in it, its origin on the glass's inner floor, so scaling it
                               up from nothing fills the glass
 
 Body is the piece's own colour (the office builder's paint, walnut until someone picks another).
-Crystal is the thin glass, Cut the solid crystal (the bases, the stopper), Glint the streaks of light
-on them, and Label, Crest and Art are the surfaces the office paints its canvases on. The names of the
+Crystal is the thin glass, Cut the solid crystal (the bases, the stopper), Glint the faint, tapered
+streaks of light on the bottle and the decanter (none on the glasses), Brass the cabinet's pulls and the
+bands on the bottle's capsule, and Label, Crest and Art are the surfaces the office paints its canvases on. The names of the
 root, the parts and the materials are a contract with furniture-whisky.ts and
 tests/whisky-model.test.ts, so rename them in all three places. The numbers in TRAY, BOTTLE, DECANTER
 and GLASSES are copied there too.
@@ -54,7 +59,6 @@ COLORS = {
     "Glint": "#ffffff",
     "Whisky": "#c8741e",
     "Stopper": "#a8322a",
-    "Gold": "#d9b25a",
     "Label": "#f6f1e6",
     "Crest": "#2b3a78",
     "Art": "#b85a63",
@@ -68,11 +72,12 @@ LEGS = 0.2
 
 # The tray on the top: where its middle is, how big it is, and how high what stands on it stands.
 TRAY = {"x": 0.17, "z": -0.01, "w": 0.66, "d": 0.3, "y": TOP + 0.008}
-# The bottle: where it stands, how tall and round it is, and where its label and crest are (heights
-# above its foot, and how far round the glass they go, in degrees).
-BOTTLE = {"x": -0.07, "z": 0.0, "h": 0.37, "r": 0.054, "label": (0.065, 0.205, 180), "crest": (0.218, 0.271, 104)}
-# The decanter: where it stands, and how high its lip is (where it pours from).
-DECANTER = {"x": 0.1, "z": -0.035, "lip": 0.226}
+# The bottle: where it stands, how tall and round it is, and where its wrap and crest are (heights
+# above its foot, and how far round the glass they go, in degrees: the wrap all the way), and how high
+# the whisky comes (up to its shoulder, where the glass starts to round over: clear glass above).
+BOTTLE = {"x": -0.07, "z": 0.0, "h": 0.37, "r": 0.054, "label": (0.016, 0.21, 360), "crest": (0.218, 0.271, 104), "fill": 0.272}
+# The decanter: where it stands, how high its lip is (where it pours from), and how high the whisky in it comes.
+DECANTER = {"x": 0.1, "z": -0.035, "lip": 0.226, "fill": 0.088}
 # The glasses: where each stands, their radius at the rim and height, and the inner floor the whisky sits on.
 GLASSES = {"at": [(0.27, -0.075), (0.39, -0.075), (0.27, 0.055), (0.39, 0.055)], "r": 0.041, "h": 0.085, "floor": 0.014, "dram": 0.032}
 # The box: where it stands, how it's turned (toward the tray), and its size.
@@ -152,16 +157,20 @@ def wrap(bm, x, z, y0, y1, w, d, yaw, lift=0.0008):
     outward(bm, faces, at(x, (y0 + y1) / 2, z))
 
 
-def glint(bm, cx, cz, r, y0, y1, a=-38.0, wide=9.0, base=0.0):
-    """A streak of light down a round glass at (cx, cz), standing on `base`: a narrow band just
-    outside it, `a` degrees round from its front (toward the window side)."""
-    for j in range(3):
-        ya, yb = y0 + (y1 - y0) * j / 3, y0 + (y1 - y0) * (j + 1) / 3
-        a0, a1 = math.radians(a - wide / 2), math.radians(a + wide / 2)
-        pts = [(a0, ya), (a1, ya), (a1, yb), (a0, yb)]
-        verts = [bm.verts.new(at(cx + r * math.sin(t), base + y, cz + r * math.cos(t))) for t, y in pts]
-        f = bm.faces.new(verts)
-        outward(bm, [f], at(cx, base + (ya + yb) / 2, cz))
+def glint(bm, cx, cz, r, y0, y1, a=-38.0, wide=4.0, base=0.0, rows=4):
+    """A streak of light down a round glass at (cx, cz), standing on `base`: a sliver just outside it,
+    `a` degrees round from its front (toward the window side), `wide` degrees at its widest in the
+    middle and tapering to a point at either end, so it reads as light on the glass, not a stick."""
+    ring = []
+    for j in range(rows + 1):
+        y = base + y0 + (y1 - y0) * j / rows
+        half = math.radians(wide / 2 * math.sin(math.pi * j / rows))
+        ts = [math.radians(a)] if half < 1e-6 else [math.radians(a) - half, math.radians(a) + half]
+        ring.append([bm.verts.new(at(cx + r * math.sin(t), y, cz + r * math.cos(t))) for t in ts])
+    faces = []
+    for lo, hi in zip(ring, ring[1:]):
+        faces.append(bm.faces.new(lo + hi[::-1]))
+    outward(bm, faces, at(cx, base + (y0 + y1) / 2, cz))
 
 
 # ---- The sideboard ----------------------------------------------------------------------------------
@@ -203,20 +212,21 @@ def tray(p):
     p.add("Silver", fk.slab, w, d, TOP, TRAY["y"], corner=0.05, edge=0.003, x=x, z=z, csegs=5, esegs=1)
     # Its gallery rim, and a handle at either end.
     loop = [(x + px, TRAY["y"] + 0.006, z + pz) for px, pz in fk.rounded_rect(w / 2 - 0.006, d / 2 - 0.006, 0.045, 5)]
-    p.add("Silver", fk.tube, loop + loop[:2], 0.006, segs=6)
+    p.add("Silver", fk.tube, loop + loop[:2], 0.006, segs=5)
     for sx in (-1, 1):
         hx = x + sx * (w / 2 + 0.012)
         path = fk.fillet([(hx - sx * 0.02, TRAY["y"] + 0.006, z - 0.06), (hx + sx * 0.012, TRAY["y"] + 0.022, z - 0.05),
                           (hx + sx * 0.012, TRAY["y"] + 0.022, z + 0.05), (hx - sx * 0.02, TRAY["y"] + 0.006, z + 0.06)], 0.02)
-        p.add("Silver", fk.tube, path, 0.005, segs=6)
+        p.add("Silver", fk.tube, path, 0.005, segs=5)
 
 
 # ---- The bottle -------------------------------------------------------------------------------------
 #
 # The Macallan's own bottle, as the Litha comes in: clear glass, a tall straight body with short
 # broad shoulders, a slim neck and a red capsule over the cork with a gold band at its foot. The
-# whisky fills it up into the neck. The label and the crest are the office's canvases on bands laid
-# just over the glass.
+# whisky comes up to the shoulders, and the glass above it is clear. The wrap (the Litha's artwork
+# all the way round, with the cream label inset at the front) and the crest are the office's canvases
+# on bands laid just over the glass.
 
 def bottle(p):
     x, z, h, r = BOTTLE["x"], BOTTLE["z"], BOTTLE["h"], BOTTLE["r"]
@@ -230,27 +240,26 @@ def bottle(p):
              (neck - 0.0015, H(0.9)), (0.0, H(0.9))]
     p.add("Crystal", fk.turned, glass, x=x, y=y, z=z, segs=28)
     p.add("Cut", fk.turned, [(0.0, 0.0015), (r - 0.004, 0.0015), (r - 0.004, 0.009), (0.0, 0.009)], x=x, y=y, z=z, segs=28)
-    # The whisky, a little in from the glass so its wall shows, filled up into the neck.
+    # The whisky, a little in from the glass so its wall shows, up to where the shoulders start.
     i = 0.004
-    whisky = [(0.0, 0.009), (r - i, 0.009), (r - i, H(0.741)), (r - i - 0.001, H(0.766)), (r - i - 0.005, H(0.79)), (r - i - 0.012, H(0.81)),
-              (r - i - 0.022, H(0.826)), (neck - 0.002, H(0.842)), (neck - 0.0035, H(0.86)), (0.0, H(0.86))]
-    p.add("Whisky", fk.turned, whisky, x=x, y=y, z=z, segs=24)
+    fill = BOTTLE["fill"]
+    whisky = [(0.0, 0.009), (r - i, 0.009), (r - i, fill - 0.002), (r - i - 0.002, fill), (0.0, fill)]
+    p.add("Whisky", fk.turned, whisky, x=x, y=y, z=z, segs=20)
     # The capsule over the cork: red, ribbed at the top, with a gold band round its foot and a fine one higher up.
     cap = neck + 0.0015
     capsule = [(0.0, H(0.891)), (cap, H(0.891)), (cap, H(0.982)), (cap - 0.001, H(0.995)), (cap - 0.008, H(1.0) - 0.0005), (0.0, H(1.0))]
     p.add("Stopper", fk.turned, capsule, x=x, y=y, z=z, segs=20)
-    p.add("Gold", fk.turned, [(0.0, H(0.888)), (cap + 0.0005, H(0.888)), (cap + 0.0005, H(0.904)), (0.0, H(0.904))], x=x, y=y, z=z, segs=20)
-    p.add("Gold", fk.turned, [(0.0, H(0.966)), (cap + 0.0003, H(0.966)), (cap + 0.0003, H(0.971)), (0.0, H(0.971))], x=x, y=y, z=z, segs=20)
-    # Streaks of light on the glass, where the label and the crest don't cover it: under the label, out
-    # past the crest's edge over the shoulder, and down the neck.
+    p.add("Brass", fk.turned, [(0.0, H(0.888)), (cap + 0.0005, H(0.888)), (cap + 0.0005, H(0.904)), (0.0, H(0.904))], x=x, y=y, z=z, segs=20)
+    p.add("Brass", fk.turned, [(0.0, H(0.966)), (cap + 0.0003, H(0.966)), (cap + 0.0003, H(0.971)), (0.0, H(0.971))], x=x, y=y, z=z, segs=20)
+    # Faint slivers of light on the glass where the wrap and the crest don't cover it: out past the
+    # crest's edge up to the shoulder, and down the neck.
     lo, hi, _ = BOTTLE["label"]
-    p.add("Glint", glint, x, z, r + 0.0012, 0.014, lo - 0.006, a=-40.0, base=y, smooth=False)
-    p.add("Glint", glint, x, z, r + 0.0012, hi + 0.006, H(0.74), a=-62.0, base=y, smooth=False)
-    p.add("Glint", glint, x, z, neck + 0.0016, H(0.845), H(0.885), a=-40.0, wide=14.0, base=y, smooth=False)
+    p.add("Glint", glint, x, z, r + 0.0012, hi + 0.008, H(0.735), a=-64.0, wide=3.5, base=y, smooth=False)
+    p.add("Glint", glint, x, z, neck + 0.0016, H(0.846), H(0.884), a=-40.0, wide=7.0, base=y, smooth=False)
 
     lo, hi, arc = BOTTLE["label"]
     lab = piece()
-    lab.add("Label", band, x, z, y + lo, y + hi, r + 0.0008, arc, cols=20, smooth=True)
+    lab.add("Label", band, x, z, y + lo, y + hi, r + 0.0008, arc, cols=40, smooth=True)
     label = lab.finish("whisky_label", weighted=False)
     lo, hi, arc = BOTTLE["crest"]
     crest = piece()
@@ -271,7 +280,8 @@ def box(p):
 # ---- The decanter -----------------------------------------------------------------------------------
 #
 # Cut crystal: an eight-sided body, its facets catching the light, a short neck, and a faceted ball
-# of a stopper. A pour's worth of whisky short of full.
+# of a stopper. The whisky in it is its own object (the office hides it while it's tipped), about
+# half full, so the glass above it shows.
 
 def decanter(root):
     x, z, y = DECANTER["x"], DECANTER["z"], TRAY["y"]
@@ -281,10 +291,13 @@ def decanter(root):
             (0.016, lip - 0.008), (0.021, lip - 0.004), (0.021, lip), (0.0, lip)]
     p.add("Crystal", fk.turned, body, x=x, y=y, z=z, segs=8, smooth=False)
     p.add("Cut", fk.turned, [(0.0, 0.001), (0.052, 0.001), (0.052, 0.014), (0.0, 0.014)], x=x, y=y, z=z, segs=8, smooth=False)
-    p.add("Whisky", fk.turned, [(0.0, 0.0145), (0.054, 0.0145), (0.056, 0.105), (0.0, 0.105)], x=x, y=y, z=z, segs=8, smooth=False)
-    p.add("Glint", glint, x, z, 0.0615, 0.02, 0.125, a=-22.5, wide=10.0, base=y, smooth=False)
+    p.add("Glint", glint, x, z, 0.0615, 0.03, 0.12, a=-22.5, wide=4.5, base=y, smooth=False)
     ob = p.finish("whisky_decanter", weighted=False)
     hang(ob, root, (x, y, z))
+
+    w = piece()
+    w.add("Whisky", fk.turned, [(0.0, 0.0145), (0.054, 0.0145), (0.0555, DECANTER["fill"]), (0.0, DECANTER["fill"])], x=x, y=y, z=z, segs=8, smooth=False)
+    hang(w.finish("whisky_decanter_whisky", weighted=False), ob, (x, y, z))
 
     s = piece()
     sy = y + lip
@@ -306,7 +319,6 @@ def glasses(root):
         wall = [(0.0, 0.0), (r - 0.004, 0.0), (r - 0.002, 0.003), (r, h), (r - 0.003, h), (r - 0.004, floor + 0.002), (0.0, floor + 0.002)]
         p.add("Crystal", fk.turned, wall, x=x, y=y, z=z, segs=12, smooth=False)
         p.add("Cut", fk.turned, [(0.0, 0.001), (r - 0.005, 0.001), (r - 0.005, floor), (0.0, floor)], x=x, y=y, z=z, segs=12, smooth=False)
-        p.add("Glint", glint, x, z, r + 0.001, 0.016, h - 0.012, a=-35.0, wide=12.0, base=y, smooth=False)
         g = p.finish(f"whisky_glass_{i}", weighted=False)
         hang(g, root, (x, y, z))
         w = piece()

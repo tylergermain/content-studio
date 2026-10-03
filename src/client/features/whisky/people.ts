@@ -34,6 +34,11 @@ function toastCurve(p: number): number {
 export class Glasses {
   private held = new Map<string, InHand>();
 
+  /** Nobody has a glass in hand. */
+  get idle(): boolean {
+    return this.held.size === 0;
+  }
+
   /** `id` raises their glass (once it's in their hand). */
   toast(id: string) {
     const h = this.held.get(id);
@@ -88,6 +93,11 @@ const POP_RISE = 0.35;
 /** The "🥃 Cheers" over the heads of whoever clinked glasses. */
 export class Pops {
   private pops: { sprite: THREE.Sprite; t: number; y: number }[] = [];
+
+  /** None up. */
+  get idle(): boolean {
+    return this.pops.length === 0;
+  }
 
   /** Pops one up over `person`'s head. */
   add(person: Person) {

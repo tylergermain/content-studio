@@ -5,8 +5,9 @@ import * as THREE from 'three';
 // over "EST. 1824", "The" in italic, MACALLAN in wide serif capitals, the Highland line under it,
 // LITHA in black brushstrokes, and the casks it was matured in. And the crest on the bottle's shoulder:
 // 1824 in gold on a navy triangle in a cream chevron. The box's front has the same label on it, and
-// the bottle's has the Litha's artwork round the glass either side of it (both in whisky-art.ts). Our
-// own rendition, so anyone who knows the bottle knows it, drawn rather than copied.
+// the bottle wears the Litha's artwork all the way round with a smaller label inset at the front
+// (insetLabel; both in whisky-art.ts). Our own rendition, so anyone who knows the bottle knows it,
+// drawn rather than copied.
 
 /** The label's serif: the distillery's capitals are a high-contrast one, which Bodoni and Didot are. */
 export const SERIF = "'Bodoni 72', Didot, 'Bodoni MT', Georgia, 'Times New Roman', serif";
@@ -193,6 +194,43 @@ export function labelFace(c: C, x: number, y: number, w: number, h: number, opts
     centred(c, '70cl', x + w * 0.27, at(588), `${15 * k}px ${SERIF}`, GREY, 1 * k);
     centred(c, '40% vol', x + w * 0.73, at(588), `${15 * k}px ${SERIF}`, GREY, 1 * k);
   }
+}
+
+/**
+ * The label as it's inset in the bottle's wrap (whisky-art.ts), from (x, y), `w` across and `h` down
+ * (laid out for 240 by 428): smaller than the box's, so it keeps what reads from a step or two away,
+ * as big as it'll go. The house over EST. 1824, "The", MACALLAN tall and close-set, the Highland line,
+ * LITHA in brushstrokes, and the casks and the bottle's size in small at the foot.
+ */
+export function insetLabel(c: C, x: number, y: number, w: number, h: number) {
+  const k = w / 240;
+  const mid = x + w / 2;
+  const at = (v: number) => y + v * (h / 428);
+  c.fillStyle = CREAM;
+  c.fillRect(x, y, w, h);
+  const g = c.createRadialGradient(mid, at(200), w * 0.25, mid, at(200), h * 0.62);
+  g.addColorStop(0, 'rgba(255,255,255,0)');
+  g.addColorStop(1, 'rgba(214,196,160,0.38)');
+  c.fillStyle = g;
+  c.fillRect(x, y, w, h);
+  c.strokeStyle = GOLD;
+  c.lineWidth = 3 * k;
+  c.strokeRect(x + 7 * k, y + 7 * k, w - 14 * k, h - 14 * k);
+  c.lineWidth = 1.2 * k;
+  c.strokeRect(x + 12 * k, y + 12 * k, w - 24 * k, h - 24 * k);
+  const most = w * 0.86;
+  house(c, mid, at(80), 78 * k);
+  centred(c, 'EST. 1824', mid, at(98), `${11 * k}px ${SERIF}`, SEPIA, 2.5 * k);
+  centred(c, 'The', mid, at(146), `italic ${40 * k}px ${SERIF}`, INK);
+  centred(c, 'MACALLAN', mid, at(212), `${66 * k}px ${SERIF}`, INK, 1 * k, most);
+  centred(c, 'HIGHLAND SINGLE MALT', mid, at(240), `${13 * k}px ${SERIF}`, GREY, 1.5 * k, most);
+  centred(c, 'SCOTCH WHISKY', mid, at(258), `${13 * k}px ${SERIF}`, GREY, 1.5 * k, most);
+  const lh = Math.min(70 * k, (w * 0.84) / 3.3);
+  litha(c, mid - lh * 1.65, at(272), lh);
+  centred(c, 'SHERRY SEASONED OAK CASKS', mid, at(372), `${10 * k}px ${SERIF}`, '#4a3f36', 1 * k, most);
+  centred(c, 'JEREZ DE LA FRONTERA', mid, at(388), `${10 * k}px ${SERIF}`, '#4a3f36', 1 * k, most);
+  centred(c, '70cl', x + w * 0.27, at(408), `${11 * k}px ${SERIF}`, GREY, 1 * k);
+  centred(c, '40% vol', x + w * 0.73, at(408), `${11 * k}px ${SERIF}`, GREY, 1 * k);
 }
 
 /** The crest on the shoulder, on a 512 by 256 canvas that's otherwise clear: 1824 on navy, in a cream chevron. */

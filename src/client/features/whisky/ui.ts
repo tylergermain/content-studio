@@ -4,24 +4,27 @@ import { key } from '../../core/hint';
 import { h } from '../../ui/dom';
 import './ui.css';
 
-export interface DramShown {
-  /** Sips left; none is no glass in hand. */
-  sips: number;
-  /** E sips: there's nothing in front of you that E would use instead. */
-  canSip: boolean;
-  /** Who's near enough to clink with, by name: C raises your glass to them. */
-  near: readonly string[];
+/** Who's near enough to clink with (see Partners): their names, and a key that changes when they do. */
+export interface Near {
+  names: readonly string[];
+  key: string;
 }
 
-let el: HTMLElement | null = null;
-let shownKey = '';
+/** The key that raises your glass to whoever's near with one of theirs. */
+export const CHEERS_KEY = 'K';
 
-/** Shows (or hides, with no sips) the dram in your hand, only when what it says changed. */
-export function showDram(d: DramShown) {
-  const k = d.sips ? `${d.sips}|${d.canSip}|${d.near.join(',')}` : '';
-  if (k === shownKey) return;
-  shownKey = k;
-  if (!d.sips) {
+let el: HTMLElement | null = null;
+let shown = { sips: 0, canSip: false, near: '' };
+
+/**
+ * Shows the dram in your hand, `sips` left (none: no glass, and it's hidden), whether E sips it (there's
+ * nothing in front of you that E would use instead), and who K clinks with. Every frame, so it does
+ * nothing unless what it says changed.
+ */
+export function showDram(sips: number, canSip: boolean, near: Near) {
+  if (sips === shown.sips && (!sips || (canSip === shown.canSip && near.key === shown.near))) return;
+  shown = { sips, canSip, near: near.key };
+  if (!sips) {
     el?.remove();
     el = null;
     return;
@@ -30,11 +33,11 @@ export function showDram(d: DramShown) {
     el = h('div.dram', { role: 'status', 'aria-label': 'Your dram' });
     (document.getElementById('hud') ?? document.body).append(el);
   }
-  const level = h('span.level', { 'aria-label': `${d.sips} of ${SIPS} sips left` }, ...Array.from({ length: SIPS }, (_, i) => h(i < d.sips ? 'span.on' : 'span')));
+  const level = h('span.level', { 'aria-label': `${sips} of ${SIPS} sips left` }, ...Array.from({ length: SIPS }, (_, i) => h(i < sips ? 'span.on' : 'span')));
   el.replaceChildren(
     h('span.title', {}, `🥃 ${WHISKY_NAME}`),
     level,
-    ...(d.canSip ? [key('E', 'Sip')] : []),
-    d.near.length ? h('span.near', {}, key('C', `Cheers with ${nameList(d.near)}`)) : h('span', { style: 'opacity:.7' }, 'find someone with a glass to clink'),
+    ...(canSip ? [key('E', 'Sip')] : []),
+    near.names.length ? h('span.near', {}, key(CHEERS_KEY, `Cheers with ${nameList(near.names)}`)) : h('span', { style: 'opacity:.7' }, 'find someone with a glass to clink'),
   );
 }

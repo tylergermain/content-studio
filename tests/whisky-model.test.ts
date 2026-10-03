@@ -8,8 +8,8 @@ import { assertInFootprint, fmt, kind, near, openPack } from './model-pack';
 // and features/whisky count on: the cabinet as one root standing on the floor at the origin, facing +z
 // inside the footprint shared/furniture.ts gives the kind; the parts the pour moves, hung where the
 // code looks for them with their origins where it moves them about (WHISKY_PARTS and WHISKY_SIZES); the
-// materials it paints; and the label, the crest and the box's art mapped for their canvases, the right
-// way round.
+// materials it paints; the bottle's whisky up to its shoulders under clear glass; and the bottle's
+// wrap, the crest and the box's art mapped for their canvases, the right way round.
 
 const FILE = new URL('../src/client/models/whisky.glb', import.meta.url);
 const pack = openPack('whisky');
@@ -22,10 +22,11 @@ const PARTS: Record<string, string> = {
   whisky_box_art: 'whisky_cabinet',
   whisky_decanter: 'whisky_cabinet',
   whisky_stopper: 'whisky_decanter',
+  whisky_decanter_whisky: 'whisky_decanter',
   ...Object.fromEntries([0, 1, 2, 3].flatMap((i) => [[`whisky_glass_${i}`, 'whisky_cabinet'], [`whisky_glass_${i}_dram`, `whisky_glass_${i}`]])),
 };
 /** The materials furniture-whisky.ts paints: Body in the piece's own colour, and the canvases' three. */
-const MATERIALS = ['Body', 'Dark', 'Brass', 'Silver', 'Gold', 'Stopper', 'Box', 'Whisky', 'Crystal', 'Cut', 'Glint', 'Label', 'Crest', 'Art'];
+const MATERIALS = ['Body', 'Dark', 'Brass', 'Silver', 'Stopper', 'Box', 'Whisky', 'Crystal', 'Cut', 'Glint', 'Label', 'Crest', 'Art'];
 /** WHISKY_SIZES: the decanter's lip over its foot, and a glass's rim over its foot. */
 const LIP = 0.226;
 const RIM = 0.085;
@@ -78,6 +79,14 @@ test('the decanter turns about its foot, its lip where the pour starts, and its 
   assert.ok(near(body.max.y - at.y, LIP, 0.002), `its lip is ${(body.max.y - at.y).toFixed(3)} over its foot`);
   const stopper = pack.bounds('whisky_stopper');
   assert.ok(near(stopper.min.y, origin('whisky_stopper').y - 0.006, 0.003) && stopper.min.y > at.y + LIP - 0.01, 'the stopper sits in its neck, its origin at the lip');
+  // The whisky in it is a part of its own (hidden while it's tipped), with its origin at the decanter's,
+  // and comes about half way up, so there's glass to see over it.
+  assert.deepEqual(pack.madeOf('whisky_decanter'), ['Crystal', 'Cut', 'Glint']);
+  assert.deepEqual(pack.madeOf('whisky_decanter_whisky'), ['Whisky']);
+  assert.ok(origin('whisky_decanter_whisky').distanceTo(at) < 0.001, 'the whisky turns with the decanter, about its foot');
+  const whisky = pack.bounds('whisky_decanter_whisky');
+  assert.ok(whisky.max.y - at.y < 0.1 && whisky.max.y - at.y > 0.06, `the decanter is about half full (${(whisky.max.y - at.y).toFixed(3)} up)`);
+  assert.ok(whisky.max.x < body.max.x && whisky.min.x > body.min.x, 'inside the glass');
 });
 
 test('each glass stands on the tray, its rim where the pour aims, and the whisky fills it up from its floor', () => {
@@ -93,7 +102,21 @@ test('each glass stands on the tray, its rim where the pour aims, and the whisky
     assert.ok(near(dram.min.y, floor.y, 0.001), `the whisky in ${name} starts at its origin, so scaling it fills the glass`);
     assert.ok(dram.max.y < g.max.y && dram.max.y - floor.y > 0.025, 'a good dram, under the rim');
     assert.ok(Math.hypot(dram.min.x + dram.max.x - 2 * at.x, dram.min.z + dram.max.z - 2 * at.z) < 0.004, 'in the middle of the glass');
+    // No streak of light on a glass: on one that small it read as a straw standing in it.
+    assert.deepEqual(pack.madeOf(name), ['Crystal', 'Cut'], `${name} is crystal, with no glint`);
   }
+});
+
+test('the bottle\'s whisky comes up to its shoulders, with clear glass over it', () => {
+  // The root's own crystal and whisky are the bottle's (the decanter's and the glasses' are parts of their own).
+  const glass = pack.bounds('whisky_cabinet', ['Crystal']);
+  const whisky = pack.bounds('whisky_cabinet', ['Whisky']);
+  const tall = glass.max.y - glass.min.y;
+  const shoulder = glass.min.y + tall * (0.741 / 0.9);
+  assert.ok(whisky.max.y <= shoulder + 0.002 && whisky.max.y > shoulder - 0.01, `the whisky stops at the shoulder (${whisky.max.y.toFixed(3)}, the shoulder ${shoulder.toFixed(3)})`);
+  assert.ok(glass.max.y - whisky.max.y > 0.05, 'and the shoulders and the neck are clear glass');
+  const wrap = pack.bounds('whisky_label');
+  assert.ok(whisky.max.y - wrap.max.y > 0.04, 'the whisky shows over the wrap');
 });
 
 /** The texture coordinates of a part, as the vertices are, from the .glb's binary chunk. */
@@ -116,24 +139,47 @@ function uvs(name: string): [number, number][] {
   return out;
 }
 
-test('the label and the crest go round the front of the bottle, mapped left to right and the canvas\'s top at the top', () => {
-  for (const name of ['whisky_label', 'whisky_crest']) {
-    const vs = pack.vertices(name);
-    const uv = uvs(name);
-    assert.equal(uv.length, vs.length);
-    const box = pack.bounds(name);
-    const mid = (box.min.x + box.max.x) / 2;
-    // Facing +z: all of it in front of the bottle's middle (z 0), its middle right at the front of the glass.
-    assert.ok(box.min.z > 0 && box.max.z > 0.05, `${name} faces forward (${box.min.z.toFixed(3)} to ${box.max.z.toFixed(3)})`);
-    // u runs from its left edge to its right as you face it; v from the canvas's top (glTF's 0) down.
-    const left = vs.reduce((m, v, i) => (v.x < vs[m].x ? i : m), 0);
-    const right = vs.reduce((m, v, i) => (v.x > vs[m].x ? i : m), 0);
-    assert.ok(uv[left][0] < 0.05 && uv[right][0] > 0.95, `${name}: u ${uv[left][0].toFixed(2)} at the left, ${uv[right][0].toFixed(2)} at the right`);
-    const top = vs.reduce((m, v, i) => (v.y > vs[m].y ? i : m), 0);
-    const bottom = vs.reduce((m, v, i) => (v.y < vs[m].y ? i : m), 0);
-    assert.ok(uv[top][1] < 0.01 && uv[bottom][1] > 0.99, `${name}: v ${uv[top][1].toFixed(2)} at the top, ${uv[bottom][1].toFixed(2)} at the foot`);
-    assert.ok(Math.abs(mid - -0.07) < 0.03, `${name} is on the bottle`);
-  }
+/** The vertex of `vs` that's most `by`. */
+const most = (vs: Vector3[], by: (v: Vector3) => number) => vs.reduce((m, v, i) => (by(v) > by(vs[m]) ? i : m), 0);
+
+test('the bottle\'s wrap goes all the way round it, from the back, its middle at the front and the canvas\'s top at the top', () => {
+  const vs = pack.vertices('whisky_label');
+  const uv = uvs('whisky_label');
+  assert.equal(uv.length, vs.length);
+  const box = pack.bounds('whisky_label');
+  assert.ok(box.min.z < -0.05 && box.max.z > 0.05 && box.max.x - box.min.x > 0.1, `it wraps the bottle (${fmt(box.getSize(new Vector3()))})`);
+  assert.ok(Math.abs((box.min.x + box.max.x) / 2 - -0.07) < 0.003, 'round the bottle');
+  // u from the back round the left (0.25), the front (0.5) and the right (0.75) as you face it: the
+  // cream label is painted in the canvas's middle, so it's at the front.
+  const front = most(vs, (v) => v.z);
+  const left = most(vs, (v) => -v.x);
+  const right = most(vs, (v) => v.x);
+  assert.ok(Math.abs(uv[front][0] - 0.5) < 0.03, `u ${uv[front][0].toFixed(2)} at the front`);
+  assert.ok(Math.abs(uv[left][0] - 0.25) < 0.03 && Math.abs(uv[right][0] - 0.75) < 0.03, `u ${uv[left][0].toFixed(2)} at the left, ${uv[right][0].toFixed(2)} at the right`);
+  const us = uv.map(([u]) => u);
+  assert.ok(Math.min(...us) < 0.001 && Math.max(...us) > 0.999, 'the whole canvas, round to the seam at the back');
+  const top = most(vs, (v) => v.y);
+  const bottom = most(vs, (v) => -v.y);
+  assert.ok(uv[top][1] < 0.01 && uv[bottom][1] > 0.99, `v ${uv[top][1].toFixed(2)} at the top, ${uv[bottom][1].toFixed(2)} at the foot`);
+});
+
+test('the crest goes round the front of the bottle, mapped left to right and the canvas\'s top at the top', () => {
+  const name = 'whisky_crest';
+  const vs = pack.vertices(name);
+  const uv = uvs(name);
+  assert.equal(uv.length, vs.length);
+  const box = pack.bounds(name);
+  const mid = (box.min.x + box.max.x) / 2;
+  // Facing +z: all of it in front of the bottle's middle (z 0), its middle right at the front of the glass.
+  assert.ok(box.min.z > 0 && box.max.z > 0.05, `${name} faces forward (${box.min.z.toFixed(3)} to ${box.max.z.toFixed(3)})`);
+  // u runs from its left edge to its right as you face it; v from the canvas's top (glTF's 0) down.
+  const left = vs.reduce((m, v, i) => (v.x < vs[m].x ? i : m), 0);
+  const right = vs.reduce((m, v, i) => (v.x > vs[m].x ? i : m), 0);
+  assert.ok(uv[left][0] < 0.05 && uv[right][0] > 0.95, `${name}: u ${uv[left][0].toFixed(2)} at the left, ${uv[right][0].toFixed(2)} at the right`);
+  const top = vs.reduce((m, v, i) => (v.y > vs[m].y ? i : m), 0);
+  const bottom = vs.reduce((m, v, i) => (v.y < vs[m].y ? i : m), 0);
+  assert.ok(uv[top][1] < 0.01 && uv[bottom][1] > 0.99, `${name}: v ${uv[top][1].toFixed(2)} at the top, ${uv[bottom][1].toFixed(2)} at the foot`);
+  assert.ok(Math.abs(mid - -0.07) < 0.03, `${name} is on the bottle`);
 });
 
 test('the box\'s art wraps its left side, its front and its right side in one strip', () => {
@@ -145,5 +191,5 @@ test('the box\'s art wraps its left side, its front and its right side in one st
 
 test('it keeps to its triangle budget', () => {
   const total = Object.keys(PARTS).concat('whisky_cabinet').reduce((n, p) => n + pack.trianglesOf(p), 0);
-  assert.ok(total <= 6000, `${total} triangles`);
+  assert.ok(total <= 4500, `${total} triangles`);
 });

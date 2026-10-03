@@ -15,5 +15,8 @@ export type WhiskyServerMsg =
   | { t: 'whisky.poured'; id: string; piece: string; top?: boolean }
   /** `id`'s glass went back on the tray: they drank it, or left the floor. */
   | { t: 'whisky.down'; id: string }
-  /** Glasses clinked: `ids` (whoever raised theirs first, then the others) and `names` the same people's, where the first stood. */
-  | { t: 'whisky.cheers'; ids: string[]; names: string[]; x: number; y: number; z: number };
+  /**
+   * Glasses clinked: `ids` (whoever raised theirs first, then the others) and `names` the same people's,
+   * where the first stood. `told`: the floor is told who raised a glass (not every toast is, see Toasts).
+   */
+  | { t: 'whisky.cheers'; ids: string[]; names: string[]; x: number; y: number; z: number; told?: true };
