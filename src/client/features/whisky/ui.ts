@@ -4,9 +4,10 @@ import { key } from '../../core/hint';
 import { h } from '../../ui/dom';
 import './ui.css';
 
-/** Who's near enough to clink with (see Partners): their names, and a key that changes when they do. */
+/** Who's near enough to raise a glass to (see Partners): their names, whether the nearest is near enough for the glasses to meet, and a key that changes when either does. */
 export interface Near {
   names: readonly string[];
+  touch: boolean;
   key: string;
 }
 
@@ -38,6 +39,8 @@ export function showDram(sips: number, canSip: boolean, near: Near) {
     h('span.title', {}, `🥃 ${WHISKY_NAME}`),
     level,
     ...(canSip ? [key('E', 'Sip')] : []),
-    near.names.length ? h('span.near', {}, key(CHEERS_KEY, `Cheers with ${nameList(near.names)}`)) : h('span', { style: 'opacity:.7' }, 'find someone with a glass to clink'),
+    near.names.length
+      ? h('span.near', {}, key(CHEERS_KEY, near.touch ? `Clink glasses with ${nameList(near.names)}` : `Raise a glass to ${nameList(near.names)}`))
+      : h('span', { style: 'opacity:.7' }, 'find someone with a glass to clink'),
   );
 }

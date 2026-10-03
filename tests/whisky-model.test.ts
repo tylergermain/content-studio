@@ -8,8 +8,9 @@ import { assertInFootprint, fmt, kind, near, openPack } from './model-pack';
 // and features/whisky count on: the cabinet as one root standing on the floor at the origin, facing +z
 // inside the footprint shared/furniture.ts gives the kind; the parts the pour moves, hung where the
 // code looks for them with their origins where it moves them about (WHISKY_PARTS and WHISKY_SIZES); the
-// materials it paints; the bottle's whisky up to its shoulders under clear glass; and the bottle's
-// wrap, the crest and the box's art mapped for their canvases, the right way round.
+// materials it paints; the decanter's cut panels and bevels; the bottle's whisky up to its shoulders
+// under clear glass, with its surface its own; and the bottle's wrap, the crest and the box's art
+// mapped for their canvases, the right way round.
 
 const FILE = new URL('../src/client/models/whisky.glb', import.meta.url);
 const pack = openPack('whisky');
@@ -26,7 +27,7 @@ const PARTS: Record<string, string> = {
   ...Object.fromEntries([0, 1, 2, 3].flatMap((i) => [[`whisky_glass_${i}`, 'whisky_cabinet'], [`whisky_glass_${i}_dram`, `whisky_glass_${i}`]])),
 };
 /** The materials furniture-whisky.ts paints: Body in the piece's own colour, and the canvases' three. */
-const MATERIALS = ['Body', 'Dark', 'Brass', 'Silver', 'Stopper', 'Box', 'Whisky', 'Crystal', 'Cut', 'Glint', 'Label', 'Crest', 'Art'];
+const MATERIALS = ['Body', 'Dark', 'Brass', 'Silver', 'Stopper', 'Box', 'Whisky', 'WhiskyTop', 'Crystal', 'Cut', 'Glint', 'Sheen', 'Label', 'Crest', 'Art'];
 /** WHISKY_SIZES: the decanter's lip over its foot, and a glass's rim over its foot. */
 const LIP = 0.226;
 const RIM = 0.085;
@@ -79,14 +80,37 @@ test('the decanter turns about its foot, its lip where the pour starts, and its 
   assert.ok(near(body.max.y - at.y, LIP, 0.002), `its lip is ${(body.max.y - at.y).toFixed(3)} over its foot`);
   const stopper = pack.bounds('whisky_stopper');
   assert.ok(near(stopper.min.y, origin('whisky_stopper').y - 0.006, 0.003) && stopper.min.y > at.y + LIP - 0.01, 'the stopper sits in its neck, its origin at the lip');
-  // The whisky in it is a part of its own (hidden while it's tipped), with its origin at the decanter's,
-  // and comes about half way up, so there's glass to see over it.
-  assert.deepEqual(pack.madeOf('whisky_decanter'), ['Crystal', 'Cut', 'Glint']);
+  // The whisky in it is a part of its own (the office pours with a level one of its own), with its origin
+  // at the decanter's, and comes about half way up, so there's glass to see over it. No streak of light
+  // on it (through the whisky it read as a crack): light lies on whole panels (Sheen).
+  assert.deepEqual(pack.madeOf('whisky_decanter'), ['Crystal', 'Cut', 'Sheen']);
   assert.deepEqual(pack.madeOf('whisky_decanter_whisky'), ['Whisky']);
   assert.ok(origin('whisky_decanter_whisky').distanceTo(at) < 0.001, 'the whisky turns with the decanter, about its foot');
   const whisky = pack.bounds('whisky_decanter_whisky');
   assert.ok(whisky.max.y - at.y < 0.1 && whisky.max.y - at.y > 0.06, `the decanter is about half full (${(whisky.max.y - at.y).toFixed(3)} up)`);
   assert.ok(whisky.max.x < body.max.x && whisky.min.x > body.min.x, 'inside the glass');
+});
+
+test('the decanter is cut: eight flat panels round it, a narrow bevel between each two, and light on a couple of them', () => {
+  const at = origin('whisky_decanter');
+  // Round the top of its body (where its shoulders start), which way each corner of a panel and of a bevel is from its middle.
+  const round = (mats: string[]) =>
+    [...new Set(pack.vertices('whisky_decanter', mats).filter((v) => Math.abs(v.y - at.y - 0.13) < 0.001).map((v) => Math.round((Math.atan2(v.x - at.x, v.z - at.z) * 180) / Math.PI + 360) % 360))].sort((a, b) => a - b);
+  const corners = round(['Crystal']);
+  assert.equal(corners.length, 16, `eight panels, two edges each (${corners})`);
+  const gaps = corners.map((a, i) => (corners[(i + 1) % corners.length] - a + 360) % 360);
+  assert.ok(gaps.every((g, i) => Math.abs(g - (i % 2 === 0 ? 7.5 : 37.5)) < 1.01) || gaps.every((g, i) => Math.abs(g - (i % 2 === 0 ? 37.5 : 7.5)) < 1.01), `wide panels and narrow bevels by turns (${gaps})`);
+  assert.deepEqual(round(['Cut']), corners, 'the bevels are cut between the panels\' edges');
+  // One of them faces the front: its edges either side of it.
+  assert.ok(corners.includes(19) && corners.includes(341), `a panel facing the front (${corners})`);
+  // The light on its panels lies on them, a hair out from the glass.
+  const sheen = pack.bounds('whisky_decanter', ['Sheen']);
+  const body = pack.bounds('whisky_decanter', ['Crystal']);
+  assert.ok(sheen.min.y > body.min.y && sheen.max.y < body.max.y, 'on its body and shoulders');
+  for (const v of pack.vertices('whisky_decanter', ['Sheen'])) {
+    const out = Math.hypot(v.x - at.x, v.z - at.z);
+    assert.ok(out > 0.015 && out < 0.0625, `just over a panel (${out.toFixed(4)} out)`);
+  }
 });
 
 test('each glass stands on the tray, its rim where the pour aims, and the whisky fills it up from its floor', () => {
@@ -117,6 +141,10 @@ test('the bottle\'s whisky comes up to its shoulders, with clear glass over it',
   assert.ok(glass.max.y - whisky.max.y > 0.05, 'and the shoulders and the neck are clear glass');
   const wrap = pack.bounds('whisky_label');
   assert.ok(whisky.max.y - wrap.max.y > 0.04, 'the whisky shows over the wrap');
+  // Its surface is its own (a lighter gold), level at the top of it, and in from the glass so the glass shows round it.
+  const top = pack.bounds('whisky_cabinet', ['WhiskyTop']);
+  assert.ok(near(top.min.y, whisky.max.y, 0.0005) && near(top.max.y, whisky.max.y, 0.0005), `its surface is level at the top (${top.min.y.toFixed(4)}..${top.max.y.toFixed(4)})`);
+  assert.ok(top.max.x - top.min.x < glass.max.x - glass.min.x - 0.012, 'in from the glass');
 });
 
 /** The texture coordinates of a part, as the vertices are, from the .glb's binary chunk. */

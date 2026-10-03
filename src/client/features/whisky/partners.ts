@@ -1,9 +1,10 @@
 /**
- * Who you'd clink glasses with right now (shared/whisky.ts's clinkWith, as the office goes by it):
- * whoever else on your floor holds a dram near enough, nearest first, a handful at most. Found again
- * every frame, so it makes nothing new unless who it is changed. Pure: no three.js, no DOM.
+ * Who you'd raise a glass to right now (shared/whisky.ts's clinkWith, as the office goes by it):
+ * whoever else on your floor holds a dram near enough, nearest first, a handful at most, and whether
+ * the nearest is near enough for the glasses to meet (CLINK.touch) or only to raise them to each other.
+ * Found again every frame, so it makes nothing new unless who it is changed. Pure: no three.js, no DOM.
  */
-import { CLINK_MOST, clinkDistance, type Stood } from '../../../shared/whisky';
+import { CLINK, CLINK_MOST, clinkDistance, type Stood } from '../../../shared/whisky';
 
 /** Someone holding a dram, as the page sees them. */
 export interface Holder extends Stood {
@@ -13,7 +14,9 @@ export interface Holder extends Stood {
 export class Partners {
   /** Their names, nearest first: the hint and the dram's bar say who K clinks with. */
   names: readonly string[] = [];
-  /** Changes whenever `names` does (their ids, in order), for whatever shows them to tell. */
+  /** The nearest is near enough for your glasses to meet (else they're only raised to each other). */
+  touch = false;
+  /** Changes whenever `names` or `touch` does (their ids, in order), for whatever shows them to tell. */
   key = '';
   private found: Holder[] = [];
   private dist: number[] = [];
@@ -52,11 +55,13 @@ export class Partners {
   /** Takes in who was found, if it's not who it was. */
   private settle() {
     const { found, was } = this;
-    let same = found.length === was.length;
+    const touch = found.length > 0 && this.dist[0] <= CLINK.touch;
+    let same = found.length === was.length && touch === this.touch;
     for (let i = 0; same && i < found.length; i++) same = found[i].id === was[i];
     if (same) return;
+    this.touch = touch;
     this.was = found.map((o) => o.id);
     this.names = found.map((o) => o.name);
-    this.key = this.was.join(',');
+    this.key = `${this.was.join(',')}${touch ? '' : ' far'}`;
   }
 }

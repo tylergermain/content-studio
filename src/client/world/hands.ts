@@ -22,8 +22,9 @@ export interface HandsInput {
 
 /** Lifting the mug for a sip and lowering it again, in seconds. */
 const SIP_TIME = 1.1;
-/** Raising a glass in a toast and lowering it again, in seconds. */
-const TOAST_TIME = 1.1;
+const aimQ = new THREE.Quaternion();
+const aimOff = new THREE.Vector3();
+const aimPos = new THREE.Vector3();
 
 interface Arm {
   group: THREE.Group;
@@ -71,8 +72,9 @@ export class Hands {
   private shootT = -1;
   /** Seconds into a sip (negative while it waits for the reach to finish), or null. */
   private sipT: number | null = null;
-  /** Seconds into raising what's in your left hand in a toast, or -1. */
-  private toastT = -1;
+  /** Where what's in your left hand is held instead (its foot, in the camera's frame), and how far it's gone there: a glass in a toast (see aimHeld). */
+  private aimAt = new THREE.Vector3();
+  private aimK = 0;
   private sway = new THREE.Vector2();
   private last: { yaw: number; pitch: number } | null = null;
   private air = 0;
@@ -304,11 +306,13 @@ export class Hands {
   }
 
   /**
-   * Raise what's in your left hand in a toast (a dram, see features/whisky): out in front and up a
-   * little, but kept down and to the left, so whoever you're clinking with stays in view.
+   * Holds what's in your left hand (a dram, see features/whisky) with its foot at `at` in the camera's
+   * frame instead, upright, `k` of the way there from where it's held (0 to 1): a glass meeting
+   * someone else's in a toast, where theirs comes to it. Null puts it back.
    */
-  toast() {
-    this.toastT = 0;
+  aimHeld(at: THREE.Vector3 | null, k = 1) {
+    this.aimK = at ? Math.min(1, Math.max(0, k)) : 0;
+    if (at) this.aimAt.copy(at);
   }
 
   private arm(side: 1 | -1): Arm {
@@ -363,12 +367,6 @@ export class Hands {
       this.sipT += dt;
       sip = reachCurve(this.sipT / SIP_TIME);
       if (this.sipT >= SIP_TIME) this.sipT = null;
-    }
-    let toast = 0;
-    if (this.toastT >= 0) {
-      this.toastT += dt;
-      toast = reachCurve(this.toastT / TOAST_TIME);
-      if (this.toastT >= TOAST_TIME) this.toastT = -1;
     }
     const shake = s.jitter * 0.004;
     this.carryK += ((this.card.held || this.book ? 1 : 0) - this.carryK) * Math.min(1, dt * 7);
@@ -456,12 +454,14 @@ export class Hands {
     l.position.y += 0.13 * sip;
     l.position.z += 0.14 * sip;
     l.rotation.x += 0.7 * sip;
-    // The toast: out to the left and a little forward and up, tipped toward them, kept low and to the
-    // side so the face of whoever you're clinking with stays clear.
-    l.position.x -= 0.08 * toast;
-    l.position.y += 0.02 * toast;
-    l.position.z -= 0.06 * toast;
-    l.rotation.x -= 0.12 * toast;
+    // In a toast: the glass to where it meets the other, upright (the arm turned as it's held at rest).
+    if (this.aimK > 0 && this.held) {
+      const k = this.aimK;
+      const b = this.left.baseRot;
+      l.rotation.set(l.rotation.x + (b.x - l.rotation.x) * k, l.rotation.y + (b.y - l.rotation.y) * k, l.rotation.z + (b.z - l.rotation.z) * k);
+      aimOff.copy(this.held.position).applyQuaternion(aimQ.setFromEuler(l.rotation));
+      l.position.lerp(aimPos.copy(this.aimAt).sub(aimOff), k);
+    }
     // A drag: the cigarette hand comes up to your mouth, just under the camera, and back down.
     if (this.smokeT >= 0) {
       this.smokeT += dt;

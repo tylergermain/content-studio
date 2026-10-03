@@ -4,8 +4,8 @@ import type { Pos } from '../../sound/places';
 
 // The whisky cabinet: a dram poured from the decanter, and two glasses clinking.
 
-/** How long after the decanter starts to tip the whisky reaches the glass, and how long it runs (see the pour in world.ts). */
-const POUR = { from: 0.72, len: 0.62 } as const;
+/** When in a pour the whisky starts to run into the glass, how long it runs, when the decanter is set down and the stopper goes back in (see POUR in world.ts). */
+const POUR = { from: 1.06, len: 0.52, down: 2.22, stopper: 2.7 } as const;
 
 /**
  * A dram from the decanter: the crystal stopper lifted with a faint ring, the whisky glugging into an
@@ -35,7 +35,9 @@ export function decant(a: AudioCore, at: Pos) {
     n.stop(t + 0.09);
     a.blip(out, t + 0.01, 300 + i * 45, 1.6, 0.05, 0.03);
   }
-  a.clink(out, t0 + 1.95, rand(2500, 2700), 0.025);
+  // The decanter set down on the silver tray, and its stopper back in.
+  a.clink(out, t0 + POUR.down, rand(1700, 1900), 0.02);
+  a.clink(out, t0 + POUR.stopper, rand(2500, 2700), 0.025);
 }
 
 /**

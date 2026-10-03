@@ -2,22 +2,26 @@
  * The whisky cabinet (see shared/whisky.ts): E at one pours you a dram of The Macallan Litha from its
  * decanter, and the glass is in your hand. E sips it (when there's nothing in front of you E would use
  * instead), and you nurse it now and then of your own accord; empty, the glass goes back on the tray.
- * With someone else holding one within a couple of metres, K raises your glass: the glasses clink,
+ * With someone else holding one within a couple of metres, K raises your glass: near enough, the
+ * glasses reach in and clink between you (clink.ts), further off they're raised to each other;
  * "🥃 Cheers" pops up over the heads of everyone in it, and now and then the floor hears who raised a
  * glass. Only what you do yourself sips your dram: a glass raised to you goes up for the clink, no more.
  * Everyone on the floor sees each pour, the glasses in people's hands, and the toast.
  */
+import * as THREE from 'three';
 import { GLASSES, POUR_EVERY_MS, SIPS, WHISKY_NAME, cheersLine } from '../../../shared/whisky';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
 import { modalOpen, toast } from '../../ui/dom';
+import { EYE_HEIGHT } from '../../player';
 import type { Person } from '../../world/character';
 import type { Interactable } from '../../world/types';
+import { CLINK_AT, TOAST_SECONDS, toastPoses, toastStep, type Raised, type Toaster } from './clink';
 import { Dram } from './dram';
-import { heldGlass, type HeldGlass } from './glass';
+import { GLASS, heldGlass, type HeldGlass } from './glass';
 import { Partners, type Holder } from './partners';
-import { Glasses, Pops } from './people';
+import { Glasses, HAND_GLASS, Pops } from './people';
 import { Toast } from './toast';
 import { CHEERS_KEY, showDram } from './ui';
 import { Cabinets, POURED_AT } from './world';
@@ -38,6 +42,21 @@ export interface WhiskyDeps {
 
 /** How full someone else's glass looks: theirs to know, so it's a good pour. */
 const THEIR_LEVEL = 0.75;
+/** How big your own glass is in first person (in your hand, under the camera). */
+const MY_GLASS = 1.1;
+/** How far off a cabinet is out of sight enough to have its decanter filled again (metres), as well as off the screen. */
+const OUT_OF_SIGHT = 14;
+
+/** A toast under way: who's in it (whoever raised it first, then the rest), when it started (seconds), and whether the glasses have met yet. */
+interface Raising {
+  ids: readonly string[];
+  at: number;
+  clinked: boolean;
+}
+
+const frustum = new THREE.Frustum();
+const viewing = new THREE.Matrix4();
+const aim = new THREE.Vector3();
 
 export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
   const cabinets = new Cabinets();
@@ -139,6 +158,8 @@ export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
       return;
     }
     dram.pour(now);
+    // What it's for, with the first glass only: a top-up goes without saying.
+    if (msg.top) return;
     setTimeout(() => {
       if (dram.holding) toast(`🥃 A dram of ${WHISKY_NAME}. E sips it, and ${CHEERS_KEY} clinks glasses with anyone near with one of their own`);
     }, (ready - now) * 1000);
@@ -151,19 +172,75 @@ export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
     toasting.cancel();
   });
 
+  /** The toasts under way, and where each glass in them goes this frame (see clink.ts). */
+  const toasts: Raising[] = [];
+  const raising = new Map<string, { raised: Raised; t: number }>();
   ctx.messages.on('whisky.cheers', (msg) => {
     const yours = toasting.heard(msg, store.you, secs());
-    ctx.sound.cheers({ x: msg.x, y: msg.y + 1.3, z: msg.z });
+    // Every glass in it goes up (yours too, as everyone else sees you), and "Cheers" over each head;
+    // the glasses clink as they meet (see the frame below).
+    toasts.push({ ids: msg.ids, at: secs(), clinked: false });
     for (const id of msg.ids) {
-      // Every glass in it goes up (yours too, as everyone else sees you), and "Cheers" over each head.
-      glasses.toast(id);
       const person = id === store.you ? ctx.me : deps.remotes.get(id)?.person;
       if (person) pops.add(person);
     }
-    // In first person, your glass goes up out to the side, so you see who you clink with.
-    if (yours.raise && dram.holding && ctx.player.view === 'first') ctx.hands.toast();
     if (yours.told) toast(cheersLine(msg.names));
   });
+
+  /** Where `id` stands as you see them, with how big the glass they hold looks, or nothing if you can't see them. */
+  function stood(id: string): Toaster | null {
+    if (id === store.you) {
+      const { pos, view } = ctx.player;
+      return { id, x: pos.x, y: pos.y, z: pos.z, r: GLASS.r * (view === 'first' ? MY_GLASS : HAND_GLASS) };
+    }
+    const at = deps.remotes.get(id)?.person.root.position;
+    return at ? { id, x: at.x, y: at.y, z: at.z, r: GLASS.r * HAND_GLASS } : null;
+  }
+
+  /** Each toast going on: where each glass in it goes now, and the clink as they meet. */
+  function toastsGoOn(now: number) {
+    raising.clear();
+    for (let i = toasts.length - 1; i >= 0; i--) {
+      const toast = toasts[i];
+      const t = now - toast.at;
+      if (t > TOAST_SECONDS) {
+        toasts.splice(i, 1);
+        continue;
+      }
+      const people = toast.ids.map(stood).filter((p): p is Toaster => !!p);
+      // Seen through your own eyes, where they meet comes up into view.
+      const poses = toastPoses(people, ctx.player.view === 'first' ? { id: store.you, height: EYE_HEIGHT } : undefined);
+      for (const r of poses) raising.set(r.id, { raised: r, t });
+      if (toast.clinked || t < CLINK_AT) continue;
+      toast.clinked = true;
+      // Heard where they meet: only glasses that do meet clink.
+      const met = poses.filter((r) => r.touch);
+      if (met.length > 1) ctx.sound.cheers({ x: met.reduce((s, r) => s + r.x, 0) / met.length, y: met[0].y, z: met.reduce((s, r) => s + r.z, 0) / met.length });
+    }
+  }
+
+  /** Your own glass in first person, in a toast: to where it meets the other in front of you (theirs comes to it), or raised toward them. */
+  function aimYours() {
+    const mine = raising.get(store.you);
+    if (!mine || ctx.player.view !== 'first') return ctx.hands.aimHeld(null);
+    const step = toastStep(mine.t, mine.raised.touch);
+    const r = mine.raised;
+    const { camera } = ctx;
+    camera.updateMatrixWorld();
+    camera.worldToLocal(aim.set(r.x - r.tx * step.gap, r.y + step.lift, r.z - r.tz * step.gap));
+    // Its foot, from its middle; not if it's somewhere behind you (you've turned away).
+    aim.y -= (GLASS.h * MY_GLASS) / 2;
+    ctx.hands.aimHeld(aim.z < -0.15 ? aim : null, step.k);
+  }
+
+  /** Whether a decanter at `at` is out of sight: off the screen, or far off. */
+  function unseen(at: THREE.Vector3): boolean {
+    const { camera } = ctx;
+    if (camera.position.distanceTo(at) > OUT_OF_SIGHT) return true;
+    camera.updateMatrixWorld();
+    frustum.setFromProjectionMatrix(viewing.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+    return !frustum.containsPoint(at);
+  }
 
   /** Each holder's entry in `holding`, kept from frame to frame. */
   const entries = new Map<string, { person: Person; level: number }>();
@@ -179,17 +256,24 @@ export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
   /** Everyone with a glass in hand this frame: the same map, and the same entry for each, every frame. */
   const holding = new Map<string, { person: Person; level: number }>();
   let inHandShown = false;
+  /** The furniture's version the cabinets were last looked for in (see FurnitureView.version). */
+  let furnished = -1;
   ctx.ticks.add('others', ({ now: ms, dt }) => {
     const now = ms / 1000;
-    cabinets.sync(ctx.office.furniture.all());
+    // The floor's cabinets, looked for again only when its furniture has been stood anew.
+    const { furniture } = ctx.office;
+    if (furniture.version !== furnished) {
+      furnished = furniture.version;
+      cabinets.sync(furniture.all());
+    }
     // No cabinet on the floor and nobody with a glass (nor one still going up, or a "Cheers" still showing): nothing to do.
-    if (!cabinets.size && !store.drams.size && !dram.holding && glasses.idle && pops.idle) {
+    if (!cabinets.size && !store.drams.size && !dram.holding && glasses.idle && pops.idle && !toasts.length) {
       if (inHandShown) ctx.hands.holdInLeft(null);
       inHandShown = false;
       showDram(0, false, near);
       return;
     }
-    cabinets.update(now, Math.min(GLASSES, store.drams.size));
+    cabinets.update(now, Math.min(GLASSES, store.drams.size), unseen);
     if (pouring.size) for (const [id, until] of pouring) if (now > until + 1) pouring.delete(id);
     if (dram.holding) {
       const { pos } = ctx.player;
@@ -206,9 +290,11 @@ export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
 
     // Your own glass in first person, once it's poured.
     const inHand = dram.holding && mineIn;
-    if (inHand) (mine ??= heldGlass(1.1)).fill(dram.level);
+    if (inHand) (mine ??= heldGlass(MY_GLASS)).fill(dram.level);
     ctx.hands.holdInLeft(inHand ? mine!.group : null);
     inHandShown = inHand;
+    toastsGoOn(now);
+    aimYours();
 
     // Everyone's glass in their hand, yours too (seen in third person).
     holding.clear();
@@ -222,7 +308,7 @@ export function installWhisky(ctx: Ctx, deps: WhiskyDeps) {
       e.level = id === store.you ? dram.level : THEIR_LEVEL;
       holding.set(id, e);
     }
-    glasses.update(holding, dt);
+    glasses.update(holding, raising);
     pops.update(dt);
     showDram(inHand ? Math.round(dram.level * SIPS) : 0, !deps.target() && !ctx.carrying(), near);
   });

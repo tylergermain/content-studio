@@ -21,19 +21,22 @@ footprint (1.2 by 0.45), its doors toward the office's +z. Hung under it, each i
                               same way
     whisky_box_art            the box's left side, front and right side, one wrap mapped 0 to 1 round
                               them from the back of the left side to the back of the right side
-    whisky_decanter           the decanter, its origin under the middle of its base: the office lifts
-                              and tips it to pour
+    whisky_decanter           the decanter, eight cut panels with a bevel between each two, its origin
+                              under the middle of its base: the office lifts and tips it to pour
       whisky_stopper          its stopper, its origin under it, lifted off while it pours
-      whisky_decanter_whisky  the whisky in it, its origin under the decanter's foot: the office
-                              hides it while the decanter is tipped, and a stream pours instead
+      whisky_decanter_whisky  the whisky in it standing, its origin under the decanter's foot: the
+                              office pours with whisky of its own that lies level however the
+                              decanter's tipped (features/whisky/decanter.ts) and hides this one
     whisky_glass_0 .. _3      the glasses, each with its origin under the middle of its base
       whisky_glass_N_dram     the whisky in it, its origin on the glass's inner floor, so scaling it
                               up from nothing fills the glass
 
 Body is the piece's own colour (the office builder's paint, walnut until someone picks another).
-Crystal is the thin glass, Cut the solid crystal (the bases, the stopper), Glint the faint, tapered
-streaks of light on the bottle and the decanter (none on the glasses), Brass the cabinet's pulls and the
-bands on the bottle's capsule, and Label, Crest and Art are the surfaces the office paints its canvases on. The names of the
+Crystal is the thin glass, Cut the solid crystal (the bases, the stopper, the decanter's bevels), Glint
+the faint, tapered streaks of light on the bottle (none on the decanter, where through the whisky one
+read as a crack, nor on the glasses), Sheen the light lying on a couple of the decanter's panels,
+Whisky and WhiskyTop the bottle's whisky and its surface, Brass the cabinet's pulls and the bands on
+the bottle's capsule, and Label, Crest and Art are the surfaces the office paints its canvases on. The names of the
 root, the parts and the materials are a contract with furniture-whisky.ts and
 tests/whisky-model.test.ts, so rename them in all three places. The numbers in TRAY, BOTTLE, DECANTER
 and GLASSES are copied there too.
@@ -58,6 +61,8 @@ COLORS = {
     "Cut": "#cfe6f5",
     "Glint": "#ffffff",
     "Whisky": "#c8741e",
+    "WhiskyTop": "#e0a85a",
+    "Sheen": "#ffffff",
     "Stopper": "#a8322a",
     "Label": "#f6f1e6",
     "Crest": "#2b3a78",
@@ -238,23 +243,26 @@ def bottle(p):
     glass = [(0.0, 0.0), (r - 0.005, 0.0), (r - 0.001, 0.003), (r, 0.01), (r, H(0.741)), (r - 0.001, H(0.768)), (r - 0.005, H(0.794)),
              (r - 0.013, H(0.815)), (r - 0.024, H(0.831)), (neck + 0.003, H(0.843)), (neck + 0.0005, H(0.853)), (neck - 0.001, H(0.87)),
              (neck - 0.0015, H(0.9)), (0.0, H(0.9))]
-    p.add("Crystal", fk.turned, glass, x=x, y=y, z=z, segs=28)
-    p.add("Cut", fk.turned, [(0.0, 0.0015), (r - 0.004, 0.0015), (r - 0.004, 0.009), (0.0, 0.009)], x=x, y=y, z=z, segs=28)
-    # The whisky, a little in from the glass so its wall shows, up to where the shoulders start.
-    i = 0.004
+    p.add("Crystal", fk.turned, glass, x=x, y=y, z=z, segs=24)
+    p.add("Cut", fk.turned, [(0.0, 0.0015), (r - 0.004, 0.0015), (r - 0.004, 0.009), (0.0, 0.009)], x=x, y=y, z=z, segs=24)
+    # The whisky, in from the glass so its wall shows, up to where the shoulders start, and its
+    # surface (WhiskyTop) a lighter gold: the office makes both see-through, as whisky is.
+    i = 0.006
     fill = BOTTLE["fill"]
-    whisky = [(0.0, 0.009), (r - i, 0.009), (r - i, fill - 0.002), (r - i - 0.002, fill), (0.0, fill)]
+    whisky = [(0.0, 0.009), (r - i, 0.009), (r - i, fill - 0.002), (r - i - 0.002, fill)]
     p.add("Whisky", fk.turned, whisky, x=x, y=y, z=z, segs=20)
+    p.add("WhiskyTop", fk.turned, [(r - i - 0.002, fill), (0.0, fill)], x=x, y=y, z=z, segs=20)
     # The capsule over the cork: red, ribbed at the top, with a gold band round its foot and a fine one higher up.
     cap = neck + 0.0015
     capsule = [(0.0, H(0.891)), (cap, H(0.891)), (cap, H(0.982)), (cap - 0.001, H(0.995)), (cap - 0.008, H(1.0) - 0.0005), (0.0, H(1.0))]
     p.add("Stopper", fk.turned, capsule, x=x, y=y, z=z, segs=20)
     p.add("Brass", fk.turned, [(0.0, H(0.888)), (cap + 0.0005, H(0.888)), (cap + 0.0005, H(0.904)), (0.0, H(0.904))], x=x, y=y, z=z, segs=20)
     p.add("Brass", fk.turned, [(0.0, H(0.966)), (cap + 0.0003, H(0.966)), (cap + 0.0003, H(0.971)), (0.0, H(0.971))], x=x, y=y, z=z, segs=20)
-    # Faint slivers of light on the glass where the wrap and the crest don't cover it: out past the
-    # crest's edge up to the shoulder, and down the neck.
+    # Faint slivers of light on the glass where the wrap doesn't cover it, over the whisky up to the
+    # shoulder (on either side of the crest, so the whisky reads as behind glass), and down the neck.
     lo, hi, _ = BOTTLE["label"]
-    p.add("Glint", glint, x, z, r + 0.0012, hi + 0.008, H(0.735), a=-64.0, wide=3.5, base=y, smooth=False)
+    p.add("Glint", glint, x, z, r + 0.0012, hi + 0.006, H(0.738), a=-34.0, wide=5.0, base=y, smooth=False)
+    p.add("Glint", glint, x, z, r + 0.0012, hi + 0.012, H(0.725), a=50.0, wide=2.5, base=y, smooth=False)
     p.add("Glint", glint, x, z, neck + 0.0016, H(0.846), H(0.884), a=-40.0, wide=7.0, base=y, smooth=False)
 
     lo, hi, arc = BOTTLE["label"]
@@ -277,21 +285,78 @@ def box(p):
     return art.finish("whisky_box_art", weighted=False)
 
 
-# ---- The decanter -----------------------------------------------------------------------------------
+# ---- The decanter ----------------------------------------------------------------------------------
 #
-# Cut crystal: an eight-sided body, its facets catching the light, a short neck, and a faceted ball
-# of a stopper. The whisky in it is its own object (the office hides it while it's tipped), about
-# half full, so the glass above it shows.
+# Cut crystal: eight flat panels round its body and up its shoulders, with a narrow bevel cut between
+# each two that catches the light (Cut), a short neck with a lip, a thick cut foot, and a faceted ball
+# of a stopper. Two of the panels have a sheen of light on them (Sheen): the whole flat face, not a
+# streak, so through the whisky it reads as light on a cut, not a crack. The whisky in it is its own
+# object, about half full, so the glass above it shows; the office pours with whisky of its own that
+# keeps level as the decanter tips (features/whisky/decanter.ts) and hides this one.
+
+# Its outline: (radius out to a panel's corners, height over its foot), from the foot up to the lip.
+DECANTER_BODY = [(0.0, 0.0), (0.05, 0.0), (0.057, 0.008), (0.06, 0.13), (0.052, 0.158), (0.032, 0.18), (0.018, 0.19),
+                 (0.016, DECANTER["lip"] - 0.008), (0.021, DECANTER["lip"] - 0.004), (0.021, DECANTER["lip"]), (0.0, DECANTER["lip"])]
+# Its panels, eight round it with one facing the front, each this many degrees of the 45 there are to each (the rest the bevel).
+PANEL = 37.5
+
+
+def faceted(bm, profile, x, y, z, cut):
+    """The decanter's body: `profile` [(radius, height), ...] turned round its eight panels, with
+    `cut` False the panels and True the narrow bevels between them (each its own material)."""
+    edges = sorted(a for k in range(8) for a in (k * 45 - PANEL / 2, k * 45 + PANEL / 2))
+    rings = []
+    for r, h in profile:
+        if r <= 1e-6:
+            rings.append([bm.verts.new(at(x, y + h, z))])
+        else:
+            rings.append([bm.verts.new(at(x + r * math.sin(math.radians(a)), y + h, z + r * math.cos(math.radians(a)))) for a in edges])
+    faces = []
+    n = len(edges)
+    # Panels start at an even corner (each one's left edge), the bevels at an odd one.
+    for lo, hi in zip(rings, rings[1:]):
+        for i in range(1 if cut else 0, n, 2):
+            quad = [lo[i % len(lo)], lo[(i + 1) % n % len(lo)], hi[(i + 1) % n % len(hi)], hi[i % len(hi)]]
+            quad = [v for k, v in enumerate(quad) if v not in quad[:k]]
+            if len(quad) >= 3:
+                faces.append(bm.faces.new(quad))
+    mid = at(x, y + profile[-1][1] / 2, z)
+    bm.normal_update()
+    for f in faces:
+        if f.normal.dot(f.calc_center_median() - Vector(mid)) < 0:
+            f.normal_flip()
+
+
+def sheen(bm, x, y, z, a, h0, h1, inset=0.16, lift=1.008):
+    """Light on the decanter's panel facing `a` degrees round from the front, from h0 up to h1 over
+    its foot: a flat face just over the panel, a little in from its edges."""
+    def radius(h):
+        for (r0, y0), (r1, y1) in zip(DECANTER_BODY, DECANTER_BODY[1:]):
+            if y0 <= h <= y1 and y1 > y0:
+                return r0 + (r1 - r0) * (h - y0) / (y1 - y0)
+        return DECANTER_BODY[-2][0]
+    half = PANEL / 2 * (1 - 2 * inset)
+    corners = []
+    for h in (h0, h1):
+        r = radius(h) * math.cos(math.radians(PANEL / 2)) / math.cos(math.radians(half)) * lift
+        corners.append([at(x + r * math.sin(math.radians(a + s * half)), y + h, z + r * math.cos(math.radians(a + s * half))) for s in (-1, 1)])
+    (a0, b0), (a1, b1) = corners
+    f = bm.faces.new([bm.verts.new(c) for c in (a0, b0, b1, a1)])
+    outward(bm, [f], at(x, y + (h0 + h1) / 2, z))
+
 
 def decanter(root):
     x, z, y = DECANTER["x"], DECANTER["z"], TRAY["y"]
     lip = DECANTER["lip"]
     p = piece()
-    body = [(0.0, 0.0), (0.05, 0.0), (0.057, 0.008), (0.06, 0.13), (0.052, 0.158), (0.032, 0.18), (0.018, 0.19),
-            (0.016, lip - 0.008), (0.021, lip - 0.004), (0.021, lip), (0.0, lip)]
-    p.add("Crystal", fk.turned, body, x=x, y=y, z=z, segs=8, smooth=False)
-    p.add("Cut", fk.turned, [(0.0, 0.001), (0.052, 0.001), (0.052, 0.014), (0.0, 0.014)], x=x, y=y, z=z, segs=8, smooth=False)
-    p.add("Glint", glint, x, z, 0.0615, 0.03, 0.12, a=-22.5, wide=4.5, base=y, smooth=False)
+    p.add("Crystal", faceted, DECANTER_BODY, x, y, z, False, smooth=False)
+    p.add("Cut", faceted, DECANTER_BODY, x, y, z, True, smooth=False)
+    # Its foot, a thick slab of crystal.
+    p.add("Cut", faceted, [(0.0, 0.001), (0.052, 0.001), (0.052, 0.014), (0.0, 0.014)], x, y, z, False, smooth=False)
+    # Light on the panel to the front's left, down its body and on its shoulder, and fainter on the right.
+    p.add("Sheen", sheen, x, y, z, -45, 0.022, 0.122, smooth=False)
+    p.add("Sheen", sheen, x, y, z, -45, 0.134, 0.153, inset=0.22, smooth=False)
+    p.add("Sheen", sheen, x, y, z, 90, 0.05, 0.11, inset=0.3, smooth=False)
     ob = p.finish("whisky_decanter", weighted=False)
     hang(ob, root, (x, y, z))
 

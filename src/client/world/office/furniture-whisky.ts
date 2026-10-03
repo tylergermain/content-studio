@@ -4,6 +4,7 @@ import { toon } from '../toon';
 import type { Builders } from './furniture-kit';
 import { boxArtTexture, wrapTexture } from './whisky-art';
 import { crestTexture } from './whisky-label';
+import { GLASS_ORDER, LIQUID_ORDER, dramGeometry, liquid } from './whisky-liquid';
 
 // The whisky cabinet's builder (see furniture.ts, and shared/furniture.ts for its footprint): a walnut
 // sideboard with The Macallan Litha, a decanter and four glasses on a silver tray, and the bottle's box
@@ -15,7 +16,7 @@ import { crestTexture } from './whisky-label';
 
 /** The parts features/whisky moves, by the names they have in whisky.glb. */
 export const WHISKY_PARTS = {
-  /** The decanter, its origin under the middle of its base; its stopper, its origin under it; and the whisky in it, hidden while it's tipped. */
+  /** The decanter, its origin under the middle of its base; its stopper, its origin under it; and the whisky in it, standing (features/whisky pours with its own, which lies level). */
   decanter: 'whisky_decanter',
   stopper: 'whisky_stopper',
   contents: 'whisky_decanter_whisky',
@@ -25,17 +26,27 @@ export const WHISKY_PARTS = {
 } as const;
 
 /**
- * What the pour goes by, from build_whisky.py: how high the decanter's lip is over its foot, a glass's
- * rim over its foot, how high the stopper's ball is over its origin, and where on the tray (the
- * cabinet's own frame) the ball's middle is while it pours: laid on its side, a ball's radius over the
- * tray, between the bottle and the decanter.
+ * What the pour goes by, from build_whisky.py: how high the decanter's lip is over its foot and how far
+ * out its edge is; a glass's rim over its foot, its floor (where its whisky stands), how far in its
+ * wall is and how deep a dram in it is; how high the stopper's ball is over its origin, and where on
+ * the tray (the cabinet's own frame) the ball's middle is while it pours: laid on its side, a ball's
+ * radius over the tray, between the bottle and the decanter.
  */
-export const WHISKY_SIZES = { lip: 0.226, rim: 0.085, stopperBall: 0.036, stopperDown: [0.02, 0.837, 0.09] } as const;
+export const WHISKY_SIZES = {
+  lip: 0.226,
+  lipRadius: 0.021,
+  rim: 0.085,
+  glassFloor: 0.016,
+  glassInside: 0.0365,
+  dram: 0.032,
+  stopperBall: 0.036,
+  stopperDown: [0.02, 0.837, 0.09],
+} as const;
 
 /** The office's outline round glass: a blue-grey, so it reads as an edge of crystal, not an ink line drawn round it, and shows on a pale floor. */
 const GLASS_EDGE = { color: [0.36, 0.48, 0.62], alpha: 0.95, thickness: 0.003 };
 /** The decanter's, a little stronger: half of it is empty glass, and it has to stand out against the floor behind it. */
-const DECANTER_EDGE = { color: [0.27, 0.37, 0.5], alpha: 1, thickness: 0.0045 };
+const DECANTER_EDGE = { color: [0.24, 0.34, 0.48], alpha: 1, thickness: 0.005 };
 
 /**
  * See-through and a little blue: the walls of the bottle, the decanter and the glasses (and the glass
@@ -47,13 +58,6 @@ export function glass(color: string, opacity: number, edge: object = GLASS_EDGE)
   m.opacity = opacity;
   m.depthWrite = false;
   m.userData.outlineParameters = edge;
-  return m;
-}
-
-/** Whisky: a deep golden amber with a little glow of its own, so it reads as a liquid through the glass, not painted wood. */
-export function whisky(color = '#a9580c'): THREE.MeshToonMaterial {
-  const m = toon(color, { emissive: '#3c1a02' }).clone();
-  m.userData.outlineParameters = { color: [0.42, 0.22, 0.06], alpha: 0.7, thickness: 0.002 };
   return m;
 }
 
@@ -70,6 +74,8 @@ function painted(map: THREE.Texture, clear = false): THREE.MeshToonMaterial {
 }
 
 let made: Record<string, THREE.Material> | null = null;
+/** The whisky in a glass on the tray, every cabinet's. */
+let trayDram: THREE.BufferGeometry | null = null;
 
 /** Every material but Body, made the first time a cabinet is built and shared by all of them. */
 function materials(): Record<string, THREE.Material> {
@@ -84,12 +90,18 @@ function materials(): Record<string, THREE.Material> {
     Silver: toon('#d3d8de'),
     Stopper: toon('#a8322a'),
     Box: toon('#26245a'),
-    Whisky: whisky(),
+    // The bottle's whisky, see-through as whisky is, under a lighter surface (whisky-liquid.ts).
+    Whisky: liquid().shaded,
+    WhiskyTop: liquid().top,
     // A cool grey-blue, thin enough that the whisky behind it stays amber: its edge is what shows the
     // glass over the whisky against a pale floor (GLASS_EDGE).
-    Crystal: glass('#cfe0ee', 0.26),
-    Decanter: glass('#bfd4e6', 0.32, DECANTER_EDGE),
+    Crystal: glass('#d8e6f1', 0.2),
+    Decanter: glass('#c8dbea', 0.26, DECANTER_EDGE),
     Cut: glass('#c6dcee', 0.5),
+    // The bevels between the decanter's panels, catching the light.
+    Bevel: glass('#f2f8ff', 0.62, DECANTER_EDGE),
+    // Light lying on a whole panel of the decanter: faint, and no edge of its own.
+    Sheen: glass('#ffffff', 0.2, { visible: false }),
     Glint: glint,
     Label: painted(wrapTexture()),
     Crest: painted(crestTexture(), true),
@@ -109,14 +121,30 @@ function whiskyCabinet(color: string): THREE.Group {
     // Glass and light cast no shadow.
     if (m.isMesh && (m.material as THREE.Material).transparent) m.castShadow = false;
   });
+  // The whisky in each glass on the tray, as a dram is in a glass in hand (empty until it's poured).
   for (let i = 0; i < 4; i++) {
-    const dram = g.getObjectByName(WHISKY_PARTS.dram(i));
-    if (dram) dram.visible = false;
+    const dram = g.getObjectByName(WHISKY_PARTS.dram(i)) as THREE.Mesh | undefined;
+    if (!dram?.isMesh) continue;
+    dram.geometry = trayDram ??= dramGeometry(WHISKY_SIZES.glassInside, WHISKY_SIZES.dram, 16);
+    dram.material = [liquid().side, liquid().top];
+    dram.visible = false;
   }
-  // The decanter's crystal a shade stronger than the bottle's and the glasses' (its stopper and its whisky are Cut and Whisky).
-  g.getObjectByName(WHISKY_PARTS.decanter)?.traverse((o) => {
+  // The decanter's crystal a shade stronger than the bottle's and the glasses', and its bevels brighter
+  // (its foot is a bevel too; its stopper stays Cut).
+  const decanter = g.getObjectByName(WHISKY_PARTS.decanter);
+  const own = (o: THREE.Object3D) => o.name !== WHISKY_PARTS.stopper && o.name !== WHISKY_PARTS.contents;
+  // Its own shapes: itself, or each of its materials' (not its stopper's nor its whisky's).
+  for (const o of decanter ? [decanter, ...decanter.children.filter(own)] : []) {
     const m = o as THREE.Mesh;
-    if (m.isMesh && m.material === mats.Crystal) m.material = mats.Decanter;
+    if (m.isMesh) m.material = m.material === mats.Crystal ? mats.Decanter : m.material === mats.Cut ? mats.Bevel : m.material;
+  }
+  // See-through things in their order: the whisky, then the glass round it.
+  g.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    const all = Array.isArray(m.material) ? m.material : [m.material];
+    if (all.some((x) => x === mats.Whisky || x === mats.WhiskyTop || x === liquid().side)) m.renderOrder = LIQUID_ORDER;
+    else if (all.some((x) => x.transparent)) m.renderOrder = GLASS_ORDER;
   });
   return g;
 }

@@ -14,10 +14,12 @@ export const GLASSES = 4;
 /** A dram goes in this many sips. */
 export const SIPS = 5;
 /**
- * How near two people with a dram stand to clink glasses (metres apart on the floor), and how far
- * apart in height they may be (on the same floor, not one on the stairs over the other).
+ * How near two people with a dram stand to raise a glass to each other (metres apart on the floor),
+ * and how far apart in height they may be (on the same floor, not one on the stairs over the other);
+ * and how near for their glasses to meet, as far as arms reach (further than that, they're raised
+ * toward each other from where they stand: see client/features/whisky/clink.ts).
  */
-export const CLINK = { reach: 2, rise: 1.2 } as const;
+export const CLINK = { reach: 2, rise: 1.2, touch: 1.3 } as const;
 /** The most people one toast takes in. */
 export const CLINK_MOST = 5;
 /** How far from the cabinet's front the office lets a pour through: its reach, and some for the lag. */
