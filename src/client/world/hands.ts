@@ -49,6 +49,8 @@ export class Hands {
   private wantsMug = false;
   /** A drink from the rooftop bar, held where the mug goes (and in its place). */
   private glass: { id: string; group: THREE.Group } | null = null;
+  /** Something a feature hands you to hold there instead (a dram from the whisky cabinet, see holdInLeft). */
+  private held: THREE.Object3D | null = null;
   /** An issue card off the board, held low in front of you in both hands. */
   private holder = new THREE.Group();
   private card: HeldCard;
@@ -217,8 +219,26 @@ export class Hands {
   holdMug(on: boolean) {
     this.wantsMug = on;
     const full = this.card.held || !!this.book || this.wantsBall;
-    this.mug.visible = on && !full && !this.glass;
+    this.mug.visible = on && !full && !this.glass && !this.held;
     if (this.glass) this.glass.group.visible = !full;
+    if (this.held) this.held.visible = !full;
+  }
+
+  /**
+   * Holds `o` in your left hand where the mug goes, upright, standing on y = 0 (a dram from the whisky
+   * cabinet, see features/whisky), or lets go of whatever it held (null). It's the feature's own: it
+   * comes out of your hand, and nothing of it is freed here. The mug waits while you hold it.
+   */
+  holdInLeft(o: THREE.Object3D | null) {
+    if (o === this.held) return;
+    this.held?.removeFromParent();
+    this.held = o;
+    if (o) {
+      o.position.set(0.09, -0.035, -0.03);
+      o.quaternion.setFromEuler(this.left.baseRot).invert();
+      this.left.group.add(o);
+    }
+    this.holdMug(this.wantsMug);
   }
 
   /** A drink from the rooftop bar in the left hand, or none (null). */

@@ -34,6 +34,7 @@ import { upgrade } from './upgrade';
 import { usage } from './usage';
 import { watch } from './watch';
 import { whiteboard } from './whiteboard';
+import { whisky } from './whisky';
 
 export const SLICES: readonly Slice[] = [
   presence,
@@ -65,4 +66,5 @@ export const SLICES: readonly Slice[] = [
   watch,
   goat,
   hoop,
+  whisky,
 ];

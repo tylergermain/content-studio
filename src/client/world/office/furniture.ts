@@ -9,6 +9,7 @@ import { ROOMS_BUILDERS } from './furniture-rooms';
 import { SCREENS_BUILDERS } from './furniture-screens';
 import { STUDIO_BUILDERS } from './furniture-studio';
 import { TICKER_BUILDERS } from './furniture-ticker';
+import { WHISKY_BUILDERS } from './furniture-whisky';
 import { PALETTE, box } from './materials';
 
 export type { BuiltPiece } from './furniture-kit';
@@ -233,6 +234,7 @@ const BUILDERS: Builders = {
   ...SCREENS_BUILDERS,
   ...TICKER_BUILDERS,
   ...PLAY_BUILDERS,
+  ...WHISKY_BUILDERS,
 };
 
 /**

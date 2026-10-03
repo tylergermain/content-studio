@@ -68,6 +68,7 @@ import { installScreens } from './features/screens';
 import { installStudio } from './features/studio';
 import { installWorkstation } from './features/workstation';
 import { installWhiteboard } from './features/whiteboard';
+import { installWhisky } from './features/whisky';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
@@ -181,6 +182,7 @@ installPlaythings(ctx, { snack: () => parts.coffee.drink() });
 parts.studio = installStudio(ctx, { redress: () => parts.boards.dressBoards(ctx.world()) });
 installGong(ctx, { burstOver: parts.views.burstOver, workerViews: parts.views.workerViews, idleAgents: () => parts.worlds.idleAgents() });
 parts.goat = installGoat(ctx);
+installWhisky(ctx, { remotes: parts.peers.remotes, target: () => parts.pointer.target() });
 
 parts.hintbar = installHintBar(ctx, core, parts);
 parts.emotes = installEmotes(ctx, { personOf });

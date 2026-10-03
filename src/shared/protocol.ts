@@ -19,6 +19,7 @@ import type { StudioClientMsg, StudioServerMsg } from './protocol/studio.js';
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
 import type { WatchServerMsg } from './protocol/watch.js';
+import type { WhiskyClientMsg, WhiskyServerMsg } from './protocol/whisky.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
 
 export * from './protocol/accounts.js';
@@ -37,6 +38,7 @@ export * from './protocol/studio.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
 export * from './protocol/watch.js';
+export * from './protocol/whisky.js';
 export * from './protocol/workers.js';
 
 export type ClientMsg =
@@ -63,7 +65,8 @@ export type ClientMsg =
   | DogClientMsg
   | GoatClientMsg
   | StudioClientMsg
-  | HoopClientMsg;
+  | HoopClientMsg
+  | WhiskyClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -81,4 +84,5 @@ export type ServerMsg =
   | GoatServerMsg
   | StudioServerMsg
   | WatchServerMsg
-  | HoopServerMsg;
+  | HoopServerMsg
+  | WhiskyServerMsg;

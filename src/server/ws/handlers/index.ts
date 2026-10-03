@@ -25,6 +25,7 @@ import { signinsHandlers } from './signins.js';
 import { teamHandlers } from './team.js';
 import { usageHandlers } from './usage.js';
 import { whiteboardHandlers, whiteboardHooks, whiteboardView } from './whiteboard.js';
+import { whiskyHandlers, whiskyHooks, whiskyView } from './whisky.js';
 import { workerHandlers, workerHooks, workersView } from './workers.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
@@ -54,6 +55,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...teamHandlers,
   ...usageHandlers,
   ...whiteboardHandlers,
+  ...whiskyHandlers,
   ...workerHandlers,
 };
 
@@ -61,7 +63,7 @@ export const handlers: HandlerMap<ClientMsg> = {
  * The features that keep something per person on a floor, in the order they let go of it when
  * someone leaves the floor or the office (see FeatureHooks): the order the office has always done it in.
  */
-export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, hoopHooks];
+export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, hoopHooks, whiskyHooks];
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
@@ -85,4 +87,5 @@ export const views: ViewPieces = {
   studio: studioView,
   ticker: tickerView,
   watch: watchView,
+  whisky: whiskyView,
 };

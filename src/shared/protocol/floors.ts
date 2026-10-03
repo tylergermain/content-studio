@@ -140,6 +140,8 @@ export interface FloorView {
   ticker: TickerState;
   /** The newest videos from the YouTube channels this floor watches (none, when it watches none). */
   watch: WatchState;
+  /** Who on this floor has a dram from a whisky cabinet in their hand, by peer id (see shared/whisky.ts). */
+  whisky: string[];
 }
 
 export type FloorClientMsg =
