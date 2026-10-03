@@ -111,8 +111,9 @@ test('the faces to hang on: the outside walls, and both sides of every wall the 
   const split = [wall('low', 'wall', 0, 9), wall('high', 'wall', -10, 9, 0, { level: 1 })];
   assert.deepEqual(wallFaces(split, 0, BIG).filter((f) => f.piece).map((f) => f.piece), ['low', 'low']);
   assert.deepEqual(wallFaces(split, 1, BIG).filter((f) => f.piece).map((f) => f.piece), ['high', 'high']);
-  // Upstairs the outside walls are the ones the deck reaches: none on a floor with no deck to furnish.
-  assert.deepEqual(wallFaces([], 1), []);
+  // Upstairs the outside walls are the ones the deck reaches: none on a floor with no deck, and the
+  // loft's two while the boss's office has it (the same as an empty loft's).
+  assert.deepEqual(wallFaces([], 1), wallFaces([], 1, EMPTY_LOFT));
   assert.deepEqual(wallFaces(split, 1, { mezzanine: 'none' }), []);
   assert.deepEqual(wallFaces([], 1, EMPTY_LOFT).map((f) => f.rotY), [SOUTH, EAST]);
   const loftSouth = wallFaces([], 1, EMPTY_LOFT)[0];
@@ -197,8 +198,10 @@ test('upstairs a painting hangs on the walls up there, and under the big mezzani
   assert.equal(problemAt(withPieces([{ ...high, level: undefined }, painting(-10, 9.07, NORTH, up)], base), 'art', BIG), NEEDS);
   assert.equal(problemAt(withPieces([high, painting(-10, 9.07, NORTH)], base), 'art', BIG), NEEDS, 'nor the other way round');
   assert.equal(problemAt(withPieces([painting(0, -13, NORTH, up)], base), 'art', BIG), 'Painting must stay on the mezzanine');
-  // In a loft the boss's office has, nothing: in an empty one, its south and east walls, under its roof.
-  assert.equal(problemAt(withPieces([painting(14, 13, SOUTH, up)]), 'art'), "Painting is upstairs, where the boss's office is");
+  // In a loft the boss's office has, its south and east walls clear of what's against them (tests/boss-loft.test.ts);
+  // in an empty one, the same walls, under its roof.
+  assert.equal(problemAt(withPieces([painting(14, 13, SOUTH, up)]), 'art'), undefined);
+  assert.equal(problemAt(withPieces([painting(11, 13, SOUTH, up)]), 'art'), 'Painting is in the way of the window');
   assert.equal(problemAt(withPieces([painting(14, 13, SOUTH, up)]), 'art', EMPTY_LOFT), undefined);
   assert.equal(problemAt(withPieces([painting(14, 13, SOUTH, { ...up, lift: 2.4, size: 1.2, aspect: 0.75 })]), 'art', EMPTY_LOFT), 'Painting is too tall for the loft');
 

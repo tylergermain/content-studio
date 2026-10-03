@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { BOSS_COUCH, BOSS_PLANTS, BOSS_SIGN, BOSS_THINGS } from '../../../shared/boss-walls';
 import { LOFT } from '../../../shared/layout';
 import { hasBoss } from '../../../shared/mezzanine';
-import { mesh, roundedBox, textPlane, toon } from '../toon';
+import { mesh, roundedBox, textPlane, toon, toonUnique } from '../toon';
 import type { Collider, Interactable } from '../types';
+import { bossLook, paletteOf, type BossLook } from './boss-look';
 import { keep, type Fixture } from './fixture';
 import { PALETTE, box } from './materials';
 import { floorPlant, pendant, plant } from './props';
@@ -15,12 +17,15 @@ interface BossOffice {
   interactables: Interactable[];
   /** The monitor on the boss's desk. */
   screen: THREE.Mesh;
+  /** Covers the couch and its cushion, lays the rug and shades the lamp in `look` (see boss-look.ts). */
+  paint(look: BossLook): void;
 }
 
 /**
  * What makes the corner loft the boss's office: the big desk facing the glass, a comfy couch, a
  * telescope aimed at the desks, the lamp over the desk and the signs. The room itself (its floor, glass,
- * roof and stairs) is the loft's (loft.ts).
+ * roof and stairs) is the loft's (loft.ts). Where what's against its walls stands is shared/boss-walls.ts's,
+ * which keeps the paintings up here clear of it.
  */
 export function buildBossOffice(): BossOffice {
   const group = new THREE.Group();
@@ -32,6 +37,11 @@ export function buildBossOffice(): BossOffice {
   const roofY = floorY + height;
   const woodMat = toon(PALETTE.wood);
   const inkMat = toon(PALETTE.deskLeg);
+  // What's in the floor's own colors, painted again whenever the floor is (see paint).
+  const couchMat = toonUnique(PALETTE.ink);
+  const cushionMat = toonUnique(PALETTE.wallTrim);
+  const rugMat = toonUnique(PALETTE.wall);
+  const shadeMat = toonUnique(PALETTE.wallTrim);
 
   const deskX = cx + 0.5;
   const deskZ = cz - 0.3;
@@ -62,18 +72,18 @@ export function buildBossOffice(): BossOffice {
   group.add(desk);
   colliders.push({ minX: deskX - 1.3, maxX: deskX + 1.3, minZ: deskZ - 0.6, maxZ: deskZ + 0.6, bottom: floorY, top: floorY + 0.8 });
 
+  // The couch, its back to the east wall: 2.5 long over its arms (BOSS_COUCH), its back 1.0 high.
   const couch = new THREE.Group();
-  const couchMat = toon('#ef476f');
   couch.add(mesh(roundedBox(1, 0.45, 2.4, 0.2), couchMat, 0, 0.3, 0));
   couch.add(mesh(roundedBox(0.35, 0.9, 2.4, 0.15), couchMat, 0.45, 0.55, 0));
   for (const sz of [-1, 1]) couch.add(mesh(roundedBox(1, 0.7, 0.3, 0.15), couchMat, 0, 0.45, sz * 1.1));
-  couch.add(mesh(roundedBox(0.2, 0.45, 0.5, 0.1), toon('#ffd166'), 0.2, 0.75, 0.4));
-  couch.position.set(maxX - 0.65, floorY, cz);
+  couch.add(mesh(roundedBox(0.2, 0.45, 0.5, 0.1), cushionMat, 0.2, 0.75, 0.4));
+  couch.position.set(BOSS_COUCH.x, floorY, BOSS_COUCH.z);
   group.add(couch);
-  colliders.push({ minX: maxX - 1.15, maxX, minZ: cz - 1.2, maxZ: cz + 1.2, bottom: floorY, top: floorY + 0.55 });
+  colliders.push({ minX: BOSS_COUCH.x - 0.5, maxX, minZ: BOSS_COUCH.z - 1.2, maxZ: BOSS_COUCH.z + 1.2, bottom: floorY, top: floorY + 0.55 });
   seatable(couch, 'loft-couch', 1.8, interactables);
 
-  const rug = mesh(roundedBox(4.6, 0.02, 3.2, 0.6), toon('#caffbf'), deskX - 0.3, floorY + 0.015, cz + 0.1, false);
+  const rug = mesh(roundedBox(4.6, 0.02, 3.2, 0.6), rugMat, deskX - 0.3, floorY + 0.015, cz + 0.1, false);
   group.add(rug);
 
   const scope = new THREE.Group();
@@ -98,10 +108,7 @@ export function buildBossOffice(): BossOffice {
   interactables.push(telescope);
   colliders.push({ minX: minX + 0.65, maxX: minX + 1.15, minZ: minZ + 0.65, maxZ: minZ + 1.15, bottom: floorY, top: floorY + 1.3 });
 
-  for (const [i, [px, pz, s]] of [
-    [maxX - 0.6, minZ + 0.6, 1],
-    [maxX - 0.6, maxZ - 0.6, 1.2],
-  ].entries()) {
+  for (const [i, { x: px, z: pz, scale: s }] of BOSS_PLANTS.entries()) {
     // Starting past the monstera, which spreads too wide for a corner this tight.
     const p = plant(floorPlant(i + 1), s);
     p.position.set(px, floorY, pz);
@@ -112,7 +119,7 @@ export function buildBossOffice(): BossOffice {
 
   // The lamp over the desk is the office's, not the room's: it hangs at head height, and an empty loft
   // takes furniture nearly up to its roof.
-  const lamp = pendant();
+  const lamp = pendant(undefined, shadeMat);
   lamp.position.set(deskX, roofY - 0.4, cz);
   group.add(lamp);
 
@@ -120,7 +127,7 @@ export function buildBossOffice(): BossOffice {
   // up under the ceiling, which leaves the wall behind the desk free for a row of pictures.
   const inside = textPlane('👑 Boss Office', { bg: '#fffaf3', size: 64 });
   inside.scale.multiplyScalar(0.6);
-  inside.position.set(maxX - 3, floorY + 2.52, maxZ - 0.04);
+  inside.position.set(BOSS_SIGN.u, floorY + BOSS_SIGN.y, maxZ - 0.04);
   inside.rotation.y = Math.PI;
   group.add(inside);
   const outside = textPlane('👑 Boss Office', { bg: '#2b2d42', color: '#fffaf3', size: 64, border: '#fffaf3' });
@@ -129,7 +136,14 @@ export function buildBossOffice(): BossOffice {
   outside.position.set(cx, roofY + 0.2, minZ - 0.07);
   outside.rotation.y = Math.PI;
   group.add(outside);
-  return { group, colliders, interactables, screen };
+
+  const paint = (look: BossLook) => {
+    couchMat.color.set(look.couch);
+    cushionMat.color.set(look.cushion);
+    rugMat.color.set(look.rug);
+    shadeMat.color.set(look.shade);
+  };
+  return { group, colliders, interactables, screen, paint };
 }
 
 declare module '../types' {
@@ -142,13 +156,24 @@ declare module '../types' {
 /**
  * The boss's office, up in the corner loft. It's the floor's choice (see hasBoss): a floor with no
  * corner loft, or one that keeps the loft an empty room for its own furniture, has the lot put away,
- * with what you'd bump into and what you'd use or sit on in it, and pictures can hang where its couch
- * and its sign were. The monitor is always given: nothing shows on it while it's put away.
+ * with what you'd bump into and what you'd use or sit on in it, and pictures can hang where its couch,
+ * its plants and its sign were. The monitor is always given: nothing shows on it while it's put away.
+ * It's in the floor's colors: whenever the floor's walls and trim are painted again (see Office.setLook),
+ * so are its couch, its cushion, its rug and its lamp's shade.
  */
 export const bossOffice: Fixture<'bossScreen'> = (site) => {
   const built = buildBossOffice();
-  // What it has against the loft's walls, which pictures stay clear of: the couch and the sign.
-  const marks = [site.wall('east', (LOFT.minZ + LOFT.maxZ) / 2, LOFT.y + 0.5, 2.4, 1), site.wall('south', LOFT.maxX - 3, LOFT.y + 1.9, 2.6, 0.6)];
+  // What it has against the loft's walls, which pictures stay clear of: the couch, the plants and the sign.
+  const marks = BOSS_THINGS.map((t) => site.wall(t.wall, (t.u0 + t.u1) / 2, LOFT.y + (t.y0 + t.y1) / 2, t.u1 - t.u0, t.y1 - t.y0));
+  // The walls' and the trim's paint it was last in, as numbers (a look is nothing more than those two to it).
+  let seen = [-1, -1];
+  const follow = () => {
+    const { wall, trim } = site.looks;
+    if (wall.color.getHex() === seen[0] && trim.color.getHex() === seen[1]) return;
+    seen = [wall.color.getHex(), trim.color.getHex()];
+    built.paint(bossLook(paletteOf(`#${wall.color.getHexString()}`, `#${trim.color.getHexString()}`)));
+  };
+  follow();
   let there = false;
   built.group.visible = false;
   for (const mark of marks) mark.off = true;
@@ -164,5 +189,6 @@ export const bossOffice: Fixture<'bossScreen'> = (site) => {
     for (const it of built.interactables) it.off = !there;
     for (const mark of marks) mark.off = !there;
   });
-  return { group: built.group, handle: { bossScreen: built.screen } };
+  // Office.setLook paints the walls and the trim and nothing else, so the office looks at them each frame.
+  return { group: built.group, handle: { bossScreen: built.screen }, update: follow };
 };

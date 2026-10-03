@@ -4,11 +4,12 @@ import { deskPoint } from '../../../shared/nav';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, DeskView, Interactable } from '../types';
 import type { Fixture } from './fixture';
+import { vacancyMarker } from './hire-marker';
 import { PALETTE, box } from './materials';
 import { deskBooks, deskMug, plant } from './props';
 
 // Where people sit: the seats you use (see SEATING), and the desks, bean bags and board agents' kiosks
-// that workers sit (or stand) at, with the "+" over a free one.
+// that workers sit (or stand) at, with the "+" over a free one (see hire-marker.ts).
 
 /** Makes `obj` somewhere to sit (see SEATING): walk up to it, or look at it, and press E. */
 export function seatable(obj: THREE.Object3D, seatId: string, radius: number, interactables: Interactable[]) {
@@ -102,16 +103,6 @@ export function buildDesk(def: DeskDef, index: number, trimMat: THREE.Material):
   group.add(vacancy);
 
   return { def, group, laptopAnchor, seatAnchor, stage, chair: ch, vacancy, vacancyY };
-}
-
-/** The floating green "+" over an empty seat. */
-export function vacancyMarker(y: number): THREE.Group {
-  const vacancy = new THREE.Group();
-  const plusMat = toon('#7cf29a', { emissive: '#1f7a3a' });
-  vacancy.add(mesh(box(0.28, 0.08, 0.08), plusMat, 0, 0, 0, false));
-  vacancy.add(mesh(box(0.08, 0.28, 0.08), plusMat, 0, 0, 0, false));
-  vacancy.position.set(0, y, 0);
-  return vacancy;
 }
 
 const BEANBAG_COLORS = ['#ff6b6b', '#4ecdc4', '#9b5de5', '#ffd166', '#f15bb5', '#00bbf9', '#06d6a0', '#fb8500'];

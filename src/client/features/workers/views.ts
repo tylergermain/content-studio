@@ -23,6 +23,7 @@ import { renderLimits } from '../../ui/limits';
 import { modelBadge, providerLabel, resolvedProvider } from '../../ui/provider';
 import { renderUsage } from '../../ui/usage';
 import { Worker } from '../../world/character';
+import { createHireMarkers } from './hire-markers';
 import { Laptop } from './laptop';
 import { Arrivals, Departures } from './leaving';
 
@@ -184,8 +185,9 @@ export function installWorkerViews(ctx: Ctx, parts: WorkerViewsParts) {
   }
 
   /**
-   * A seat or kiosk shows it's free (its '+', or the board agent waiting there) only while nobody's at
-   * it, and once every desk is taken, bean bags come out for the workers who don't fit.
+   * A seat or kiosk shows it's free (its '+', faded in by createHireMarkers, or the board agent waiting
+   * there) only while nobody's at it, and once every desk is taken, bean bags come out for the workers
+   * who don't fit.
    */
   function arrangeSeats() {
     const world = ctx.world();
@@ -198,6 +200,8 @@ export function installWorkerViews(ctx: Ctx, parts: WorkerViewsParts) {
     for (const c of appeared) if (p.y > -0.1 && p.y < c.top && p.x > c.minX - 0.3 && p.x < c.maxX + 0.3 && p.z > c.minZ - 0.3 && p.z < c.maxZ + 0.3) p.y = c.top;
   }
   store.on('workers', syncWorkers);
+  // Which of the free seats show their '+': near you, the one you look at, or all of them.
+  createHireMarkers(ctx);
   const workerPos = new THREE.Vector3();
   ctx.ticks.add('others', ({ dt, t }) => {
     const camPos = camera.position;

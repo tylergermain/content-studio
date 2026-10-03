@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { palette, piece } from '../models';
-import { toon } from '../toon';
+import { toon, toonUnique } from '../toon';
 import { BLACK, type Builders } from './furniture-kit';
 import { glassPane } from './materials';
 
@@ -25,8 +25,27 @@ function room(part: string, own: Record<string, THREE.Material>): THREE.Group {
 /** A painted wall, its skirting board and its cap a shade darker. */
 const wall = (part: string, color: string) => room(part, { Wall: toon(color), Trim: toon(shade(color, 0.84)) });
 
+/** Each wood's slats, kept for every panel in that wood (see slat()). */
+const slats = new Map<string, THREE.MeshToonMaterial>();
+
+/**
+ * The slats of a wood `color`, left out of the toon outline: its line on both edges of every slat
+ * runs together from an angle or across the room, and the wood reads as grey felt. A material of
+ * their own, since toon()'s is shared with whatever else is that color, which keeps its outline.
+ */
+function slat(color: string): THREE.MeshToonMaterial {
+  const key = new THREE.Color(color).getHexString();
+  let mat = slats.get(key);
+  if (!mat) {
+    mat = toonUnique(color);
+    mat.userData.outlineParameters = { visible: false };
+    slats.set(key, mat);
+  }
+  return mat;
+}
+
 /** A panel of upright wood slats, `color` the wood. */
-const woodWall = (part: string, color: string) => room(part, { Slat: toon(color) });
+const woodWall = (part: string, color: string) => room(part, { Slat: slat(color) });
 
 /** Where the glass goes in a glass wall's frame (GLASS in build_rooms.py): from the rail along the floor to the one along the top. */
 const GLASS = { bottom: 0.09, top: 2.54 };

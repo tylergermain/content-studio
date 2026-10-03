@@ -4,17 +4,19 @@ import { ELEVATOR_FRONT, FLOOR, WALL_HEIGHT } from '../../../shared/layout';
 import { bulb, type NightParts } from '../outside';
 import { canvasTexture } from '../texture';
 import { mergeByMaterial, mesh, toon } from '../toon';
+import { ceilingFinish, services } from './ceiling-finish';
 import type { Fixture } from './fixture';
 import { PALETTE, box } from './materials';
 
 // What hangs under the office's ceiling: the five pendant lamps, and the floor's own choice of what's
-// up there with them (see RoomOptions.ceiling). The tiles themselves are the stack's, on every floor;
-// a floor that says nothing has them bare, with the yellow cone pendants the office comes with. The
-// others each hang a kit under them: timber beams, a row of banners and a light ring, or a studio's
-// lighting grid. Everything of a kit is well over every head (nothing under 4.4 m, so over the big
-// mezzanine's stairs and rail too), clear of the fire pole and the ladder's hatch, and none of it is
-// in anyone's way: there's nothing here to bump into. Its lights are bulbs the sky turns up at night
-// (see bulb), with no halos of their own: the sky makes those once, for the pendants.
+// up there with them (see RoomOptions.ceiling). A floor that says nothing has the stack's cream tiles
+// bare, with the yellow cone pendants the office comes with. The others each repaint the ceiling
+// itself (see ceiling-finish.ts) and hang a kit under it: timber beams under timber boards, a row of
+// banners and a light ring under a bright white ceiling, or a studio's lighting grid, ducts and cable
+// trays under a black deck. Everything of a kit is well over every head (nothing under 4.4 m, so over
+// the big mezzanine's stairs and rail too), clear of the fire pole and the ladder's hatch, and none of
+// it is in anyone's way: there's nothing here to bump into. Its lights are bulbs the sky turns up at
+// night (see bulb), with no halos of their own: the sky makes those once, for the pendants.
 
 /** Where the five pendants hang: where they always have, since the sky makes their halos once (see NightParts.halos). */
 export const LAMPS: readonly (readonly [x: number, z: number])[] = [
@@ -251,9 +253,10 @@ const GRID = {
   bar: { fromX: -7.4, toX: -0.4, z: -6.2, y: 5.6, spots: 8, first: -6.9, last: -0.9 },
 } as const;
 
-/** A studio's lighting grid over the desks, with a bar of spots over the anchor desk. */
+/** A studio's lighting grid over the desks, with a bar of spots over the anchor desk, and its ducts and cable trays over that. */
 function grid(lit: THREE.Material): THREE.Group {
   const parts = new THREE.Group();
+  parts.add(services());
   const dark = toon(DARK);
   const { y, r, bar } = GRID;
   for (const [z, fromX, toX] of GRID.across) parts.add(rod(dark, [fromX, y, z], [toX, y, z], r));
@@ -287,15 +290,19 @@ export function buildCeilings(night: NightParts, trim: THREE.Material): Record<C
 }
 
 /**
- * What hangs under the ceiling, which is the floor's choice (see RoomOptions.ceiling): every kit is
- * built, and the one the floor has is shown. There's nothing of any of them to bump into or to use.
+ * The ceiling, which is the floor's choice (see RoomOptions.ceiling): every kit is built, and the one
+ * the floor has is shown, with the ceiling over it painted to go with it. There's nothing of any of
+ * them to bump into or to use.
  */
 export const ceiling: Fixture = (site) => {
   const kits = buildCeilings(site.get('night'), site.looks.trim);
+  // (The stack's ceiling is a toon material, tiles and all: see buildStack.)
+  const finish = ceilingFinish(site.get('stack').ceiling as THREE.MeshToonMaterial);
   const group = new THREE.Group();
   for (const kind of Object.keys(kits) as CeilingKit[]) group.add(kits[kind]);
   site.get('room').on((room) => {
     for (const kind of Object.keys(kits) as CeilingKit[]) kits[kind].visible = kind === room.ceiling;
+    finish(room.ceiling);
   });
   return { group };
 };

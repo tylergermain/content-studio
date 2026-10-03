@@ -36,14 +36,20 @@ function built() {
   const group = new THREE.Group();
   const colliders: unknown[] = [];
   const interactables: unknown[] = [];
-  const site = { group, colliders, interactables, looks: { trim: new THREE.MeshToonMaterial() }, get: (key: string) => (key === 'night' ? night : room) } as unknown as Site;
+  // The stack's ceiling, as buildStack paints it: white, with its tiles for a picture and a glow.
+  const tiles = new THREE.MeshToonMaterial({ color: '#ffffff', map: new THREE.Texture() });
+  tiles.emissive.set('#6a655d');
+  tiles.emissiveMap = tiles.map;
+  const stack = { ceiling: tiles };
+  const handles: Record<string, unknown> = { night, room, stack };
+  const site = { group, colliders, interactables, looks: { trim: new THREE.MeshToonMaterial() }, get: (key: string) => handles[key] } as unknown as Site;
   const hung = lamps(site);
   const pendants = [...group.children];
   const kits = ceiling(site);
   group.updateMatrixWorld(true);
   kits.group!.updateMatrixWorld(true);
   const byKind = Object.fromEntries(KITS.map((kind, i) => [kind, kits.group!.children[i]])) as Record<CeilingKit, THREE.Object3D>;
-  return { night, room, group, colliders, interactables, hung, pendants, kits, byKind };
+  return { night, room, group, colliders, interactables, hung, pendants, kits, byKind, tiles };
 }
 
 const show = (room: RoomView, kind: CeilingKind) => room.set({ ...ROOM_DEFAULTS, ceiling: kind });
@@ -120,6 +126,33 @@ test('a floor shows the kit it asks for, and one that says nothing has none', ()
   }
   show(room, 'tiles');
   assert.deepEqual(shown(), []);
+});
+
+test('the ceiling itself goes with the kit, and a floor that says nothing has its tiles as they were', () => {
+  const { room, tiles } = built();
+  const { map, emissiveMap } = tiles;
+  const glow = tiles.emissive.getHex();
+  const painted = () => ({ map: tiles.map, glow: tiles.emissiveMap, emissive: tiles.emissive.getHex(), color: tiles.color.getHex() });
+  const asItCame = { map, glow: emissiveMap, emissive: glow, color: 0xffffff };
+  assert.deepEqual(painted(), asItCame);
+  const seen = new Map<CeilingKind, ReturnType<typeof painted>>();
+  for (const kind of KITS) {
+    show(room, kind);
+    const now = painted();
+    assert.ok(now.map && now.glow, `${kind} has a picture and a glow`);
+    assert.notEqual(now.map, map, `${kind} is still the tiles`);
+    seen.set(kind, now);
+    show(room, 'tiles');
+    assert.deepEqual(painted(), asItCame, `the tiles after ${kind}`);
+    // Painted once: a floor that comes back to it gets the same.
+    show(room, kind);
+    assert.deepEqual(painted(), now, `${kind} again`);
+  }
+  // Each is its own: the boards, the white and the black are three pictures.
+  assert.equal(new Set(KITS.map((kind) => seen.get(kind)!.map)).size, KITS.length);
+  // The white is the brightest of them and the black the darkest, however the room's lit.
+  const glows = Object.fromEntries(KITS.map((kind) => [kind, new THREE.Color(seen.get(kind)!.emissive).getHSL({ h: 0, s: 0, l: 0 }).l]));
+  assert.ok(glows.banners > glows.beams && glows.beams > glows.grid, JSON.stringify(glows));
 });
 
 test('nothing of a kit is in the way, lights the room by itself, or is lit without the sky knowing', () => {

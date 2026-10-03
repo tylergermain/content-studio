@@ -110,7 +110,7 @@ export const FURNITURE = {
   'ceiling-panel': { label: 'Ceiling panel', icon: '🔳', group: 'Rooms', w: 2.4, d: 2.4, top: 0, color: '#7a5236', overhead: true },
   table: { label: 'Table', icon: '🟫', group: 'Tables', w: 2.4, d: 1.1, top: 0.76, color: '#c98b5a' },
   'standing-table': { label: 'Standing table', icon: '🍸', group: 'Tables', r: 0.5, top: 1.05, color: '#c98b5a' },
-  'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46 },
+  'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46, color: '#c98b5a' },
   credenza: { label: 'Credenza', icon: '🗄️', group: 'Tables', w: 2, d: 0.48, top: 0.72, color: '#b98554' },
   'side-table': { label: 'Side table', icon: '▫️', group: 'Tables', w: 0.6, d: 0.6, top: 0.52, color: '#f7f3ea' },
   sofa: { label: 'Sofa', icon: '🛋️', group: 'Seating', w: 4.4, d: 1, top: 0.47, color: '#5b8def', seat: { label: '🛋️ Couch', places: [-1.2, 0, 1.2], hips: 0.5, depth: -0.05, out: 0.9 } },
@@ -230,7 +230,7 @@ export const DEFAULT_FURNITURE: readonly Piece[] = [
   { id: 'lounge-rug', kind: 'rug-large', x: 13.4, z: 0, rotY: 0, color: '#ffc6ff' },
   // The couch, its back to the room, facing the TV on the east wall.
   { id: 'couch', kind: 'sofa', x: 10.5, z: 0, rotY: QUARTER, color: '#5b8def' },
-  { id: 'coffee-table', kind: 'coffee-table', x: 13, z: 0, rotY: 0 },
+  { id: 'coffee-table', kind: 'coffee-table', x: 13, z: 0, rotY: 0, color: '#c98b5a' },
   // A pouf either side of the lounge (the seats still called beanbags), turned to the TV.
   { id: 'lounge-beanbag-1', kind: 'pouf', x: 12.5, z: 3.5, rotY: tidy(Math.atan2(TV.x - 12.5, TV.z - 3.5)), color: '#06d6a0' },
   { id: 'lounge-beanbag-2', kind: 'pouf', x: 14.5, z: -3.4, rotY: tidy(Math.atan2(TV.x - 14.5, TV.z + 3.4)), color: '#ffd166' },

@@ -17,7 +17,6 @@ export const PALETTE = {
   wood: '#c98b5a',
   cork: '#d8a86a',
   chairs: ['#ff8a5b', '#5bc0eb', '#9bc53d', '#b388eb', '#ffb400', '#f7aef8'],
-  rugs: ['#bde0fe', '#ffd6a5', '#caffbf', '#ffc6ff'],
   plant: '#5fb760',
   plantDark: '#3f8f45',
   pot: '#e76f51',

@@ -4,6 +4,7 @@ import { PAINTING } from '../../../shared/hangings';
 import type { Collider, Interactable } from '../types';
 import type { Fixture } from './fixture';
 import { buildPiece, disposePiece } from './furniture';
+import { pillowsIn } from './props';
 import type { ScreenMesh } from './furniture-kit';
 
 // The furniture on the floor: the lounge, the rugs, the plants and whatever else the office builder
@@ -95,6 +96,8 @@ const hung = (p: Piece) => (kindDef(p.kind).shows ? [p.frame ?? PAINTING.frame, 
 const rebuilt = (was: Piece, next: Piece) => was.kind !== next.kind || was.color !== next.color || was.text !== next.text || was.level !== next.level || hung(was) !== hung(next);
 
 export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
+  // The couches' throw pillows are in the floor's own paint.
+  pillowsIn(site.looks);
   const views = new Map<string, PieceView>();
   /** What the office's own features built (see adopt), by kind, and how the floor's arranged now. */
   const adopted = new Map<string, Adopted>();

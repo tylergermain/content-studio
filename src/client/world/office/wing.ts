@@ -62,8 +62,8 @@ function paintGrowSign(c: HTMLCanvasElement, level: number) {
 /**
  * The back office: the bit of north wall between the gong and the east wall, which comes down when
  * the floor's built out, and behind it the bay, a row deeper each time, with a pair of desks down the
- * middle of each row, a rug under them, a lamp over them and a window in the east wall. The sign that
- * says there's room to grow hangs on whichever wall is at the back.
+ * middle of each row, a rug under them in the floor's colors, a lamp over them and a window in the east
+ * wall. The sign that says there's room to grow hangs on whichever wall is at the back.
  */
 export function buildWing(group: THREE.Group, colliders: Collider[], interactables: Interactable[], desks: Map<string, DeskView>, looks: Looks, trimMat: THREE.Material, planks: THREE.Material, ceiling: THREE.Material, night: NightParts): WingView {
   const T = WALL_T;
@@ -80,7 +80,8 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
     const row = i + 1;
     const z = wingRowZ(row);
     const extras = new THREE.Group();
-    extras.add(mesh(roundedBox(3.4, 0.02, WING.row - 1, 0.5), toon(PALETTE.rugs[(row + 1) % PALETTE.rugs.length]), midX, 0.011, z, false));
+    // Its rug is the floor's own paint, the rows taking turns between its walls' and its trim's (as the Steps' cushions do).
+    extras.add(mesh(roundedBox(3.4, 0.02, WING.row - 1, 0.5), row % 2 ? looks.wall : looks.trim, midX, 0.011, z, false));
     const lamp = pendant(WALL_HEIGHT - 4.05);
     lamp.position.set(midX, 4.05, z);
     extras.add(lamp);

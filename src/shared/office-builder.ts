@@ -2,6 +2,7 @@
 // stand on an office floor. The browser checks a layout as it's dragged about, and the server checks
 // it again before it's saved (server/floorplan.ts).
 
+import { BOSS_ROOM, bossWallClash } from './boss-walls.js';
 import { DESKS, DESK_SIZE, ELEVATOR, ELEVATOR_FRONT, FLOOR, type DeskDef } from './layout.js';
 import { DEFAULT_FURNITURE, canGoUp, cleanFurniture, isRound, isSolid, kindDef, pieceBox, pieceRadius, pieceTop, type Box, type Piece } from './furniture.js';
 import type { RoomOptions } from './floorplan.js';
@@ -107,14 +108,24 @@ const standingPiece = (p: Piece): Standing => {
 
 const within = (b: Box, a: Box) => b.minX >= a.minX - SLACK && b.maxX <= a.maxX + SLACK && b.minZ >= a.minZ - SLACK && b.maxZ <= a.maxZ + SLACK;
 
-/** Why a piece upstairs (`level: 1`) can't be where it is in a room like `room`, whatever else is up there; or nothing. */
+/**
+ * Why a piece upstairs (`level: 1`) can't be where it is in a room like `room`, whatever else is up
+ * there; or nothing. While the boss's office has the loft only a painting goes up there, on the
+ * office's own walls and clear of what it has against them (see shared/boss-walls.ts).
+ */
 function misplacedUp(p: Piece, s: Standing, room: RoomOptions): string | undefined {
   const deck = deckOf(room);
   if (!deck) return `${s.label} is upstairs, and this floor is all one level`;
-  if (!deck.floor) return `${s.label} is upstairs, where the boss's office is`;
-  if (!canGoUp(p.kind)) return `The ${s.label.toLowerCase()} only stands on the office floor`;
-  if (!within(s.box, deck.floor)) return `${s.label} must stay on the mezzanine`;
-  if (isSolid(p)) for (const f of keepClearUp(room)) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} would block ${f.what}`;
+  if (!deck.floor) {
+    if (deck.kind !== 'corner' || !kindDef(p.kind).hangs) return `${s.label} is upstairs, where the boss's office is`;
+    if (!within(s.box, BOSS_ROOM)) return `${s.label} must stay in the boss's office`;
+    const what = bossWallClash(p);
+    if (what) return `${s.label} is in the way of ${what}`;
+  } else {
+    if (!canGoUp(p.kind)) return `The ${s.label.toLowerCase()} only stands on the office floor`;
+    if (!within(s.box, deck.floor)) return `${s.label} must stay on the mezzanine`;
+    if (isSolid(p)) for (const f of keepClearUp(room)) if (touching(s, { label: f.what, as: f.what, box: boxOf(f.rect) })) return `${s.label} would block ${f.what}`;
+  }
   if (pieceTop(p) > deck.height - 0.05) return `${s.label} is too tall for the ${deck.kind === 'big' ? 'mezzanine' : 'loft'}`;
   return undefined;
 }

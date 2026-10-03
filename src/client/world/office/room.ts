@@ -11,7 +11,7 @@ import { wallBoard } from './props';
 // The room itself, past its walls and its seats: what the sky lights and darkens, the boards on the
 // walls, and the TV and the machine's monitor. What stands on its floor (the lounge, the rugs, the
 // plants) is furniture, which the office builder arranges: see furnish.ts. What hangs under its
-// ceiling, the lamps with it, is ceiling.ts.
+// ceiling, the lamps with it, is ceiling.ts, and how the ceiling itself is painted ceiling-finish.ts.
 
 declare module '../types' {
   interface OfficeHandles {

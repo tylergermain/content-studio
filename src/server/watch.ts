@@ -2,19 +2,24 @@ import type { Floor } from './floor.js';
 import type { WatchState, WatchVideo } from '../shared/protocol.js';
 import type { WatchChannel } from '../shared/studio.js';
 import { CHANNEL_ID, YOUTUBE_ID, channelLink, youtubeHost } from '../shared/youtube.js';
+import { parseVideosPage, videosUrl } from './watch-page.js';
 
 // The YouTube channels a floor watches (see StudioSetup.watch in shared/studio.ts): the office finds
-// which channel each pasted link is, and reads every channel's public feed for its newest videos,
-// which the floor's screens play through YouTube's own player (client/features/screens). No API key:
-// the feeds are the ones a feed reader subscribes to. One of these for the whole building.
+// which channel each pasted link is, and reads every channel's newest videos, which the floor's
+// screens play through YouTube's own player (client/features/screens). No API key: a channel is read
+// from its public feed, the one a feed reader subscribes to, or, while YouTube has the feeds switched
+// off (every one answers 404 since 2026), from its page of videos (watch-page.ts). One of these for
+// the whole building.
 
 /** How often every channel is read, and how soon after its last read a change of setup may read one again. */
 const EVERY_MS = 10 * 60_000;
 const FRESH_MS = 60_000;
 const TIMEOUT_MS = 10_000;
-/** The most of a feed, and of a channel's or a video's page, that's read. */
+/** The most of a feed, and of a channel's or a video's page, that's read (a page of videos is about 1.2 MB, 270 kB as sent). */
 const FEED_BYTES = 1024 * 1024;
 const PAGE_BYTES = 4 * 1024 * 1024;
+/** Once a feed can't be read, how long the channels' pages are read instead before the feeds are tried again. */
+const FEEDS_OFF_MS = 60 * 60_000;
 /** How many videos a floor is sent: the newest across all its channels. */
 export const KEEP = 30;
 /** How many channels are read at once. */
@@ -103,15 +108,19 @@ export function newest(videos: readonly WatchVideo[], keep = KEEP): WatchVideo[]
     .slice(0, keep);
 }
 
+/** What the office says when YouTube sends it to agree to cookies, by what it was reading. */
+const CONSENT_LINK = 'YouTube asked the office to agree to cookies before showing that page. Paste the channel’s own link instead (youtube.com/channel/UC…)';
+const CONSENT_VIDEOS = 'YouTube asked the office to agree to cookies before showing its videos';
+
 /**
  * A page of YouTube's, as text, no more than `max` bytes of it. It's followed where it's sent on, but
  * only while that's still YouTube, a few times, and never for longer than TIMEOUT_MS.
  */
-async function read(url: string, max: number): Promise<string> {
+async function read(url: string, max: number, consent = CONSENT_LINK): Promise<string> {
   let at = new URL(url);
   const signal = AbortSignal.timeout(TIMEOUT_MS);
   for (let hop = 0; hop < 4; hop++) {
-    if (at.hostname === 'consent.youtube.com') throw new Error('YouTube asked the office to agree to cookies before showing that page. Paste the channel’s own link instead (youtube.com/channel/UC…)');
+    if (at.hostname === 'consent.youtube.com') throw new Error(consent);
     if (at.protocol !== 'https:' || !youtubeHost(at)) throw new Error('YouTube sent that link somewhere that isn’t YouTube');
     const res = await fetch(at, { redirect: 'manual', signal, headers: { 'user-agent': 'Mozilla/5.0 (compatible; agent-office)', 'accept-language': 'en' } });
     if (res.status >= 300 && res.status < 400) {
@@ -179,6 +188,8 @@ export class Watch {
   private busy = false;
   /** A read was asked for while one was under way: `true` for every channel, `false` for the ones that are due. */
   private next: boolean | undefined;
+  /** Until when the feeds are taken to be off, and the channels' pages read instead. */
+  private feedsOff = 0;
 
   constructor(private out: WatchOut) {}
 
@@ -253,11 +264,11 @@ export class Watch {
       async (id) => {
         const was = this.feeds.get(id);
         try {
-          const feed = parseFeed(await read(feedUrl(id), FEED_BYTES));
+          const feed = await this.videosOf(id, was?.videos ?? []);
           this.feeds.set(id, { videos: feed.videos, at: Date.now() });
           if (feed.name) for (const f of floors) for (const c of f.studio.watching()) if (c.id === id && f.studio.found(c.url, id, feed.name)) this.out.studio(f);
         } catch (err) {
-          // What it had out last time stays up: YouTube's feeds have their off moments.
+          // What it had out last time stays up: YouTube has its off moments.
           this.feeds.set(id, { videos: was?.videos ?? [], at: Date.now(), error: why(err) });
         }
       },
@@ -271,6 +282,26 @@ export class Watch {
       this.told.set(f.id, key);
       this.out.watch(f);
     }
+  }
+
+  /**
+   * A channel's name and newest videos: from its feed while the feeds answer, else from its page of
+   * videos. The first feed that can't be read sends every channel to its page for the next hour.
+   */
+  private async videosOf(id: string, before: readonly WatchVideo[]): Promise<{ name: string; videos: WatchVideo[] }> {
+    if (Date.now() >= this.feedsOff) {
+      try {
+        const xml = await read(feedUrl(id), FEED_BYTES);
+        if (/<feed\b/i.test(xml)) return parseFeed(xml);
+      } catch {
+        // Its page, then.
+      }
+      this.feedsOff = Date.now() + FEEDS_OFF_MS;
+    }
+    const page = parseVideosPage(await read(videosUrl(id), PAGE_BYTES, CONSENT_VIDEOS), Date.now(), before);
+    if (!page) throw new Error('YouTube’s videos page has changed: the office can’t find the videos');
+    if (!page.videos.length) throw new Error('YouTube’s videos page lists none the office can read');
+    return page;
   }
 
   /** Runs `fn` over `items`, a few at a time. */

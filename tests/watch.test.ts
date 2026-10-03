@@ -1,9 +1,10 @@
 // The channels a floor watches: reading a YouTube link (shared/youtube.ts), a channel's feed and its
-// page (server/watch.ts), what a floor's setup keeps of them (shared/studio.ts), and what a screen set
-// to them plays, in what order (client/features/screens/watchlist.ts).
+// page (server/watch.ts), its page of videos while the feeds are off (server/watch-page.ts, against
+// pages YouTube really sent, trimmed, in tests/fixtures/youtube), what a floor's setup keeps of them
+// (shared/studio.ts), and what a screen set to them plays, in what order (client/features/screens/watchlist.ts).
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync } from 'node:fs';
+import { mkdtempSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { WATCH_MEDIA, cleanFurniture } from '../src/shared/furniture.js';
@@ -13,6 +14,7 @@ import type { WatchVideo } from '../src/shared/protocol.js';
 import type { Floor } from '../src/server/floor.js';
 import { Studio } from '../src/server/studio.js';
 import { KEEP, Watch, channelIdIn, feedUrl, newest, parseFeed } from '../src/server/watch.js';
+import { ageOf, initialData, parseVideosPage, videosUrl } from '../src/server/watch-page.js';
 import { BAD_FOR, ago, fresh, labelOf, nextVideo, playable, startAt } from '../src/client/features/screens/watchlist.js';
 
 const UC = 'UCXuqSBlHAE6Xw-yeJA0Tunw';
@@ -345,8 +347,8 @@ function floorWatching(id: string, links: string[]): Floor {
   return { id, studio } as unknown as Floor;
 }
 
-/** Stands in for YouTube: `pages` by address, each a body, or a status and headers. What was asked for is kept. */
-function youtube(pages: Record<string, string | { status: number; location?: string }>) {
+/** Stands in for YouTube: `pages` by address, each a body, or a status with a body or where it sends you. What was asked for is kept. */
+function youtube(pages: Record<string, string | { status: number; location?: string; body?: string }>) {
   const asked: { url: string; redirect?: string }[] = [];
   const real = globalThis.fetch;
   globalThis.fetch = (async (input: URL | string, init?: RequestInit) => {
@@ -355,7 +357,7 @@ function youtube(pages: Record<string, string | { status: number; location?: str
     const page = pages[url];
     if (page === undefined) return new Response('nothing here', { status: 404 });
     if (typeof page === 'string') return new Response(page);
-    return new Response(null, { status: page.status, headers: page.location ? { location: page.location } : {} });
+    return new Response(page.body ?? null, { status: page.status, headers: page.location ? { location: page.location } : {} });
   }) as typeof fetch;
   return { asked, restore: () => void (globalThis.fetch = real) };
 }
@@ -438,9 +440,9 @@ test('a feed that cannot be read says why, and what it had out stays up', async 
     assert.equal(watch.state(floor.studio.watching()).videos.length, 3);
     // The same again is not news.
     assert.deepEqual(told, ['one']);
-    // YouTube's feed goes away: a minute later (when it's due again) the office says so, and keeps the videos.
+    // YouTube goes away, feed and page: a minute later (when it's due again) the office says so, and keeps the videos.
     yt.restore();
-    const down = youtube({ [feedUrl(UC)]: { status: 500 } });
+    const down = youtube({ [feedUrl(UC)]: { status: 500 }, [videosUrl(UC)]: { status: 500 } });
     try {
       const now = Date.now;
       Date.now = () => now() + 120_000;
@@ -476,6 +478,273 @@ test('two floors that watch the same channel share one read of it, and a floor t
     assert.deepEqual(told.sort(), ['one', 'two']);
     assert.deepEqual(asked(yt), [feedUrl(UC)]);
     assert.deepEqual(watch.state(idle.studio.watching()), { videos: [], at: 0 });
+  } finally {
+    yt.restore();
+  }
+});
+
+// ---- A channel's page of videos (server/watch-page.ts), read while YouTube's feeds are off ----
+
+const fixture = (name: string) => readFileSync(path.join(import.meta.dirname, 'fixtures', 'youtube', name), 'utf8');
+/** youtube.com/channel/UC2ojq-nuP8ceeHqiroeKhBA/videos as YouTube sent it on 2026-10-03, its grid cut to the first seven videos. */
+const PAGE = fixture('channel-videos.html');
+/** What feeds/videos.xml?channel_id=… answered for every channel that day, with a 404. */
+const GONE = fixture('feed-404.html');
+const NATE = 'UC2ojq-nuP8ceeHqiroeKhBA';
+const NATES = ['9hetShMMp2s', 'l8ywUsEJ2XQ', 'pY5_Ux_YJjo', 'BvvfZKKz4Yo', '7eo-11K2e3c', 'eg_1NXDcoPk', 'Ktnwygcnd8U'];
+const H = 3_600_000;
+const D = 24 * H;
+const MINUTE = 60_000;
+
+test('a channel’s page of videos gives its name and its videos, newest first, dated by how long ago each came out', () => {
+  const now = Date.parse('2026-10-03T06:21:00Z');
+  const page = parseVideosPage(PAGE, now);
+  assert.ok(page);
+  assert.equal(page.name, 'Nate Herk | AI Automation');
+  assert.deepEqual(
+    page.videos.map((v) => v.id),
+    NATES,
+  );
+  // "8h ago", "11h ago", "1d ago", "2d ago", "4d ago" twice (a second apart, in the page's order), "5d ago".
+  assert.deepEqual(
+    page.videos.map((v) => now - v.at),
+    [8 * H, 11 * H, D, 2 * D, 4 * D, 4 * D + 1000, 5 * D],
+  );
+  assert.deepEqual(page.videos[0], { id: '9hetShMMp2s', title: 'Claude Code Mods Are Game Changers. Set Up These 5 NOW.', channel: 'Nate Herk | AI Automation', at: now - 8 * H, short: false });
+  // Made with another channel: its row of names is no date, and the page's channel is who it's from.
+  assert.deepEqual(page.videos[1], { id: 'l8ywUsEJ2XQ', title: 'How to Actually Build & Sell Software with AI as a Non-Techie', channel: 'Nate Herk | AI Automation', at: now - 11 * H, short: false });
+  assert.ok(page.videos.every((v) => !v.short && v.channel === page.name));
+  // The page is found by its `ytInitialData`.
+  assert.equal((initialData(PAGE)?.metadata as { channelMetadataRenderer: { externalId: string } }).channelMetadataRenderer.externalId, NATE);
+  assert.equal(videosUrl(NATE), `https://www.youtube.com/channel/${NATE}/videos?hl=en`);
+});
+
+test('the same page read again keeps each video’s time while its words still allow it', () => {
+  const now = Date.parse('2026-10-03T06:21:00Z');
+  const first = parseVideosPage(PAGE, now)!.videos;
+  // Ten minutes and half an hour later each says what it said, so nothing has changed to tell a floor.
+  assert.deepEqual(parseVideosPage(PAGE, now + 10 * MINUTE, first)!.videos, first);
+  assert.deepEqual(parseVideosPage(PAGE, now + 30 * MINUTE, first)!.videos, first);
+  // Not told what it had, the times would move with the clock.
+  assert.notDeepEqual(parseVideosPage(PAGE, now + 10 * MINUTE)!.videos, first);
+  // Two hours on, a video that still says "8h ago" came out later than it was given: the newest time
+  // the words allow again. The ones that say days still fit what they were given.
+  const later = parseVideosPage(PAGE, now + 2 * H, first)!.videos;
+  assert.deepEqual(
+    later.slice(0, 2).map((v) => now - v.at),
+    [6 * H, 9 * H],
+  );
+  assert.deepEqual(later.slice(2), first.slice(2));
+  // A time from the feed (to the second) stays, as long as the page's words allow it.
+  const exact = [{ ...first[2], at: now - 30 * H }];
+  assert.equal(parseVideosPage(PAGE, now, exact)!.videos[2].at, now - 30 * H);
+  assert.equal(parseVideosPage(PAGE, now, [{ ...first[2], at: now - 3 * D }])!.videos[2].at, now - D);
+});
+
+test('how long ago a video came out, as YouTube’s page says it', () => {
+  const nbsp = String.fromCharCode(0xa0);
+  const cases: [string, number, number][] = [
+    ['8 hours ago', 8 * H, 9 * H],
+    ['8h ago', 8 * H, 9 * H],
+    ['1 hour ago', H, 2 * H],
+    ['an hour ago', H, 2 * H],
+    ['5m ago', 5 * MINUTE, 6 * MINUTE],
+    ['5 minutes ago', 5 * MINUTE, 6 * MINUTE],
+    ['45 seconds ago', 45_000, 46_000],
+    ['1d ago', D, 2 * D],
+    ['1 day ago', D, 2 * D],
+    [`3${nbsp}days ago`, 3 * D, 4 * D],
+    ['2w ago', 14 * D, 21 * D],
+    ['2 weeks ago', 14 * D, 21 * D],
+    ['1 month ago', 30 * D, 60 * D],
+    ['5mo ago', 150 * D, 180 * D],
+    ['2 years ago', 730 * D, 1095 * D],
+    ['1y ago', 365 * D, 730 * D],
+    ['Streamed 2 days ago', 2 * D, 3 * D],
+    ['Streamed live 3 hours ago', 3 * H, 4 * H],
+    ['Premiered 6 days ago', 6 * D, 7 * D],
+  ];
+  for (const [text, least, most] of cases) assert.deepEqual(ageOf(text), { least, most }, text);
+  for (const text of ['', 'ago', 'Premieres 10/5/26, 7:00 PM', 'Scheduled for 10/9/26, 12:00 PM', 'Streaming now', '1.2K watching', '40K views', '40 thousand views', 'I quit 3 years ago', '8 hours ago, again', 'vor 8 Stunden', 'il y a 2 jours', 'Streamed live on Oct 1, 2026'])
+    assert.equal(ageOf(text), undefined, text);
+});
+
+/** A page of YouTube's with `data` as its `ytInitialData`, written the way `how` says. */
+const pageOf = (data: unknown, how = 'var ytInitialData = ') => `<!DOCTYPE html><html><body><script nonce="n">${how}${JSON.stringify(data)};</script></body></html>`;
+/** A grid item as the Videos tab writes one (a `lockupViewModel`), cut to what the office reads. */
+const lockup = (id: string, title: string, said: string | undefined, kind = 'LOCKUP_CONTENT_TYPE_VIDEO', url = `/watch?v=${id}`, endpoint: object = { watchEndpoint: { videoId: id } }) => ({
+  richItemRenderer: {
+    content: {
+      lockupViewModel: {
+        metadata: { lockupMetadataViewModel: { title: { content: title }, metadata: { contentMetadataViewModel: { metadataRows: [{ metadataParts: [{ text: { content: '1.2K' }, accessibilityLabel: '1.2 thousand views' }, ...(said ? [{ text: { content: said } }] : [])] }] } } } },
+        contentId: id,
+        contentType: kind,
+        rendererContext: { accessibilityContext: { label: `${title} 10 minutes` }, commandContext: { onTap: { innertubeCommand: { commandMetadata: { webCommandMetadata: { url } }, ...endpoint } } } },
+      },
+    },
+  },
+});
+
+test('what a page of videos says, in whichever of YouTube’s shapes it is written', () => {
+  const now = Date.parse('2026-10-03T12:00:00Z');
+  const ls = String.fromCharCode(0x2028);
+  const grid = [
+    lockup('SSSSSSSSSS1', 'A Short with a date', '2 hours ago', 'LOCKUP_CONTENT_TYPE_SHORT', '/shorts/SSSSSSSSSS1', { reelWatchEndpoint: { videoId: 'SSSSSSSSSS1' } }),
+    lockup('LLLLLLLLLL1', 'We met 3 years ago', '5 hours ago'),
+    lockup('PPPPPPPPPP1', 'A playlist', '1 hour ago', 'LOCKUP_CONTENT_TYPE_PLAYLIST'),
+    lockup('QQQQQQQQQQ1', 'A première', 'Premieres 10/9/26, 12:00 PM'),
+    lockup('TTTTTTTTTT1', '2 hours ago', undefined),
+    lockup('not-an-id', 'No video id', '1 hour ago'),
+    lockup('LLLLLLLLLL1', 'The same again', '5 hours ago'),
+    { richItemRenderer: { content: { shortsLockupViewModel: { entityId: 'shorts-shelf-item-UUUUUUUUUU1', overlayMetadata: { primaryText: { content: 'An undated Short' }, secondaryText: { content: '1.2K views' } }, onTap: { innertubeCommand: { reelWatchEndpoint: { videoId: 'UUUUUUUUUU1' } } } } } } },
+    { videoRenderer: { videoId: 'VVVVVVVVVV1', title: { runs: [{ text: 'Line\nbreak\u0000and ' }, { text: 'x'.repeat(300) }] }, publishedTimeText: { simpleText: 'Streamed 1 day ago' } } },
+    { gridVideoRenderer: { videoId: 'GGGGGGGGGG1', title: { simpleText: 'An older grid' }, publishedTimeText: { simpleText: '3 days ago' } } },
+    { continuationItemRenderer: { trigger: 'CONTINUATION_TRIGGER_ON_ITEM_SHOWN' } },
+  ];
+  const data = {
+    contents: {
+      twoColumnBrowseResultsRenderer: {
+        tabs: [
+          { tabRenderer: { title: 'Home', content: { sectionListRenderer: { contents: [lockup('HHHHHHHHHH1', 'On the home tab, not the one open', '1 minute ago')] } } } },
+          // The grid wrapped differently from today's: still found.
+          { tabRenderer: { title: 'Videos', selected: true, content: { sectionListRenderer: { contents: [{ itemSectionRenderer: { contents: [{ gridRenderer: { items: grid } }] } }] } } } },
+          { expandableTabRenderer: { title: '' } },
+        ],
+      },
+    },
+    metadata: { channelMetadataRenderer: { title: `Some${ls}Channel`, externalId: UC } },
+  };
+  const want = (page: ReturnType<typeof parseVideosPage>) => {
+    assert.ok(page);
+    assert.equal(page.name, 'Some Channel');
+    assert.deepEqual(
+      page.videos.map((v) => [v.id, now - v.at, v.short]),
+      [
+        ['SSSSSSSSSS1', 2 * H, true],
+        ['LLLLLLLLLL1', 5 * H, false],
+        ['VVVVVVVVVV1', D, false],
+        ['GGGGGGGGGG1', 3 * D, false],
+      ],
+    );
+    // Its title is never taken for its date, and a title is one line and never endless.
+    assert.equal(page.videos[1].title, 'We met 3 years ago');
+    assert.ok(page.videos[2].title.startsWith('Line break and xxx'));
+    assert.equal(page.videos[2].title.length, 200);
+    assert.equal(page.videos[3].title, 'An older grid');
+  };
+  want(parseVideosPage(pageOf(data), now));
+  want(parseVideosPage(pageOf(data, 'window["ytInitialData"] = '), now));
+  // Something that only looks like it first, then the real one.
+  want(parseVideosPage(`<script>var ytcfg = "ytInitialData = {"; window.ytInitialData = {not json};</script>${pageOf(data)}`, now));
+  // No tabs at all: whatever the page shows.
+  assert.deepEqual(
+    parseVideosPage(pageOf({ contents: { richGridRenderer: { contents: grid.slice(0, 2) } } }), now)?.videos.map((v) => v.id),
+    ['SSSSSSSSSS1', 'LLLLLLLLLL1'],
+  );
+});
+
+test('a page with no ytInitialData, or one cut short, has nothing to read', () => {
+  const now = Date.now();
+  assert.equal(parseVideosPage('', now), undefined);
+  assert.equal(parseVideosPage('<html><body>Before you continue to YouTube</body></html>', now), undefined);
+  assert.equal(parseVideosPage(GONE, now), undefined);
+  assert.equal(parseVideosPage(PAGE.slice(0, Math.floor(PAGE.length / 2)), now), undefined);
+  assert.equal(parseVideosPage(pageOf([1, 2, 3]), now), undefined);
+  // Found, with nothing in it: no videos.
+  assert.deepEqual(parseVideosPage(pageOf({ contents: {} }), now), { name: '', videos: [] });
+});
+
+/** Waits (a little at a time, up to a second) until `done` says so. */
+async function until(done: () => boolean) {
+  for (let i = 0; i < 200 && !done(); i++) await new Promise((r) => setTimeout(r, 5));
+  await new Promise((r) => setTimeout(r, 20));
+}
+
+/** Runs `fn` with the office's clock `ms` ahead. */
+async function ahead(ms: number, fn: () => Promise<void>) {
+  const now = Date.now;
+  Date.now = () => now() + ms;
+  try {
+    await fn();
+  } finally {
+    Date.now = now;
+  }
+}
+
+test('while YouTube’s feeds answer 404, a channel is read from its page of videos, and its feed tried again an hour on', async () => {
+  const link = `https://www.youtube.com/channel/${NATE}`;
+  const pages: Record<string, string | { status: number; body?: string }> = { [feedUrl(NATE)]: { status: 404, body: GONE }, [videosUrl(NATE)]: PAGE };
+  const yt = youtube(pages);
+  try {
+    const floor = floorWatching('one', [link]);
+    const { watch, told, renamed } = await readFor([floor]);
+    assert.deepEqual(told, ['one']);
+    assert.deepEqual(renamed, ['one']);
+    assert.deepEqual(floor.studio.watching(), [{ id: NATE, name: 'Nate Herk | AI Automation', url: link }]);
+    const state = watch.state(floor.studio.watching());
+    assert.equal(state.errors, undefined);
+    assert.deepEqual(
+      state.videos.map((v) => v.id),
+      NATES,
+    );
+    const age = Date.now() - state.videos[0].at;
+    assert.ok(age >= 8 * H && age < 8 * H + 5000, String(age));
+    assert.deepEqual(asked(yt), [feedUrl(NATE), videosUrl(NATE)]);
+    assert.ok(yt.asked.every((a) => a.redirect === 'manual'));
+
+    // Due again two minutes on: the page alone, the feeds being off, and the same videos at the same times are no news.
+    await ahead(2 * MINUTE, async () => {
+      watch.refresh();
+      await until(() => yt.asked.length >= 3);
+    });
+    assert.deepEqual(asked(yt).slice(2), [videosUrl(NATE)]);
+    assert.deepEqual(told, ['one']);
+    assert.deepEqual(watch.state(floor.studio.watching()).videos, state.videos);
+
+    // An hour on, the feed is tried first again, and it's back: the page isn't read.
+    pages[feedUrl(NATE)] = `<feed><title>Nate Herk | AI Automation</title><entry><yt:videoId>9hetShMMp2s</yt:videoId><title>From the feed</title><published>2026-10-02T22:21:00+00:00</published></entry></feed>`;
+    await ahead(61 * MINUTE, async () => {
+      watch.refresh();
+      await until(() => told.length >= 2);
+    });
+    assert.deepEqual(asked(yt).slice(3), [feedUrl(NATE)]);
+    assert.deepEqual(
+      watch.state(floor.studio.watching()).videos.map((v) => [v.id, v.title]),
+      [['9hetShMMp2s', 'From the feed']],
+    );
+  } finally {
+    yt.restore();
+  }
+});
+
+test('a channel whose page of videos cannot be read says why, on its own, and only YouTube is asked', async () => {
+  const id = (n: number) => `UC${'x'.repeat(21)}${n}`;
+  const yt = youtube({
+    [videosUrl(id(1))]: { status: 404, body: GONE },
+    [videosUrl(id(2))]: { status: 302, location: 'https://consent.youtube.com/m?continue=x' },
+    [videosUrl(id(3))]: { status: 302, location: 'https://evil.example/steal' },
+    [videosUrl(id(4))]: '<html><body>Before you continue to YouTube</body></html>',
+    [videosUrl(id(5))]: pageOf({ contents: { richGridRenderer: { contents: [lockup('QQQQQQQQQQ1', 'A première', 'Premieres 10/9/26, 12:00 PM')] } } }),
+    [videosUrl(id(6))]: { status: 500 },
+    [videosUrl(NATE)]: PAGE,
+  });
+  try {
+    const links = [1, 2, 3, 4, 5, 6].map((n) => `https://www.youtube.com/channel/${id(n)}`);
+    const floor = floorWatching('one', [...links, `https://www.youtube.com/channel/${NATE}`]);
+    const { watch } = await readFor([floor]);
+    const { errors = {}, videos } = watch.state(floor.studio.watching());
+    assert.equal(errors[links[0]], 'YouTube has nothing at that link');
+    assert.equal(errors[links[1]], 'YouTube asked the office to agree to cookies before showing its videos');
+    assert.match(errors[links[2]], /isn’t YouTube/);
+    assert.match(errors[links[3]], /videos page has changed/);
+    assert.match(errors[links[4]], /lists none the office can read/);
+    assert.equal(errors[links[5]], 'YouTube answered 500');
+    assert.equal(Object.keys(errors).length, 6);
+    // The one that reads plays all the same.
+    assert.equal(videos.length, NATES.length);
+    assert.ok(!asked(yt).some((url) => !url.startsWith('https://www.youtube.com/')), asked(yt).join(' '));
+    // Each fits whole on a screen's card.
+    for (const e of Object.values(errors)) assert.ok(e.length <= 70, e);
   } finally {
     yt.restore();
   }

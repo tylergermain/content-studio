@@ -32,8 +32,16 @@ export function buildLoft(looks: Looks): Loft {
   const frameMat = toon('#ffffff');
   const woodMat = toon(PALETTE.wood);
 
-  // Floor slab, planked like downstairs, with a trim fascia you see from below.
-  group.add(mesh(box(w, SLAB, d), trimMat, cx, floorY - SLAB / 2, cz));
+  // Floor slab, planked like downstairs. Its underside is the meeting room's ceiling and its edges are
+  // what the hall sees of the loft, so it's the walls' paint, with the trim only a thin line along the
+  // foot of the two open edges (west only as far as the stairs, which run up against the rest).
+  group.add(mesh(box(w, SLAB, d), wallMat, cx, floorY - SLAB / 2, cz));
+  // The line stands proud of the slab's face (as far as the glass's sill does), touching it nowhere it'd flicker.
+  const LINE = { h: 0.06, proud: 0.03 };
+  const lineY = floorY - SLAB + LINE.h / 2;
+  const westRun = STAIRS.minZ - minZ;
+  group.add(mesh(box(w + LINE.proud, LINE.h, LINE.proud), trimMat, cx - LINE.proud / 2, lineY, minZ - LINE.proud / 2, false));
+  group.add(mesh(box(LINE.proud, LINE.h, westRun), trimMat, minX - LINE.proud / 2, lineY, minZ + westRun / 2, false));
   const planks = floorTexture(w, d);
   looks.planks.push(planks);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshToonMaterial({ map: planks, gradientMap: (toon('#fff') as THREE.MeshToonMaterial).gradientMap }));
@@ -43,9 +51,9 @@ export function buildLoft(looks: Looks): Loft {
   group.add(floor);
   colliders.push({ minX, maxX, minZ, maxZ, bottom: floorY - SLAB, top: floorY });
 
-  // Posts holding up the open corner.
+  // Posts holding up the open corner, in the walls' paint like the slab.
   for (const x of [minX + 0.15, cx]) {
-    group.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, floorY - SLAB, 12), trimMat, x, (floorY - SLAB) / 2, minZ + 0.15));
+    group.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, floorY - SLAB, 12), wallMat, x, (floorY - SLAB) / 2, minZ + 0.15));
     colliders.push({ minX: x - 0.14, maxX: x + 0.14, minZ: minZ + 0.01, maxZ: minZ + 0.29, top: floorY - SLAB });
   }
 
@@ -54,8 +62,14 @@ export function buildLoft(looks: Looks): Loft {
   const into = WALL_T - 0.03;
   const roof = mesh(box(w + into, 0.2, d + into), wallMat, cx + into / 2, roofY + 0.1, cz + into / 2, false);
   group.add(roof);
-  group.add(mesh(box(w + 0.02 + into, 0.24, 0.04), trimMat, cx + (into - 0.02) / 2, roofY + 0.1, minZ - 0.02, false));
-  group.add(mesh(box(0.04, 0.24, d + 0.02 + into), trimMat, minX - 0.02, roofY + 0.1, cz + (into - 0.02) / 2, false));
+  // A band round its open edges, the walls' paint with the trim's thin line along its top, as at the slab's foot.
+  for (const [mat, y0, y1] of [
+    [wallMat, roofY - 0.02, roofY + 0.22 - LINE.h],
+    [trimMat, roofY + 0.22 - LINE.h, roofY + 0.22],
+  ] as const) {
+    group.add(mesh(box(w + 0.02 + into, y1 - y0, 0.04), mat, cx + (into - 0.02) / 2, (y0 + y1) / 2, minZ - 0.02, false));
+    group.add(mesh(box(0.04, y1 - y0, d + 0.02 + into), mat, minX - 0.02, (y0 + y1) / 2, cz + (into - 0.02) / 2, false));
+  }
   colliders.push({ minX, maxX, minZ, maxZ, bottom: roofY, top: roofY + 0.2 });
   group.add(mesh(box(w, 0.25, 0.04), trimMat, cx, floorY + 0.125, maxZ - 0.02, false));
   group.add(mesh(box(0.04, 0.25, d), trimMat, maxX - 0.02, floorY + 0.125, cz, false));

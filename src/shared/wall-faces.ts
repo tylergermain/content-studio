@@ -3,6 +3,7 @@
 // a painting onto the nearest one as it's dragged, and the rules (shared/office-builder.ts) refuse one
 // that's on none, so nothing is saved hanging in mid-air.
 
+import { BOSS_ROOM } from './boss-walls.js';
 import type { RoomOptions } from './floorplan.js';
 import { kindDef, type Piece } from './furniture.js';
 import { FLOOR } from './layout.js';
@@ -42,10 +43,13 @@ function outerFaces(area: Area): WallFace[] {
 /**
  * Every face a painting on `level` can hang on, on a floor with this furniture and this room: the
  * outside walls where that level reaches them, then both sides of each wall piece standing on it
- * (glass takes nothing). Upstairs there are none while the boss's office has the loft.
+ * (glass takes nothing). While the boss's office has the loft, upstairs is its south and east walls
+ * and nothing else (what of them is clear of its things is the rules' to say: see bossWallClash).
  */
 export function wallFaces(furniture: readonly Piece[], level = 0, room: RoomOptions = {}): WallFace[] {
-  const floor = level ? deckOf(room)?.floor : FLOOR;
+  const deck = level ? deckOf(room) : undefined;
+  if (deck?.kind === 'corner' && !deck.floor) return outerFaces(BOSS_ROOM);
+  const floor = level ? deck?.floor : FLOOR;
   if (!floor) return [];
   const faces = outerFaces(floor);
   for (const p of furniture) {

@@ -65,8 +65,14 @@ test('walls on the other level are not this level’s to hang on', () => {
   // Upstairs has the outside walls its deck reaches: not the north one, on the big mezzanine.
   assert.deepEqual(snapToFace({ x: 2, z: 12.8 }, upstairs), { x: 2, z: 13, rotY: SOUTH });
   assert.equal(upstairs.some((f) => f.z === -13), false);
-  // And no walls at all on a floor with nothing upstairs to furnish.
-  assert.deepEqual(wallFaces(furniture, 1, {}), []);
+  // Up in the boss's office, its south and east walls and nothing else; on a floor that's all one level, no walls at all.
+  assert.deepEqual(
+    wallFaces(furniture, 1, {}).map((f) => [f.z, f.x, f.rotY, f.piece]),
+    [
+      [13, (9.12 + 18) / 2, SOUTH, undefined],
+      [(8.12 + 13) / 2, 18, EAST, undefined],
+    ],
+  );
   assert.deepEqual(wallFaces(furniture, 1, { mezzanine: 'none' }), []);
 });
 
