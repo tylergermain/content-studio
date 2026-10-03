@@ -17,6 +17,7 @@ import { decor } from './decor';
 import { dog } from './dog';
 import { floorPlan } from './floor-plan';
 import { goat } from './goat';
+import { hoop } from './hoop';
 import { jukebox } from './jukebox';
 import { leaveOnMerge } from './leave-on-merge';
 import { machine } from './machine';
@@ -63,4 +64,5 @@ export const SLICES: readonly Slice[] = [
   studio,
   watch,
   goat,
+  hoop,
 ];

@@ -275,7 +275,7 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-20), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'cars', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch']);
+  assert.deepEqual(Object.keys(welcome).slice(-21), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'hoop', 'cars', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch']);
   // It's the office, whatever map the building was on once.
   assert.ok(!('map' in welcome) && !('jail' in welcome));
 

@@ -51,6 +51,11 @@ export interface BallShot {
 export interface BallState {
   holder?: string;
   shot?: BallShot;
+  /**
+   * Whose ball it is to pick up, while a game of PIG is on (see shared/pig.ts): theirs alone, or
+   * nobody's ('') while a shot is on its way. None: anyone's.
+   */
+  for?: string;
 }
 
 /** Whether a throw from the page is one the office passes on: from somewhere on the floor, no faster than anyone throws. */

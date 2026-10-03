@@ -26,6 +26,8 @@ import type { OfficePrompts } from '../prompts.js';
 import type { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ChatLog } from '../history.js';
 import type { Arcade, HighScores } from '../cabinet.js';
+import type { LongShots } from '../longshots.js';
+import type { PigGames } from '../pig.js';
 import type { AgentProvider, FloorInfo, Me, ServerMsg, ServiceInfo, ServicesState, SignInKind } from '../../shared/protocol.js';
 import type { Client } from './client.js';
 import type { Spot } from './input.js';
@@ -46,6 +48,10 @@ export interface Core {
   /** The arcade's high scores: one table for the whole building, on every floor's cabinet. */
   highScores: HighScores;
   arcade: Arcade;
+  /** The hoop's scoreboard: the building's longest shots and PIG winners (see longshots.ts). */
+  longShots: LongShots;
+  /** The games of PIG at the hoop, one a floor (see pig.ts). */
+  pig: PigGames;
   /** What the office is called where it has no project of its own to go by (webhooks, invites). */
   officeName: string;
   /** The models each provider's own CLI lists, for the ones that list them (see models.ts). */

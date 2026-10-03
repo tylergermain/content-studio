@@ -15,6 +15,7 @@ import { green, tee } from '../../features/golf/world';
 import { stack } from '../stack';
 import { tower } from '../tower';
 import { hoop } from '../../features/basketball/world';
+import { scoreboard } from '../../features/scoreboard/world';
 import { kitchen } from '../kitchen';
 import { signs } from '../desksigns';
 import type { Collider, DeskView, Interactable, Office, OfficeHandles } from '../types';
@@ -89,6 +90,8 @@ function floorPlan() {
     garageLift,
     gong,
     hoop,
+    // The longest-shots board beside the hoop, which goes where the hoop goes.
+    scoreboard,
     whiteboard,
     clearOfStairs,
   ] as const;

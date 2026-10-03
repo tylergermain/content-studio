@@ -9,6 +9,7 @@ import type { FloorPlan, RoomOptions } from '../floorplan.js';
 import type { GoatState } from './goat.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
+import type { HoopView } from './hoop.js';
 import type { JukeboxState } from '../jukebox.js';
 import type { StudioState, TickerState } from '../studio.js';
 import type { WatchState } from './watch.js';
@@ -129,6 +130,8 @@ export interface FloorView {
   meeting: MeetingState;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   ball: BallState;
+  /** The scoreboard beside the hoop: the building's longest shots and PIG winners, and this floor's game of PIG. */
+  hoop: HoopView;
   /** The cars in the garage (see CARS in shared/garage.ts): where each one is, and who's in it. */
   cars: CarState[];
   /** What this floor's wall boards and kiosks are for, when it has made them its own, and what's posted on the boards. */

@@ -65,10 +65,13 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     return true;
   });
 
+  /** Whose the ball is to pick up, when it isn't anyone's (a game of PIG: see BallState.for), or undefined. */
+  const notYours = () => (store.ball.for !== undefined && store.ball.for !== store.you ? store.ball.for : undefined);
+
   /** E at the ball: it's yours, if nobody beats you to it. */
   function takeBall() {
     if (ctx.carrying()) return toast('🗂️ Your hands are full: put the card back first (Q)', 'warn');
-    if (ball.holder) return;
+    if (ball.holder || notYours() !== undefined) return;
     deps.reach();
     ctx.sound.ball('bounce', ball.at, 1.5);
     ball.takeNow(store.you);
@@ -79,7 +82,12 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
 
   ctx.interactions.define('ball', {
     reach: 3.2,
-    hint: () => ({ k: String(ball.still), parts: [hintTitle('🏀 Basketball'), ball.still ? aside('shoot some hoops') : '', key('E', ball.still ? 'Pick it up' : 'Catch it!')] }),
+    hint: () => {
+      // In a game of PIG, it's whoever's turn it is (nobody's, mid-shot).
+      const theirs = notYours();
+      if (theirs !== undefined) return { k: `pig|${theirs}`, parts: [hintTitle('🐷 PIG'), aside(theirs ? `${clip(store.peers.get(theirs)?.name ?? 'Someone', 16)}'s shot` : 'the shot is in the air')] };
+      return { k: String(ball.still), parts: [hintTitle('🏀 Basketball'), ball.still ? aside('shoot some hoops') : '', key('E', ball.still ? 'Pick it up' : 'Catch it!')] };
+    },
     use: onE(() => takeBall()),
   });
 
@@ -236,16 +244,21 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     el.style.setProperty('--width', String(SWEET.width));
   }
 
+  /** What else the hint says while the ball's in your hands (a game of PIG's, say): see addBallHint. */
+  const ballHints: (() => Hint | null)[] = [];
+
   /** With the ball in your hands: how to shoot, and how to put it down. */
   function ballHint(): Hint {
     const first = ctx.player.view === 'first';
+    const more = ballHints.map((fn) => fn()).filter((m): m is Hint => !!m);
     return {
-      k: `${streak}|${first}|${!!windFrom}`,
+      k: `${streak}|${first}|${!!windFrom}|${more.map((m) => m.k).join('|')}`,
       parts: [
         h('span.title', {}, '🏀 Ball in hand'),
         streak > 1 ? aside(`🔥 ${streak} in a row`) : '',
         windFrom ? aside('let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
         key('Q', 'Drop it'),
+        ...more.flatMap((m) => m.parts),
       ],
     };
   }
@@ -272,6 +285,8 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     /** No shot after all (a window opened, the page lost focus): the wind-up's let go of. */
     stopWinding: () => void (windFrom = 0),
     ballHint,
+    /** Adds to what the hint says while the ball's in your hands (after how to shoot and drop it). */
+    addBallHint: (fn: () => Hint | null) => void ballHints.push(fn),
     ballAtFeet,
   };
 }

@@ -9,6 +9,7 @@ import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
 import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
 import type { GoatClientMsg, GoatServerMsg } from './protocol/goat.js';
+import type { HoopClientMsg, HoopServerMsg } from './protocol/hoop.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
@@ -26,6 +27,7 @@ export * from './protocol/changes.js';
 export * from './protocol/floors.js';
 export * from './protocol/github.js';
 export * from './protocol/goat.js';
+export * from './protocol/hoop.js';
 export * from './protocol/meetings.js';
 export * from './protocol/presence.js';
 export * from './protocol/queue.js';
@@ -60,7 +62,8 @@ export type ClientMsg =
   | CarClientMsg
   | DogClientMsg
   | GoatClientMsg
-  | StudioClientMsg;
+  | StudioClientMsg
+  | HoopClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
@@ -77,4 +80,5 @@ export type ServerMsg =
   | ToysServerMsg
   | GoatServerMsg
   | StudioServerMsg
-  | WatchServerMsg;
+  | WatchServerMsg
+  | HoopServerMsg;

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR } from '../../../shared/layout';
+import { rimDistance } from '../../../shared/longshots';
 import { BALL, HOOP, RETURN_AFTER, THREE_POINT, backboard, launch, nearSolids, outOfReach, simulate, type BallHit, type BallShot, type BallSim, type BallState, type Solid } from '../../../shared/hoop';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -351,7 +352,7 @@ export class Basketball {
       for (const h of hits) this.onHit?.(h, pos);
       if (s.scored && !was && this.shot) {
         this.settled = true;
-        const distance = Math.hypot(this.shot.x - HOOP.rim.x, this.shot.z - HOOP.rim.z);
+        const distance = rimDistance(this.shot);
         this.onBasket?.({ by: this.shot.by, distance, swish: !s.touched.rim && !s.touched.board, bank: s.touched.board, three: distance > THREE_POINT });
       }
       const gone = s.lost || (s.still && outOfReach(s));

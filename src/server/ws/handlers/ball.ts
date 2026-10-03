@@ -4,6 +4,7 @@ import type { BallClientMsg } from '../../../shared/protocol.js';
 import type { Ctx } from '../../office/context.js';
 import type { Client } from '../../office/client.js';
 import { num } from '../../office/input.js';
+import { hoopMayThrow, hoopThrown } from './hoop.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
 export const ballView: ViewPieces['ball'] = (_ctx, floor) => floor?.court.state() ?? {};
@@ -13,10 +14,14 @@ export const ballChanged = (ctx: Ctx, floor: Floor) => ctx.toFloor(floor, { t: '
 function ball(ctx: Ctx, c: Client, msg: BallClientMsg) {
   const floor = ctx.floorOf(c);
   if (!floor) return;
-  const changed = msg.t === 'ball.take' ? floor.court.take(c.id) : floor.court.throw(c.id, { x: num(msg.x), y: num(msg.y), z: num(msg.z), vx: num(msg.vx), vy: num(msg.vy), vz: num(msg.vz) });
+  const s = msg.t === 'ball.throw' ? { x: num(msg.x), y: num(msg.y), z: num(msg.z), vx: num(msg.vx), vy: num(msg.vy), vz: num(msg.vz) } : null;
+  // A game of PIG on the floor has its say about a throw first (whose turn it is, and from where).
+  const changed = !s ? floor.court.take(c.id) : hoopMayThrow(ctx, c, floor, s) && floor.court.throw(c.id, s);
   // Whoever didn't get it (someone else caught it first) is told where it really is.
   if (changed) ballChanged(ctx, floor);
   else ctx.sendTo(c, { t: 'ball', ball: floor.court.state() });
+  // The office flies a shot itself, for the longest shots and the game of PIG.
+  if (changed && s) hoopThrown(ctx, c, floor, s);
 }
 
 export const ballHandlers = {
