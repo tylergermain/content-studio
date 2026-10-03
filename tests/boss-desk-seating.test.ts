@@ -136,9 +136,11 @@ test('a share handed its picture is up at once, goes to everyone connected, and 
     const track = { name, contentHint: '', stopped: false, addEventListener: (type: string, fn: () => void) => void heard.set(type, fn), stop: () => void (track.stopped = true) };
     return { track, end: () => heard.get('ended')?.(), getVideoTracks: () => [track], getTracks: () => [track] };
   };
+  // A connection with no line for video yet: the share makes one, and stopping takes the picture off it.
   const added: unknown[] = [];
-  const removed: unknown[] = [];
-  voice.conns.set('peer', { pc: { addTrack: (t: unknown) => (added.push(t), { sender: t }), removeTrack: (s: unknown) => void removed.push(s) } } as never);
+  const swapped: unknown[] = [];
+  const pc = { getTransceivers: () => [], addTrack: (t: unknown) => (added.push(t), { replaceTrack: (now: unknown) => (swapped.push([t, now]), Promise.resolve()) }) };
+  voice.conns.set('peer', { pc } as never);
 
   const game = stream('game');
   const asked = voice.startShare(game as never);
@@ -159,7 +161,7 @@ test('a share handed its picture is up at once, goes to everyone connected, and 
   voice.stopShare();
   assert.equal(voice.sharing, false);
   assert.equal(game.track.stopped, true);
-  assert.deepEqual(removed, [{ sender: game.track }]);
+  assert.deepEqual(swapped, [[game.track, null]]);
   assert.deepEqual(sent.at(-1), { t: 'voice', voice: false, muted: false, sharing: false });
 
   // The picture ending by itself takes the share down too.
