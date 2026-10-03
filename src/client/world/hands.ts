@@ -22,6 +22,9 @@ export interface HandsInput {
 
 /** Lifting the mug for a sip and lowering it again, in seconds. */
 const SIP_TIME = 1.1;
+const aimQ = new THREE.Quaternion();
+const aimOff = new THREE.Vector3();
+const aimPos = new THREE.Vector3();
 
 interface Arm {
   group: THREE.Group;
@@ -49,6 +52,8 @@ export class Hands {
   private wantsMug = false;
   /** A drink from the rooftop bar, held where the mug goes (and in its place). */
   private glass: { id: string; group: THREE.Group } | null = null;
+  /** Something a feature hands you to hold there instead (a dram from the whisky cabinet, see holdInLeft). */
+  private held: THREE.Object3D | null = null;
   /** An issue card off the board, held low in front of you in both hands. */
   private holder = new THREE.Group();
   private card: HeldCard;
@@ -67,6 +72,9 @@ export class Hands {
   private shootT = -1;
   /** Seconds into a sip (negative while it waits for the reach to finish), or null. */
   private sipT: number | null = null;
+  /** Where what's in your left hand is held instead (its foot, in the camera's frame), and how far it's gone there: a glass in a toast (see aimHeld). */
+  private aimAt = new THREE.Vector3();
+  private aimK = 0;
   private sway = new THREE.Vector2();
   private last: { yaw: number; pitch: number } | null = null;
   private air = 0;
@@ -217,8 +225,26 @@ export class Hands {
   holdMug(on: boolean) {
     this.wantsMug = on;
     const full = this.card.held || !!this.book || this.wantsBall;
-    this.mug.visible = on && !full && !this.glass;
+    this.mug.visible = on && !full && !this.glass && !this.held;
     if (this.glass) this.glass.group.visible = !full;
+    if (this.held) this.held.visible = !full;
+  }
+
+  /**
+   * Holds `o` in your left hand where the mug goes, upright, standing on y = 0 (a dram from the whisky
+   * cabinet, see features/whisky), or lets go of whatever it held (null). It's the feature's own: it
+   * comes out of your hand, and nothing of it is freed here. The mug waits while you hold it.
+   */
+  holdInLeft(o: THREE.Object3D | null) {
+    if (o === this.held) return;
+    this.held?.removeFromParent();
+    this.held = o;
+    if (o) {
+      o.position.set(0.09, -0.035, -0.03);
+      o.quaternion.setFromEuler(this.left.baseRot).invert();
+      this.left.group.add(o);
+    }
+    this.holdMug(this.wantsMug);
   }
 
   /** A drink from the rooftop bar in the left hand, or none (null). */
@@ -277,6 +303,16 @@ export class Hands {
   /** Raise the mug for a sip, once the right hand is back from the coffee machine. */
   sip() {
     this.sipT = -REACH_TIME * 0.6;
+  }
+
+  /**
+   * Holds what's in your left hand (a dram, see features/whisky) with its foot at `at` in the camera's
+   * frame instead, upright, `k` of the way there from where it's held (0 to 1): a glass meeting
+   * someone else's in a toast, where theirs comes to it. Null puts it back.
+   */
+  aimHeld(at: THREE.Vector3 | null, k = 1) {
+    this.aimK = at ? Math.min(1, Math.max(0, k)) : 0;
+    if (at) this.aimAt.copy(at);
   }
 
   private arm(side: 1 | -1): Arm {
@@ -418,6 +454,14 @@ export class Hands {
     l.position.y += 0.13 * sip;
     l.position.z += 0.14 * sip;
     l.rotation.x += 0.7 * sip;
+    // In a toast: the glass to where it meets the other, upright (the arm turned as it's held at rest).
+    if (this.aimK > 0 && this.held) {
+      const k = this.aimK;
+      const b = this.left.baseRot;
+      l.rotation.set(l.rotation.x + (b.x - l.rotation.x) * k, l.rotation.y + (b.y - l.rotation.y) * k, l.rotation.z + (b.z - l.rotation.z) * k);
+      aimOff.copy(this.held.position).applyQuaternion(aimQ.setFromEuler(l.rotation));
+      l.position.lerp(aimPos.copy(this.aimAt).sub(aimOff), k);
+    }
     // A drag: the cigarette hand comes up to your mouth, just under the camera, and back down.
     if (this.smokeT >= 0) {
       this.smokeT += dt;

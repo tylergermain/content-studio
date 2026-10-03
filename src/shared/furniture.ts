@@ -113,6 +113,8 @@ export const FURNITURE = {
   'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46, color: '#c98b5a' },
   credenza: { label: 'Credenza', icon: '🗄️', group: 'Tables', w: 2, d: 0.48, top: 0.72, color: '#b98554' },
   'side-table': { label: 'Side table', icon: '▫️', group: 'Tables', w: 0.6, d: 0.6, top: 0.52, color: '#f7f3ea' },
+  // A walnut sideboard with The Macallan Litha, a decanter and four glasses on a silver tray: E pours you a dram (see client/features/whisky).
+  'whisky-cabinet': { label: 'Whisky cabinet', icon: '🥃', group: 'Tables', w: 1.2, d: 0.45, top: 0.95, color: '#7a5034', use: { z: 0.85, radius: 1.4 } },
   sofa: { label: 'Sofa', icon: '🛋️', group: 'Seating', w: 4.4, d: 1, top: 0.47, color: '#5b8def', seat: { label: '🛋️ Couch', places: [-1.2, 0, 1.2], hips: 0.5, depth: -0.05, out: 0.9 } },
   armchair: { label: 'Armchair', icon: '🪑', group: 'Seating', w: 1, d: 0.95, top: 0.45, color: '#ef476f', seat: { label: '🪑 Armchair', places: [0], hips: 0.5, depth: 0, out: 0.85 } },
   pouf: { label: 'Pouf', icon: '🫘', group: 'Seating', r: 0.5, top: 0.42, color: '#06d6a0', seat: { label: '🫘 Beanbag', places: [0], hips: 0.42, depth: -0.1, out: 1.2 } },

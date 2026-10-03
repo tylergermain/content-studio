@@ -73,10 +73,10 @@ const welcome = () =>
   });
 
 /** What a floor you arrive on fires, in order. */
-const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig'];
+const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky'];
 
 /** Every topic, to listen for them all. */
-const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig'] as const;
+const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky'] as const;
 
 /** Every message the store takes in (and one it doesn't), and the topics it fires, in the order it has always fired them. */
 const RUN: [ServerMsg, string[]][] = [
@@ -118,6 +118,10 @@ const RUN: [ServerMsg, string[]][] = [
   [msg({ t: 'machine', state: {} }), ['machine']],
   [msg({ t: 'dog', dog: null }), ['dog']],
   [msg({ t: 'goat', goat: null }), ['goat']],
+  [msg({ t: 'whisky.poured', id: 'p-b', piece: 'whisky' }), ['whisky']],
+  [msg({ t: 'whisky.poured', id: 'p-b', piece: 'whisky', top: true }), []],
+  [msg({ t: 'whisky.down', id: 'p-b' }), ['whisky']],
+  [msg({ t: 'whisky.down', id: 'p-b' }), []],
   [msg({ t: 'ball', ball: {} }), ['ball']],
   [msg({ t: 'hoop.board', board: { shots: [{ name: 'Ann', color: '#fff', dist: 7.2, at: 1 }], wins: [] }, latest: { name: 'Ann', dist: 7.2, rank: 1, first: true } }), ['hoopBoard']],
   [msg({ t: 'pig', pig: null }), ['pig']],
@@ -226,7 +230,7 @@ test('what the browser remembers keeps its keys and shapes', () => {
 
 test("the store's keys are its state, as window.__office shows them", () => {
   // As the office had them before its store was split into slices: methods and the slices aren't among them.
-  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drawing', 'floor', 'floorPlan', 'floors', 'goat', 'goatStart', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'queue', 'repos', 'screens', 'services', 'signins', 'sky', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
+  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drams', 'drawing', 'floor', 'floorPlan', 'floors', 'goat', 'goatStart', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'queue', 'repos', 'screens', 'services', 'signins', 'sky', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
 });
 
 test('a new store starts every field where it always has', async () => {
@@ -237,7 +241,7 @@ test('a new store starts every field where it always has', async () => {
   void subs;
   assert.deepEqual({ name: profile.name, color: profile.color }, { name: 'Guest', color: '#4f86f7' });
   assert.deepEqual(
-    JSON.parse(JSON.stringify(rest, (_k, v) => (v instanceof Map ? [...v] : v === undefined ? '<undefined>' : v))),
+    JSON.parse(JSON.stringify(rest, (_k, v) => (v instanceof Map || v instanceof Set ? [...v] : v === undefined ? '<undefined>' : v))),
     {
       you: '', peers: [], workers: [], screens: [], project: null, floors: [], floor: null, projectsDir: { dir: '', custom: false },
       repos: { list: [], loading: false, at: 0 }, issues: { items: [], fetchedAt: 0, loading: true }, pulls: { items: [], fetchedAt: 0, loading: true },
@@ -254,6 +258,7 @@ test('a new store starts every field where it always has', async () => {
       team: null, accounts: null, signins: null,
       goat: null, goatStart: 0,
       hoopBoard: { shots: [], wins: [] }, hoopLatest: null, pig: null,
+      drams: [],
     },
   );
 });

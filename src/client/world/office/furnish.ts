@@ -63,6 +63,8 @@ export interface FurnitureView {
   roots(): THREE.Group[];
   get(id: string): PieceView | undefined;
   all(): IterableIterator<PieceView>;
+  /** Goes up each time the furniture is stood anew (see set): whatever keeps a list of some of it knows when to look again. */
+  readonly version: number;
 }
 
 declare module '../types' {
@@ -102,6 +104,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
   /** What the office's own features built (see adopt), by kind, and how the floor's arranged now. */
   const adopted = new Map<string, Adopted>();
   let now: { pieces: readonly Piece[]; wing: number } = { pieces: DEFAULT_FURNITURE, wing: 0 };
+  let version = 0;
 
   /**
    * Stands something a feature built where `p` has it: it's put away, moved and turned, not built or
@@ -227,6 +230,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
   const view: FurnitureView = {
     set(pieces, wing) {
       now = { pieces, wing };
+      version++;
       const kept = new Set<string>();
       // What the office comes with: where this floor has each, or put away on a floor that doesn't have it.
       for (const [kind, a] of adopted) stand(a, pieces.find((p) => p.kind === kind), wing);
@@ -249,6 +253,9 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     roots: () => [...[...views.values()].map((v) => v.group), ...[...adopted.values()].map((a) => a.group)],
     get: (id) => views.get(id),
     all: () => views.values(),
+    get version() {
+      return version;
+    },
   };
 
   view.set(DEFAULT_FURNITURE, 0);

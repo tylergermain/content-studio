@@ -32,6 +32,7 @@ import { needsYou } from '../features/needsyou/sound';
 import { plaything, type PlaySound } from '../features/playthings/sound';
 import type { Pos } from './places';
 import { Footsteps, pageTurn, paper } from './steps';
+import { cheers, decant } from '../features/whisky/sound';
 import { toss, type TossSound } from '../features/bargames/sound';
 import { fidgeting, Typing } from './typing';
 import { Rain, thunder } from './weather';
@@ -290,6 +291,18 @@ export class OfficeSound {
 
   hiccup() {
     hiccup(this.a);
+  }
+
+  // ---- The whisky cabinet (features/whisky) -------------------------------------------------------
+
+  /** A dram poured from the decanter at `at`. */
+  decant(at: Pos) {
+    decant(this.a, at);
+  }
+
+  /** Glasses clinking at `at`. */
+  cheers(at: Pos) {
+    cheers(this.a, at);
   }
 
   // ---- The jukebox (features/jukebox) -------------------------------------------------------------
