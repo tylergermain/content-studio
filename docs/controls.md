@@ -49,9 +49,3 @@ The prompt edits the way it does in your own terminal (iTerm2's *Natural Text Ed
 | ⌘ + ⌫ | Delete to the start of the line (Mac) |
 | ⌘ + ⌦ | Delete to the end of the line (Mac) |
 | ⌘ + ← / → | Jump to the start / end of the line (Mac) |
-
-### Basketball shots
-
-Hold **E** (or the mouse in first person) to charge, then release to throw where you are looking. Charge grows to maximum power over 1.05 seconds and stays there, so holding too long does not cycle back to an easy shot. A quick release drops short, while a long hold can hit the backboard or ceiling too hard. Aim, release height, and timing determine layups, floaters, and ordinary shots.
-
-**Space** only jumps. There is no assisted dunk button or correction toward the hoop. A dunk requires releasing downward while airborne, with the ball already above and immediately beside the rim. Jumping off the counter or using coffee can help you reach it, but the ball must still physically pass through the net to score. Q drops the ball.

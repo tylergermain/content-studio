@@ -438,5 +438,3 @@ Admins can open **Org chart** to assign human member accounts to positions and p
 Look at an agent and press **Q** for an in-world live voice conversation. They turn to face you while you talk, and Q or Esc ends the conversation. See [worker chat](docs/worker-chat.md) for setup and controls.
 
 Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and content previews, with the raw Terminal available from that workspace.
-
-With the basketball in hand, hold **E or click** to charge and release to throw exactly where you aim. Short holds barely move it; long holds throw hard. **Space** jumps for layups and floaters. Dunking requires an airborne downward release from above and immediately beside the rim, followed by a real physics basket.
