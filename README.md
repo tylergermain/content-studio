@@ -1,3 +1,27 @@
+# Content Studio
+
+Worker desks now open a conversation panel with content previews and optional GPT-Live 1 voice. Files a worker links in its messages open in that panel, and an admin can share a folder outside the floor, such as the one a render was saved to, so the links into it open there too. Click **Talk live** to configure an OpenAI project API key privately on the Studio. Text chat works without an API key. See [Worker chat and live voice](docs/worker-chat.md).
+
+Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for new workers, queue tasks, meetings, and the office default. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` and trusts the office hooks. Pi uses its normal unrestricted tools with `--approve` for project trust. These defaults apply to fresh and resumed launches. Restart existing workers to apply them.
+
+Pi is locked to the Mac Studio's `studio-local` provider. An empty model uses `qwen3.8-flash-next`; a bare model id is qualified automatically. Cloud provider selections are rejected. The local provider and its oMLX credentials remain in the Studio's Pi configuration. Other upstream adapters remain for reading older state but cannot be selected for new work.
+
+Tyler Germain's fork of [Agent Office](https://github.com/AgentSystemLabs/agent-office), with a 3D office builder for the content team. Claude, Codex, and Pi workers use the connected Content OS floor. Pi can use the Mac Studio's local model server.
+
+Open **Menu → Office builder**, or press **U**, on an office floor as an admin. The camera goes up over the room and you drag the desks and the furniture about on the floor itself: turn them, paint them, add sofas, tables, plants, rugs, dividers and signs from the catalog, repaint the room, and move the whiteboard, the jukebox and the rest of what the office comes with. **Team desks** are desks for people: sit down at one and your screen goes up on its monitor. Save a layout to apply it to everyone on that floor. See [Office builder](docs/office-builder.md).
+
+The catalog also has what a studio needs: walls, glass and wood slat panels to divide a floor into rooms, a long table, a podcast desk, softboxes, a camera and a backdrop, more plants, video screens that loop the videos in a floor's `.agent-office/media` folder or play the newest videos from the YouTube channels the floor watches (through YouTube's own player), a stock ticker and a market board for live prices, and things to play with (a trampoline, a punching bag, ping-pong, foosball, a prize wheel). Each floor chooses its own structure: one level, the corner loft (the boss's office, or an empty room) or a big mezzanine along the south side with rooms upstairs and one flight of stairs or two; where its AI workers meet (the glass room, a stage with a panel table, or an anchor desk with a prompter); the Steps, an amphitheatre across the lounge to sit on; a kitchen or none; what hangs under its ceiling (tiles, timber beams, banners or a lighting grid); any of its outside walls in oak or walnut slats; and one driving tee or two on its balcony. The floor's own pictures hang as paintings on any wall, upstairs included. A floor can be a folder rather than a repository, with wall boards and kiosk agents of its own (*Newsroom*, a Slack feed, Metricool).
+
+Outside, the building is a 15-storey Friday Labs tower. The real floors are its bottom storeys, in graphite with warm-paper window frames and a second row of windows high up every wall; each one's slab band and its name, lit along its south wall, are in its floor's color, the trim of the paint it's given in the office builder. Above them three glass bars stacked and shifted like the Friday Labs mark run up to the rooftop bar, with a green light line in the dark seam at the foot of each, the lit lockup near the top and the red beacon on a mast. A lit marquee hangs over the garage, where a green lane leads to the lift and a board lists the floors. See [Features](docs/features.md).
+
+The building has one goat, Marc, on its bottom floor beside that floor's dog: he grazes on the plants, nibbles the rugs and gets the zoomies, and **E** pets him, after which he follows you about for a minute. The lounge's arcade cabinet and the boss's monitor play the same four games (Minesweeper, Blockfall, 2048 and Snake) against one high-score table per game for the whole building. The scoreboard beside the basketball hoop keeps the building's longest shots, and two people at the court can play PIG (**P** asks). See [Features](docs/features.md).
+
+Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, the back office, and which floor Marc lives on (he follows only an admin into the elevator). Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
+
+The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
+
+---
+
 > [!WARNING]
 > **Work in progress.** Agent Office is built for one person's workflow — mine — and it changes fast as I iterate on it.
 > Expect breaking changes between releases: keys that move, screens that get redrawn, features that come and go
@@ -39,11 +63,10 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
-- **Together.** Voice, chat, screen sharing on the lounge TV and a shared whiteboard.
+- **Together.** Voice, chat, screen sharing on the lounge TV, a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
+- **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
-- **Other maps.** Turn the whole building into a castle: sit on a throne of iron blades while your workers line up before you when they're done, send new ones off through the Hand of the King, and watch their beards grow long and grey as they toil. Send one home and the Kingsguard runs up from the dungeon, marches it down the stairs and throws it in a cell, where it starves, dies and rots down to a skeleton. Or make a map of your own, with its own way of seeing workers off in JSON ([docs/maps.md](docs/maps.md)).
-
-There's a lot more (a rooftop bar, an office dog, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
+There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
 
 ## Requirements
 
@@ -323,7 +346,19 @@ deploy/dokploy.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 
 **Their own Claude and GitHub.** With accounts, everyone's workers run on their own Claude plan, and the office acts on GitHub as them: comments, merges, labels, pushes and pull requests show up under their name. The first time someone comes in, **🔐 Your sign-ins** opens (it's in the **☰** menu too). *Sign in with Claude* gives them Claude's sign-in page and takes back the code it shows. *Sign in with GitHub* shows a one-time code for github.com/login/device. They can paste a token from `claude setup-token`, or a GitHub token, instead. A 🐚 shell they open at a desk runs as them, so `claude auth login` and `gh auth login` typed there work too. Admins can use the office machine's own sign-ins instead. Each account's sign-ins live in `.agent-office/homes/<account>/`, and revoking the account deletes them. The boards are read with the machine's own `gh`, so that account needs read access to the repos. Running it just for yourself, with no accounts, none of this applies.
 
-**3. Turn off the shared password.** Until you do, anyone who knows the office password can get in, as an admin. Once everyone has an account, switch it off in **🔑 Accounts** (signed in with your own admin account), or `agent-office accounts password off`.
+**3. Turn off the shared password.** Until you do, anyone who knows the office password gets in as an admin, whether or not they have an account: the shared password has no role of its own, so it counts as one. Once you and the other admins have joined with your own accounts, switch it off in **🔑 Accounts** (signed in with your own admin account), or run `agent-office accounts password off`. It refuses until at least one admin account exists, and everyone who came in on the shared password is signed out within seconds.
+
+**Admins and members.** Members hire workers, use the boards, hang signs and pictures, and ride the elevator. Managing the building is the admins': adding a project as a floor (from GitHub or from a folder), stopping a clone, renaming, moving or removing a floor, moving the workspace folder, the office builder, a floor's board setup, and building the back office out or walling it up. A member's elevator shows only the floors, the roof and the garage.
+
+```bash
+agent-office accounts invite tyler --admin   # an admin: prints a single-use /join#… link, valid 7 days
+agent-office accounts invite gavin --admin
+agent-office accounts invite sam             # a member (the default)
+agent-office accounts password off           # once the admins have joined
+agent-office accounts role sam admin         # or back to member
+```
+
+From a checkout without the command installed, the same is `npx tsx src/server/cli.ts accounts …`. It looks for the office in the current directory, then in `~/agent-office`; pass `--dir <dir>` for one somewhere else.
 
 **Removing someone.** Revoke their account in **🔑 Accounts** (or `agent-office accounts revoke <name>`), and on a server also remove them in **👥 Invite teammates** (on AWS, `deploy/aws.sh uninvite <name>`; on Railway, `deploy/railway.sh uninvite <name>`; on Fly.io, `deploy/fly.sh uninvite <name>`; on Dokploy, `deploy/dokploy.sh uninvite <name>`) to take away their SSH keys and drop open tunnels (other teammates just reconnect). If the shared password is still on, change it with `deploy/aws.sh reset-password` (or `deploy/railway.sh reset-password`, `deploy/fly.sh reset-password` or `deploy/dokploy.sh reset-password`).
 
@@ -334,7 +369,7 @@ deploy/dokploy.sh ssh 'node /opt/agent-office/bin/agent-office.js accounts invit
 | W A S D | Walk (hold Shift to run) |
 | Space | Jump |
 | Mouse drag / wheel | Orbit / zoom the camera |
-| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator |
+| E | Interact: hire a worker, open its terminal, read a board, sit down, ride the elevator, watch a video screen, use something to play with |
 | P | Give a task to a new worker, or to the one at this desk |
 | C | See a worker's changes: diff, commit, open a PR |
 | N | Go to the next worker that's waiting on you |
@@ -372,7 +407,6 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Features](docs/features.md): everything in the office, room by room
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
-- [Maps](docs/maps.md): the castle, and making a map of your own
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself
 - [AWS reference](docs/aws.md): Tailscale, service tunnels, upgrades, and everything `deploy/aws.sh` does
 - [Railway reference](docs/railway.md): what `deploy/railway.sh` sets up, and what the volume keeps
@@ -383,6 +417,28 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [How it works](docs/how-it-works.md): the architecture, and security notes
 - [Code layout](docs/code-layout.md): where the code lives, adding a feature or an agent provider, and the size guard
 
+The lounge jukebox is audible across most of the floor, with a gentle fade at distant desks. Adjust your personal jukebox volume in Settings → Sound & voice.
+
 ## License
 
 [MIT](LICENSE)
+
+Footsteps and jump landings are muted by default. Enable them under Settings → Sound & voice → Footsteps; the choice is saved in your browser.
+Spotify Connect controls are available in the jukebox, with a private connection for each signed-in account. Configure a Spotify developer app and connect your account there; playback uses your chosen Spotify device and requires Premium. See [Spotify setup](docs/spotify.md).
+Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
+
+Worker chat adapts to smaller windows with Updates and workspace views (the role's Screening room, Design board, Reports, or Files), keeping the composer accessible without scrolling through the workspace.
+
+### Specialist agents
+
+Hire a Video Editor, Researcher, Designer, or custom specialist from an empty desk. Each role has its own `agents/<id>/AGENTS.md`, saved provider session, and optional native MCP configuration while sharing the floor's content. Admins can edit roles in **Manage specialists**. See [specialist setup and tool configuration](docs/specialists.md). This version uses local processes with shared access; role folders are not computer sandboxes.
+
+Each role opens with an interface of its own beside the conversation. The Video Editor's **Screening room** plays each render in a 2D player that streams 4K by byte range, lists its versions, and sends notes taken at timestamps back as one revision request; the Designer's **Design board** compares images side by side and at YouTube size; the Researcher's **Reports** list their sources. An approval only tells the worker the file is final, never to publish it. Admins choose a custom role's interface in **Manage specialists**. See [interfaces](docs/specialists.md#interfaces).
+
+### Org chart and employee permissions
+
+Admins can open **Org chart** to assign human member accounts to positions and place specialist roles beneath them. Employees can hire only those specialist roles, including indirect reports; unassigned members cannot hire. Agent delegation inherits the hiring human's restrictions. See [org chart setup and account requirements](docs/org-chart.md). The policy controls managed studio workers; computer-level isolation remains a separate step.
+
+Look at an agent and press **Q** for an in-world live voice conversation. They turn to face you while you talk, and Q or Esc ends the conversation. See [worker chat](docs/worker-chat.md) for setup and controls.
+
+Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and its role's workspace, with the raw Terminal available from that window; the desk hint says which workspace E opens. A link in a worker's message opens the file in the workspace; a link into a folder outside the floor reads **Not shared with the office** until an admin clicks **Share … with this floor** under it, and **Stop sharing** at the foot of the workspace takes the folder back. See [content preview and links](docs/worker-chat.md#content-preview-and-links).

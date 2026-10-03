@@ -1,5 +1,7 @@
 import * as THREE from 'three';
+import { columnsOf } from '../../../shared/clerestory';
 import { BALCONY_DOOR, EXIT_DOOR, FLOOR, WALL_HEIGHT, WALL_T, WINDOWS, WING, type Opening, type Side } from '../../../shared/layout';
+import { FACADE } from '../facade';
 import type { NightParts } from '../outside';
 import { mergeByMaterial, mesh, textPlane, toon } from '../toon';
 import type { Collider } from '../types';
@@ -24,7 +26,7 @@ export interface Door {
 /** A window filling its hole in an outside wall: a frame lining the hole, a mullion, sills and real glass. */
 export function windowIn(o: Opening): THREE.Group {
   const g = new THREE.Group();
-  const frame = toon('#ffffff');
+  const frame = toon(FACADE.frame);
   const w = o.width;
   const h = o.y1 - o.y0;
   const F = 0.09;
@@ -67,7 +69,7 @@ export function wetPane(o: Opening, mat: THREE.Material): THREE.Group {
 /** A door's frame and threshold, lining its hole in the wall (built like windowIn: along x, outdoors toward +z). */
 function doorFrame(o: Opening): THREE.Group {
   const g = new THREE.Group();
-  const frame = toon('#ffffff');
+  const frame = toon(FACADE.frame);
   const F = 0.08;
   const D = WALL_T + 0.04;
   g.add(mesh(box(o.width, F, D), frame, 0, o.y1 - F / 2, 0, false));
@@ -227,22 +229,27 @@ export function buildWalls(group: THREE.Group, colliders: Collider[], openings: 
     };
     const block = (u0: number, u1: number, bottom?: number) =>
       colliders.push(alongX ? { minX: u0, maxX: u1, minZ: w.at - T / 2, maxZ: w.at + T / 2, top: 99, bottom } : { minX: w.at - T / 2, maxX: w.at + T / 2, minZ: u0, maxZ: u1, top: 99, bottom });
-    const holes = openings.filter((o) => o.wall === w.side).sort((a, b) => a.u - b.u);
+    // Holes one over another (a window and the upper one over it) are a column, built round together.
+    const columns = columnsOf(openings.filter((o) => o.wall === w.side));
     for (const [a, b, top] of w.spans) {
       let u = a;
       let floorU = a;
-      for (const o of holes) {
-        const h0 = o.u - o.width / 2;
-        const h1 = o.u + o.width / 2;
+      for (const { u0: h0, u1: h1, holes } of columns) {
         if (h0 < a || h1 > b) continue;
         piece(u, h0, 0, top);
-        piece(h0, h1, 0, o.y0);
-        piece(h0, h1, o.y1, top);
+        // Under the lowest, between each and the next one up, and over the top one.
+        let y = 0;
+        for (const o of holes) {
+          piece(h0, h1, y, o.y0);
+          y = o.y1;
+        }
+        piece(h0, h1, y, top);
         u = h1;
-        if (o.y0 > 0) continue;
+        const low = holes[0];
+        if (low.y0 > 0) continue;
         // A door: walk through it, under the wall above.
         run(floorU, h0);
-        block(h0, h1, o.y1);
+        block(h0, h1, low.y1);
         floorU = h1;
       }
       piece(u, b, 0, top);
@@ -295,11 +302,15 @@ export function wallRun(into: THREE.Group, cols: Collider[], axis: 'x' | 'z', at
     into.add(m);
   };
   let u = u0;
-  for (const o of [...holes].sort((a, b) => a.u - b.u)) {
-    piece(u, o.u - o.width / 2, 0, WALL_HEIGHT);
-    piece(o.u - o.width / 2, o.u + o.width / 2, 0, o.y0);
-    piece(o.u - o.width / 2, o.u + o.width / 2, o.y1, WALL_HEIGHT);
-    u = o.u + o.width / 2;
+  for (const { u0: h0, u1: h1, holes: column } of columnsOf(holes)) {
+    piece(u, h0, 0, WALL_HEIGHT);
+    let y = 0;
+    for (const o of column) {
+      piece(h0, h1, y, o.y0);
+      y = o.y1;
+    }
+    piece(h0, h1, y, WALL_HEIGHT);
+    u = h1;
   }
   piece(u, u1, 0, WALL_HEIGHT);
   const len = u1 - u0;

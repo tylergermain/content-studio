@@ -3,11 +3,11 @@ import { mkdirSync } from 'node:fs';
 import path from 'node:path';
 import type { ChangesState, FloorInfo, PeerInfo, ProjectInfo, ServerMsg, WorkerInfo } from '../shared/protocol.js';
 import { isBusy } from '../shared/status.js';
-import { DESK_BY_ID } from '../shared/layout.js';
+import { DESK_BY_ID, type StationKind } from '../shared/layout.js';
 import type { FloorDef } from './building.js';
 import { excludeFromGit } from './config.js';
 import { agentProviders, configuredProvider } from './agents.js';
-import { WorkerManager, workedMs, type HookEnv, type RunAs } from './workers.js';
+import { WorkerManager, type HookEnv, type RunAs } from './workers.js';
 import { GitHub, MergeWatch } from './github.js';
 import type { GhAs } from './signins.js';
 import { TaskQueue } from './queue.js';
@@ -16,8 +16,8 @@ import { Decor } from './decor.js';
 import { FloorPlanStore } from './floorplan.js';
 import { Docs } from './docs.js';
 import { Dog } from './dog.js';
+import { goatHome, type GoatHome } from './goat.js';
 import { Court } from './court.js';
-import { Jail } from './jail.js';
 import { Garage } from './garage.js';
 import { Jukebox } from './jukebox.js';
 import { Whiteboard } from './whiteboard.js';
@@ -27,6 +27,7 @@ import { landedWork, landedWorkers, type Landed } from './leave-on-merge.js';
 import type { Ledger } from './usage.js';
 import type { Capacity } from './machine.js';
 import { officePrompt, type PromptSource } from './prompts.js';
+import { Studio } from './studio.js';
 
 type ToastLevel = 'info' | 'warn' | 'error';
 
@@ -46,6 +47,7 @@ export interface FloorContext {
   /** Workers hired by an account run on its own sign-ins (see signins.ts). */
   runAs?: RunAs;
   /** How to run gh as an account: its own sign-in, the office's (undefined), or why it can't. */
+  hiringAllowed?(floor: Floor, owner: string | undefined, specialist: string | undefined, kind: 'agent' | 'shell'): string | undefined;
   ghAs(owner: string | undefined): GhAs | undefined | string;
   /** To everyone on this floor. */
   emit(floor: Floor, msg: ServerMsg, droppable?: boolean): void;
@@ -68,8 +70,6 @@ export interface FloorContext {
   pullsChanged(floor: Floor): void;
   /** Whether a worker on another floor works in this floor's project too. */
   lent(floor: Floor): boolean;
-  /** Whether the building's map locks up workers sent home (see MapPlan.sendHome), instead of letting them go. */
-  locksUp(): boolean;
 }
 
 /** The open pull request on a floor's board whose head is `branch`. */
@@ -119,6 +119,8 @@ export class Floor {
   readonly decor: Decor;
   /** The signs over its desks, and how far its back office is built out. */
   readonly plan: FloorPlanStore;
+  /** What the floor's boards and kiosks are for, when it has made them its own (see shared/studio.ts). */
+  readonly studio: Studio;
   readonly jukebox: Jukebox;
   /** The whiteboard everyone on the floor draws on together. */
   readonly whiteboard: Whiteboard;
@@ -129,12 +131,12 @@ export class Floor {
   /** Settles once the workers whose terminals outlived the last office are picked back up, and the rest woken. */
   readonly ready: Promise<void>;
   readonly dog: Dog;
+  /** Marc, the building's one goat, while he's on this floor (see goat.ts). */
+  readonly goat: GoatHome;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   readonly court = new Court();
   /** The cars in the garage: who's in which, and where their drivers have left them. */
   readonly garage = new Garage();
-  /** Workers sent home on a map that locks them up (see MapPlan.sendHome). */
-  readonly jail: Jail;
   private timer: NodeJS.Timeout;
   /** Pull requests merging, to ring the gong for. */
   private merges = new MergeWatch();
@@ -156,7 +158,7 @@ export class Floor {
     this.docs = new Docs(def.dir);
     // Before the workers and the dog: the back office's desks are only there once it's built.
     this.plan = new FloorPlanStore(dataDir);
-    this.jail = new Jail(dataDir);
+    this.studio = new Studio(dataDir);
 
     // Before the workers, so it hears about the ones who wake up needing input.
     this.dog = new Dog(def.id, dataDir, {
@@ -164,7 +166,9 @@ export class Floor {
       people: () => ctx.peers(this),
       send: (dog) => ctx.emit(this, { t: 'dog', dog }),
       wing: () => this.plan.wing,
+      layout: () => this.plan.layoutNow(),
     });
+    this.goat = goatHome(this, ctx, dataDir);
 
     this.workers = new WorkerManager(
       def.dir,
@@ -183,12 +187,9 @@ export class Floor {
           // Its turn ended, or whoever had its terminal open closed it: it may be free to go now.
           this.sendLandedHome();
         },
-        remove: (workerId, info) => {
+        remove: (workerId) => {
           this.changes?.forget(workerId);
-          // Sent home on a map that locks workers up: into the dungeon with it, for good (a meeting's
-          // workers aren't sent home when it's over, just let go).
-          const jail = info && !info.meeting && ctx.locksUp() ? this.jail.add({ ...info, workedMs: workedMs(info) }) : undefined;
-          ctx.emit(this, { t: 'worker.remove', workerId, ...(jail ? { jail } : {}) });
+          ctx.emit(this, { t: 'worker.remove', workerId });
           this.queue?.onWorkerGone(workerId);
           this.meetings?.onWorkerGone(workerId);
           this.dog.onWorkerGone(workerId);
@@ -200,10 +201,16 @@ export class Floor {
       },
       ctx.ledger,
       ctx.capacity,
-      ctx.prompts,
+      // The office's prompts, but for the kiosks' agents this floor has briefed and named itself (see studio.ts).
+      {
+        text: (id) => (id.startsWith('station.') ? this.studio.brief(id.slice('station.'.length) as StationKind, def.name) : undefined) ?? ctx.prompts.text(id),
+        agent: () => ctx.prompts.agent(),
+        stationName: (kind) => this.studio.agentName(kind),
+      },
       ctx.runAs,
       ctx.dshProfile,
     );
+    this.workers.hiringPolicy = (owner,specialist,kind) => ctx.hiringAllowed?.(this,owner,specialist,kind);
     this.workers.wing = () => this.plan.wing;
 
     this.github = new GitHub(
@@ -304,7 +311,7 @@ export class Floor {
       },
     );
 
-    this.decor = new Decor(dataDir);
+    this.decor = new Decor(dataDir, () => this.plan.layoutNow().room);
     this.jukebox = new Jukebox(dataDir);
     this.whiteboard = new Whiteboard(dataDir);
     this.ready = this.workers.start();
@@ -397,6 +404,7 @@ export class Floor {
       dir: this.dir,
       branch: this.project.branch,
       palette: this.def.palette,
+      ...(this.plan.look !== undefined ? { look: this.plan.look } : {}),
       addedBy: this.def.addedBy,
       addedAt: this.def.addedAt,
       workers: ws.filter((w) => !DESK_BY_ID.get(w.deskId)?.station).length,
@@ -412,6 +420,7 @@ export class Floor {
     clearInterval(this.timer);
     clearTimeout(this.landedTimer);
     this.dog.stop();
+    this.goat.stop();
     this.github.stop();
     this.queue.shutdown();
     this.meetings.shutdown();

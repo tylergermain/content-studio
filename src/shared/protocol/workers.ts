@@ -35,6 +35,7 @@ export interface WorkerInfo {
   model?: string;
   /** Reasoning effort requested for this worker, when one was chosen. */
   effort?: AgentEffort;
+  specialist?: string;
   deskId: string;
   name: string;
   color: string;
@@ -92,14 +93,6 @@ export interface WorkerInfo {
   lastInput?: { by: string; at: number };
   /** The meeting it was called to, for a worker at the meeting room's table (see Meeting). */
   meeting?: string;
-  /**
-   * How long it has spent working (ms), over the stretches that have ended, and when the one it's in
-   * now started (while it's working): on the castle map, the longer it has worked, the more worn out it looks.
-   */
-  workedMs?: number;
-  workingSince?: number;
-  /** Sent out by a map's herald (the castle's Hand of the King), so every browser has it run to its seat from beside them. */
-  via?: 'herald';
 }
 
 /** Where the branch of a worker whose worktree was deleted still is (see WorkerInfo.lost). */
@@ -153,30 +146,10 @@ export const FLAG_BOLD = 1;
 export const FLAG_INVERSE = 2;
 export const FLAG_DIM = 4;
 
-/**
- * A worker sent home on a map that locks them up (see MapPlan.sendHome): who it was, and when it was
- * locked up, which is how far it has wasted away since.
- */
-export interface Prisoner {
-  id: string;
-  name: string;
-  color: string;
-  /** When it was locked up (ms). */
-  at: number;
-  /** How long it had worked, for how worn out it looks (see MapConfig.agents.ageMinutes). */
-  workedMs?: number;
-}
-
-/** A floor's dungeon: everyone locked up in it, first to last, and how many from before them are only bones on the heap now. */
-export interface JailState {
-  prisoners: Prisoner[];
-  bones: number;
-}
-
 export type WorkerClientMsg =
   /** With `issue`, the worker is there for that GitHub issue: it moves to In progress at once, is assigned on GitHub (which keeps it there) and taken off the queue. */
   /** With `repos` (other floors' ids), the worker works in their repositories too, each in a worktree of its own (see WorkerInfo.repos). */
-  | { t: 'worker.spawn'; deskId: string; prompt?: string; worktree?: boolean; kind?: WorkerKind; provider?: AgentProvider; model?: string; effort?: AgentEffort; issue?: number; repos?: string[]; via?: 'herald' }
+  | { t: 'worker.spawn'; specialist?: string; deskId: string; prompt?: string; worktree?: boolean; kind?: WorkerKind; provider?: AgentProvider; model?: string; effort?: AgentEffort; issue?: number; repos?: string[] }
   | { t: 'worker.resume'; workerId: string }
   | { t: 'worker.kill'; workerId: string; cleanup?: WorktreeCleanup }
   /** Asks what the worker's worktree holds; answered with a `worker.worktree` message. */
@@ -201,8 +174,7 @@ export type WorkerClientMsg =
 
 export type WorkerServerMsg =
   | { t: 'worker.update'; worker: WorkerInfo }
-  /** A worker's gone; `jail`, when it was sent home on a map that locks workers up (MapPlan.sendHome), with it in there now. */
-  | { t: 'worker.remove'; workerId: string; jail?: JailState }
+  | { t: 'worker.remove'; workerId: string }
   | { t: 'worker.worktree'; workerId: string; state: WorktreeState }
   | { t: 'screen'; workerId: string; cols: number; rows: number; lines: Record<number, Run[]>; full: boolean; cursor: [number, number] }
   | { t: 'term.snapshot'; workerId: string; data: string; cols: number; rows: number }

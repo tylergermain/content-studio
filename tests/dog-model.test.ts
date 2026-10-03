@@ -45,7 +45,7 @@ for (const breed of DOG_BREEDS) {
       assert.ok(Math.abs(turn.w) > 0.999, `${name} isn't turned in the rest pose (${turn.toArray().map((v) => v.toFixed(3))})`);
     }
     const box = dog.bounds();
-    // The nose out at the front, the collar behind and below the head, the wings' spot on the back behind that.
+    // The nose out at the front, the collar behind and below the head, the back's socket behind that.
     assert.ok(box.max.z - at('socket_nose').z < 0.05, `the nose socket is at the front (${at('socket_nose').z.toFixed(3)} of ${box.max.z.toFixed(3)})`);
     assert.ok(at('socket_head').z < at('socket_nose').z, 'the head socket is behind the nose');
     assert.ok(at('socket_neck').z < at('socket_head').z && at('socket_neck').y < at('socket_head').y, 'the collar is behind and below the head');
@@ -83,7 +83,7 @@ test('the breeds are built as they should be: a corgi and a dachshund low, a dac
   const pup = size('pup');
   for (const low of ['corgi', 'dachshund'] as const) {
     const box = size(low);
-    // Ears aside: the top of its back, where the socket for wings is.
+    // Ears aside: the top of its back, where its back socket is.
     const back = models[low].placed(models[low].byName('socket_back')).at.y;
     assert.ok(back < models.pup.placed(models.pup.byName('socket_back')).at.y - 0.05, `a ${low}'s back is well under the pup's`);
     assert.ok(box.max.z - box.min.z > pup.max.z - pup.min.z, `a ${low} is longer than the pup`);

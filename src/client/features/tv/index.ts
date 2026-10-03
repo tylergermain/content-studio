@@ -1,10 +1,13 @@
 /**
- * The office TV: the screen someone on the floor is sharing, or its idle card while nobody is. What's
- * shared, and watching it full screen, is features/voice's.
+ * The office TV: the screen someone on the floor is sharing, else the video the jukebox has on (see
+ * features/jukebox/video.ts), or its idle card while there's neither. What's shared, and watching it
+ * full screen, is features/voice's.
  */
 import * as THREE from 'three';
 import type { Ctx } from '../../core/context';
-import { hintTitle, key, onE } from '../../core/hint';
+import { aside, hintTitle, key, onE } from '../../core/hint';
+import { clip } from '../../ui/dom';
+import { jukeboxVideo } from '../jukebox/video';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -56,20 +59,27 @@ export function installTv(ctx: Ctx, deps: TvDeps) {
     reach: 10,
     hint: () => {
       const any = deps.shares().length > 0;
-      return { k: String(any), parts: [hintTitle('📺 Office TV'), key('E', any ? 'Watch full screen' : 'Share your screen')] };
+      // The jukebox's video, while it's what's on: who and what.
+      const on = any ? undefined : video.showing();
+      return { k: `${any}|${on ?? ''}`, parts: [hintTitle('📺 Office TV'), ...(on ? [aside(clip(on, 64))] : []), key('E', any ? 'Watch full screen' : 'Share your screen')] };
     },
     use: onE(() => deps.watch()),
   });
 
   let tvStream: MediaStream | null = null;
-  /** Puts `stream` up on the TV, or the idle card when there's none. */
+  // A shared screen has the TV first: the jukebox's video plays docked in the HUD meanwhile.
+  const video = jukeboxVideo(ctx, ctx.office.tvScreen, { shared: () => tvStream !== null });
+  /** Puts `stream` up on the TV, or the jukebox's video or the idle card when there's none. */
   function show(stream: MediaStream | null) {
     if (stream !== tvStream) {
       tvStream = stream;
       tvVideo.srcObject = stream;
       if (stream) void tvVideo.play().catch(() => {});
+      // The video lets go of the screen before the share takes it, and takes it back after.
+      if (stream) video.update();
       tvMat.map = stream ? tvTexture : tvIdle;
       tvMat.needsUpdate = true;
+      if (!stream) video.update();
     }
   }
 

@@ -63,6 +63,7 @@ export async function startServer(cfg: Config, opts: StartOptions = {}) {
     ctx.machine.stop();
     ctx.sky.stop();
     ctx.themes.stop();
+    ctx.feeds.stop();
     for (const f of ctx.floors.values()) f.shutdown(keep);
     ctx.building.shutdown(keep);
     ctx.ledger.flush();

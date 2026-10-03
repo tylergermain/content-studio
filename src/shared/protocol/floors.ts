@@ -3,10 +3,16 @@
 import type { CabinetView } from '../cabinet.js';
 import type { Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
-import type { FloorPlan } from '../floorplan.js';
+import type { Piece } from '../furniture.js';
+import type { DeskLayout } from '../office-builder.js';
+import type { FloorPlan, RoomOptions } from '../floorplan.js';
+import type { GoatState } from './goat.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
+import type { HoopView } from './hoop.js';
 import type { JukeboxState } from '../jukebox.js';
+import type { StudioState, TickerState } from '../studio.js';
+import type { WatchState } from './watch.js';
 import type { WhiteboardView } from '../whiteboard.js';
 import type { AgentProvider } from './agents.js';
 import type { GhIssue, GhPull, GhState } from './github.js';
@@ -14,7 +20,7 @@ import type { MeetingState } from './meetings.js';
 import type { PeerInfo } from './presence.js';
 import type { QueueState } from './queue.js';
 import type { ServicesState } from './settings.js';
-import type { JailState, WorkerInfo } from './workers.js';
+import type { WorkerInfo } from './workers.js';
 
 export interface ProjectInfo {
   name: string;
@@ -42,6 +48,8 @@ export interface FloorInfo {
   branch?: string;
   /** Which of FLOOR_PALETTES it's painted in. */
   palette: number;
+  /** Which of FLOOR_PALETTES the office builder painted it over its own (FloorPlan.look): its color on the building's outside too. */
+  look?: number;
   /** Being cloned: on the elevator panel, but nobody can go there yet. */
   cloning?: boolean;
   /** How the clone is getting on, once git says. */
@@ -105,11 +113,13 @@ export interface FloorView {
   queue: QueueState;
   /** Pictures on this floor's walls. */
   decor: Decoration[];
-  /** The signs over this floor's desks, and how far its back office is built out. */
+  /** The signs over this floor's desks, how far its back office is built out, and how it's arranged. */
   plan: FloorPlan;
   services: ServicesState;
   /** The floor's dog; null in a building with no floors yet. */
   dog: DogState | null;
+  /** Marc, the building's goat, while he's on this floor; null on every other. */
+  goat: GoatState | null;
   /** What the lounge jukebox is playing. */
   jukebox: JukeboxState;
   /** Who's at the arcade cabinet, what's on its screen, and the building's high scores. */
@@ -120,10 +130,18 @@ export interface FloorView {
   meeting: MeetingState;
   /** The basketball by the hoop: who has it, or how it was last thrown. */
   ball: BallState;
+  /** The scoreboard beside the hoop: the building's longest shots and PIG winners, and this floor's game of PIG. */
+  hoop: HoopView;
   /** The cars in the garage (see CARS in shared/garage.ts): where each one is, and who's in it. */
   cars: CarState[];
-  /** Workers sent home and locked up in the dungeon, on a map that has one. */
-  jail: JailState;
+  /** What this floor's wall boards and kiosks are for, when it has made them its own, and what's posted on the boards. */
+  studio: StudioState;
+  /** The prices on this floor's ticker (none, when it has no ticker). */
+  ticker: TickerState;
+  /** The newest videos from the YouTube channels this floor watches (none, when it watches none). */
+  watch: WatchState;
+  /** Who on this floor has a dram from a whisky cabinet in their hand, by peer id (see shared/whisky.ts). */
+  whisky: string[];
 }
 
 export type FloorClientMsg =
@@ -133,11 +151,18 @@ export type FloorClientMsg =
    * floor list), or the ladder or fire pole you came by.
    */
   | { t: 'floor.go'; floor: string; at?: { x: number; y: number; z: number; rotY: number } }
-  /** The repositories that could become a floor; answered with `floor.repos`. */
+  /** The repositories that could become a floor (admins only); answered with `floor.repos`. */
   | { t: 'floor.repos'; refresh?: boolean }
-  /** Clone a repository and make it a new floor; answered with `floor.added` once it's there. */
+  /** Clone a repository and make it a new floor (admins only); answered with `floor.added` once it's there. */
   | { t: 'floor.add'; repo: string }
-  /** Stop a floor's clone before it's there (admins, or whoever added it); the one who added it hears `floor.added` with why. */
+  /**
+   * Make a folder on the office's machine a floor (admins only): no repository, nothing to do with
+   * GitHub. The folder's made if it isn't there. Answered with `floor.added` (its `repo` is the folder).
+   */
+  | { t: 'floor.folder'; dir: string; name?: string }
+  /** Rename a floor, or move it to storey `to` (0 is the bottom one): admins only. */
+  | { t: 'floor.edit'; floor: string; name?: string; to?: number }
+  /** Stop a floor's clone before it's there (admins only); the one who added it hears `floor.added` with why. */
   | { t: 'floor.cancel'; floor: string }
   /** Take a floor off the building (admins only). Its checkout stays on disk; everyone on it rides to another floor. */
   | { t: 'floor.remove'; floor: string }
@@ -147,9 +172,16 @@ export type FloorClientMsg =
 export type PlanClientMsg =
   /** Hang a sign over a desk on your floor (a SIGN_COLORS color), or take it down with no text. */
   | { t: 'desk.label'; deskId: string; text: string; color?: string }
-  /** Knock the back office out another row, with two more desks; or wall its last row back up. */
+  /** Knock the back office out another row, with two more desks; or wall its last row back up (admins only). */
   | { t: 'floor.expand' }
-  | { t: 'floor.shrink' };
+  | { t: 'floor.shrink' }
+  /**
+   * Save the floor as the office builder arranged it (admins only): where its desks stand, its
+   * furniture, its paint (`look`, one of FLOOR_PALETTES; none is the floor's own) and its room's own
+   * fittings (`room`, see RoomOptions). `revision` is
+   * the layout it was arranged from (FloorPlan.layoutRevision): a newer one saved meanwhile refuses it.
+   */
+  | { t: 'floor.layout'; desks: DeskLayout; furniture: Piece[]; look?: number; room?: RoomOptions; revision: number };
 
 export type FloorServerMsg =
   /** You arrived on another floor: everything on it, replacing the last one's, and where everyone is now. */
@@ -161,5 +193,5 @@ export type FloorServerMsg =
   | { t: 'floor.added'; repo: string; floor?: string; error?: string }
   /** The projects folder moved (see floor.projectsDir). */
   | { t: 'projectsDir'; state: ProjectsDirState }
-  /** Your floor's signs changed, or its back office was built out or walled up. */
+  /** Your floor's signs changed, its back office was built out or walled up, or the office builder rearranged it. */
   | { t: 'plan'; plan: FloorPlan };

@@ -4,14 +4,16 @@
  * and the meeting room's two. What E does at each is defined with it.
  */
 import type * as THREE from 'three';
+import { meetingPlace } from '../../../shared/meeting-place';
 import type { GhIssue } from '../../../shared/protocol';
-import type { Ctx } from '../../core/context';
+import type { Ctx, Hint } from '../../core/context';
 import { aside, boardHint, hintTitle, key, onE } from '../../core/hint';
 import { store, type Topic } from '../../state';
 import { openBoard } from '../../ui/boards';
 import { inProgress } from '../../ui/github/progress';
 import type { BoardActions } from '../../ui/github/prompts';
 import { clip } from '../../ui/dom';
+import { meetingName } from '../../ui/meeting';
 import { openIssue } from '../../ui/pull';
 import { openServices } from '../../ui/services';
 import { BoardTexture, QueueBoardTexture, ServicesBoardTexture } from './world';
@@ -38,6 +40,8 @@ export interface BoardsDeps {
   boardActions(): BoardActions;
   /** The task queue's window. */
   showQueue(): void;
+  /** A floor's own board where the issues or the pull request board hangs, when it has one there (see features/studio). */
+  bulletin(board: 'issues' | 'pulls'): { texture: THREE.Texture; hint(): Hint; open(): void } | null;
 }
 
 export function installBoards(ctx: Ctx, deps: BoardsDeps) {
@@ -103,11 +107,15 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   ctx.interactions.define('issues', {
     reach: 9,
     hint: () => {
+      const own = deps.bulletin('issues');
+      if (own) return own.hint();
       const aimedNote = deps.aimedNote();
       if (aimedNote) return { k: String(aimedNote.number), parts: [hintTitle(clip(`📌 #${aimedNote.number} ${aimedNote.title}`, 60)), key('E', 'Take it'), key('O', 'Read it')] };
       return issuesTex.hasNotes ? { k: 'notes', parts: [hintTitle('📌 Issues board'), key('E', 'Open'), aside('or point at a note to take it')] } : boardHint('📌 Issues board');
     },
     use: (_it, key, note) => {
+      const own = deps.bulletin('issues');
+      if (own) return key === 'E' ? own.open() : undefined;
       // A note on the issues board: E takes it straight off the cork, O opens it to read first.
       if (note && key === 'E') return deps.pickUp(note);
       if (note && key === 'O') return openIssue(note, ctx.net, deps.boardActions());
@@ -116,8 +124,8 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   });
   ctx.interactions.define('pulls', {
     reach: 9,
-    hint: () => boardHint('🔀 Pull request board'),
-    use: onE(() => openBoard('pulls', ctx.net, deps.boardActions())),
+    hint: () => deps.bulletin('pulls')?.hint() ?? boardHint('🔀 Pull request board'),
+    use: onE(() => (deps.bulletin('pulls') ?? { open: () => openBoard('pulls', ctx.net, deps.boardActions()) }).open()),
   });
   ctx.interactions.define('services', {
     reach: 9,
@@ -135,15 +143,30 @@ export function installBoards(ctx: Ctx, deps: BoardsDeps) {
   // The machine monitor on the west wall.
   const machineTex = new MachineTexture();
   mountBoard(office.machineScreen, machineTex.texture, () => machineTex.render(store.machine), ['machine']);
-  // The meeting room: its output as it's written on the back wall, and how it's going on the door.
+  // The meeting place: its output as it's written on its board, and how it's going on its sign. A free
+  // one names the place the floor's workers meet at (RoomOptions.meeting), so both follow the room.
+  const meetingAt = () => {
+    const place = meetingPlace(office.room.get());
+    return { title: place.title, name: meetingName(place) };
+  };
   const meetingBoardTex = new MeetingBoardTexture();
-  mountBoard(office.meetingBoard, meetingBoardTex.texture, () => meetingBoardTex.render(store.meeting), ['meeting']);
+  const renderMeetingBoard = () => meetingBoardTex.render(store.meeting, meetingAt());
+  mountBoard(office.meetingBoard, meetingBoardTex.texture, renderMeetingBoard, ['meeting']);
   const meetingSignTex = new MeetingSignTexture();
-  mountBoard(office.meetingSign, meetingSignTex.texture, () => meetingSignTex.render(store.meeting), ['meeting']);
+  const renderMeetingSign = () => meetingSignTex.render(store.meeting, meetingAt());
+  mountBoard(office.meetingSign, meetingSignTex.texture, renderMeetingSign, ['meeting']);
+  let meetsAt = office.room.get().meeting;
+  office.room.on((room) => {
+    if (room.meeting === meetsAt) return;
+    meetsAt = room.meeting;
+    renderMeetingBoard();
+    renderMeetingSign();
+  });
   /** Puts every board's texture up on `w`'s boards. */
   function dressBoards(w: World) {
-    showOn(w.boardMeshes.issues, issuesTex.texture);
-    showOn(w.boardMeshes.pulls, pullsTex.texture);
+    // A floor's own board hangs in place of the GitHub one (see features/studio).
+    showOn(w.boardMeshes.issues, deps.bulletin('issues')?.texture ?? issuesTex.texture);
+    showOn(w.boardMeshes.pulls, deps.bulletin('pulls')?.texture ?? pullsTex.texture);
     showOn(w.boardMeshes.services, servicesTex.texture);
     showOn(w.boardMeshes.queue, queueTex.texture);
     if (w.meetingBoard) showOn(w.meetingBoard, meetingBoardTex.texture);

@@ -1,5 +1,5 @@
-import { JUKEBOX } from '../../../shared/layout';
-import { STREAM } from '../../../shared/jukebox';
+import { JUKEBOX_AT } from '../../sound/places';
+import { STREAM, YOUTUBE } from '../../../shared/jukebox';
 import type { AudioCore } from '../../sound/core';
 import { biquad, rms } from '../../sound/dsp';
 import { TunePlayer } from '../../sound/music';
@@ -16,13 +16,15 @@ export interface JukeboxPlay {
 }
 
 /** How the jukebox fades with distance: the same curve for its tunes (a panner) and a stream (by hand). */
-const MUSIC_REF = 2.5;
-const MUSIC_ROLLOFF = 1.3;
+const MUSIC_REF = 14;
+const MUSIC_ROLLOFF = 0.45;
 
-/** The jukebox on your floor: a tune or a stream, muffled from across the room, at your own volume. */
+/** The jukebox on your floor: a tune or a stream, audible across most of the floor, at your own volume. */
 export class Jukebox {
   // From the cabinet, through a filter that muffles it from across the room, to your own volume.
   private musicIn!: PannerNode;
+  /** Where the music comes from now (see JUKEBOX_AT). */
+  private at = { ...JUKEBOX_AT };
   private musicTone!: BiquadFilterNode;
   private musicCutoff = 16000;
   /** Your music volume, which the DJ on the roof plays through too. */
@@ -44,7 +46,8 @@ export class Jukebox {
   /** Once there's audio: the jukebox's part of the graph. */
   connect(ctx: AudioContext) {
     // The jukebox skips the master (it has its own volume) and keeps playing while the tab is hidden.
-    this.musicIn = this.a.panner(JUKEBOX, MUSIC_REF, MUSIC_ROLLOFF);
+    this.musicIn = this.a.panner(JUKEBOX_AT, MUSIC_REF, MUSIC_ROLLOFF);
+    this.at = { ...JUKEBOX_AT };
     this.musicTone = biquad(ctx, 'lowpass', 16000, 0.5);
     this.musicBus = ctx.createGain();
     this.musicBus.gain.value = 0;
@@ -89,6 +92,7 @@ export class Jukebox {
   beat(): number {
     if (this.tune) return this.tune.beat(this.musicAt());
     if (this.stream && !this.stream.paused) return 0.35 + 0.25 * Math.sin(performance.now() / 320);
+    if (this.jukebox?.track === YOUTUBE) return 0.35 + 0.25 * Math.sin(performance.now() / 320);
     return 0;
   }
 
@@ -123,6 +127,8 @@ export class Jukebox {
     const j = this.jukebox;
     if (!j) return;
     if (j.track === STREAM && j.url) return this.startStream(j.url);
+    // A YouTube video plays in YouTube's own player on the lounge TV (see video.ts), at heard().
+    if (j.track === YOUTUBE) return;
     const tune = (this.tune = new TunePlayer(ctx, this.musicIn, j.track));
     this.a.count('tune');
     // On a timer rather than every frame, so it carries on in a background tab.
@@ -153,8 +159,14 @@ export class Jukebox {
 
   /** Muffles the jukebox the further you are from it. */
   hearJukebox(now: number) {
+    // The office builder moved it (or this floor has it somewhere else): the music comes from where it is.
+    if (this.at.x !== JUKEBOX_AT.x || this.at.z !== JUKEBOX_AT.z) {
+      this.at = { ...JUKEBOX_AT };
+      this.musicIn.positionX.value = this.at.x;
+      this.musicIn.positionZ.value = this.at.z;
+    }
     const d = this.jukeboxDistance();
-    const cutoff = d < 5 ? 16000 : Math.max(1600, 16000 * (5 / d) ** 1.5);
+    const cutoff = d < 18 ? 16000 : Math.max(5000, 16000 * (18 / d) ** 0.8);
     if (Math.abs(cutoff - this.musicCutoff) > this.musicCutoff * 0.02) {
       this.musicCutoff = cutoff;
       this.musicTone.frequency.setTargetAtTime(cutoff, now, 0.1);
@@ -165,13 +177,18 @@ export class Jukebox {
   /** A stream plays outside Web Audio (most don't allow that), so it gets quieter with distance by hand. */
   private hearStream() {
     if (!this.stream) return;
+    this.stream.volume = this.heard();
+  }
+
+  /** How loud what plays outside Web Audio (a stream, a video) is where you stand, 0–1: your music volume, fading with distance as the tunes do. */
+  heard(): number {
     const d = Math.max(MUSIC_REF, this.jukeboxDistance());
-    this.stream.volume = Math.min(1, this.musicGain() * (MUSIC_REF / (MUSIC_REF + MUSIC_ROLLOFF * (d - MUSIC_REF))));
+    return Math.min(1, this.musicGain() * (MUSIC_REF / (MUSIC_REF + MUSIC_ROLLOFF * (d - MUSIC_REF))));
   }
 
   private jukeboxDistance(): number {
     const l = this.a.listener;
-    return Math.hypot(l.x - JUKEBOX.x, l.y - JUKEBOX.y, l.z - JUKEBOX.z);
+    return Math.hypot(l.x - JUKEBOX_AT.x, l.y - JUKEBOX_AT.y, l.z - JUKEBOX_AT.z);
   }
 
 }

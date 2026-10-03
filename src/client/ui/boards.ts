@@ -115,7 +115,7 @@ function card(n: number, title: string, meta: (Node | string)[], i: number, oncl
   return h(
     'li.card',
     {
-      style: `--tilt:${TILTS[n % TILTS.length]};background:${NOTE_COLORS[n % NOTE_COLORS.length]};--pin:${['#ef476f', '#118ab2', '#06d6a0', '#ffd166'][i % 4]}`,
+      style: `--tilt:${TILTS[n % TILTS.length]};--note:${NOTE_COLORS[n % NOTE_COLORS.length]};--pin:${['#ef476f', '#118ab2', '#06d6a0', '#ffd166'][i % 4]}`,
       tabindex: 0,
       onclick,
       onkeydown: ((e: KeyboardEvent) => e.key === 'Enter' && e.target === e.currentTarget && onclick()) as EventListener,

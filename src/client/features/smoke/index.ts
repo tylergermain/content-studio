@@ -27,7 +27,7 @@ export function installSmoke(ctx: Ctx) {
   /** Out on the balcony (a little slack at the door), where smoking is allowed. */
   function onBalcony(): boolean {
     const p = ctx.player.pos;
-    return ctx.inOffice() && p.y > -0.5 && p.y < 2 && p.x > BALCONY.minX - 0.5 && p.x < BALCONY.maxX + 0.5 && p.z > BALCONY.minZ - 0.8 && p.z < BALCONY.maxZ + 0.5;
+    return p.y > -0.5 && p.y < 2 && p.x > BALCONY.minX - 0.5 && p.x < BALCONY.maxX + 0.5 && p.z > BALCONY.minZ - 0.8 && p.z < BALCONY.maxZ + 0.5;
   }
 
   /** Ends the break when the cigarette burns down, or when you take it back inside. */
@@ -56,7 +56,7 @@ export function installSmoke(ctx: Ctx) {
     }),
   });
 
-  /** Puts it out, if you're on a smoke break: something else is taking you away (the golf tee, another map). */
+  /** Puts it out, if you're on a smoke break: something else is taking you away (the golf tee). */
   function stop() {
     if (smokeBreakUntil) setSmoking(false);
   }

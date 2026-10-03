@@ -467,7 +467,7 @@ export interface UsableSource<I, O> {
 }
 
 /**
- * What there is to use on the office's own map besides the building's own things, from the parts that
+ * What there is to use in the office besides the building's own things, from the parts that
  * come and go or move about in it, in the order they were added: what each has to use, and what the
  * aim can land on that isn't the building.
  */

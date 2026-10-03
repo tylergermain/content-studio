@@ -4,11 +4,12 @@ import { deskPoint } from '../../../shared/nav';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, DeskView, Interactable } from '../types';
 import type { Fixture } from './fixture';
+import { vacancyMarker } from './hire-marker';
 import { PALETTE, box } from './materials';
 import { deskBooks, deskMug, plant } from './props';
 
 // Where people sit: the seats you use (see SEATING), and the desks, bean bags and board agents' kiosks
-// that workers sit (or stand) at, with the "+" over a free one.
+// that workers sit (or stand) at, with the "+" over a free one (see hire-marker.ts).
 
 /** Makes `obj` somewhere to sit (see SEATING): walk up to it, or look at it, and press E. */
 export function seatable(obj: THREE.Object3D, seatId: string, radius: number, interactables: Interactable[]) {
@@ -18,9 +19,13 @@ export function seatable(obj: THREE.Object3D, seatId: string, radius: number, in
   obj.userData.interact = it;
 }
 
-export function chair(color: string): THREE.Group {
+/** The colour of every chair in the office: one graphite, whoever's desk it's at. */
+export const CHAIR_COLOR = '#2b2d42';
+
+/** A swivel chair. They're all CHAIR_COLOR: the colour a caller asks for is no longer used. */
+export function chair(_color?: string): THREE.Group {
   const g = new THREE.Group();
-  const mat = toon(color);
+  const mat = toon(CHAIR_COLOR);
   g.add(mesh(roundedBox(0.62, 0.1, 0.58, 0.12), mat, 0, 0.5, 0));
   const back = mesh(roundedBox(0.62, 0.1, 0.6, 0.12), mat, 0, 0.86, 0.27);
   back.rotation.x = Math.PI / 2 - 0.12;
@@ -98,16 +103,6 @@ export function buildDesk(def: DeskDef, index: number, trimMat: THREE.Material):
   group.add(vacancy);
 
   return { def, group, laptopAnchor, seatAnchor, stage, chair: ch, vacancy, vacancyY };
-}
-
-/** The floating green "+" over an empty seat. */
-export function vacancyMarker(y: number): THREE.Group {
-  const vacancy = new THREE.Group();
-  const plusMat = toon('#7cf29a', { emissive: '#1f7a3a' });
-  vacancy.add(mesh(box(0.28, 0.08, 0.08), plusMat, 0, 0, 0, false));
-  vacancy.add(mesh(box(0.08, 0.28, 0.08), plusMat, 0, 0, 0, false));
-  vacancy.position.set(0, y, 0);
-  return vacancy;
 }
 
 const BEANBAG_COLORS = ['#ff6b6b', '#4ecdc4', '#9b5de5', '#ffd166', '#f15bb5', '#00bbf9', '#06d6a0', '#fb8500'];
@@ -229,11 +224,12 @@ export const desks: Fixture = (site) => {
     site.desks.set(def.id, view);
     const hw = DESK_SIZE.width / 2 - 0.05;
     const hd = DESK_SIZE.depth / 2 - 0.02;
-    site.colliders.push({ minX: def.x - hw, maxX: def.x + hw, minZ: def.z - hd, maxZ: def.z + hd, top: DESK_SIZE.height });
+    view.collider = { minX: def.x - hw, maxX: def.x + hw, minZ: def.z - hd, maxZ: def.z + hd, top: DESK_SIZE.height };
+    site.colliders.push(view.collider);
     const seat = deskSeat(def, 1.25);
     const it: Interactable = { kind: 'desk', deskId: def.id, x: seat.x, z: seat.z, radius: 1.3 };
     site.interactables.push(it);
-    view.group.userData.interact = it;
+    view.group.userData.interact = view.interact = it;
   });
   return {};
 };

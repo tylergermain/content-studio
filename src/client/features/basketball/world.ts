@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR } from '../../../shared/layout';
+import { rimDistance } from '../../../shared/longshots';
 import { BALL, HOOP, RETURN_AFTER, THREE_POINT, backboard, launch, nearSolids, outOfReach, simulate, type BallHit, type BallShot, type BallSim, type BallState, type Solid } from '../../../shared/hoop';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
@@ -12,6 +13,8 @@ export interface HoopView {
   group: THREE.Group;
   /** The backboard and the arms holding it up, to walk (and jump) into. */
   colliders: Collider[];
+  /** Taken down on this floor (see the office builder): no hoop, and no ball. */
+  away: boolean;
   /** The net swings as a ball drops through it. */
   swish(): void;
   update(dt: number): void;
@@ -109,6 +112,7 @@ export function buildHoop(): HoopView {
   return {
     group,
     colliders,
+    away: false,
     swish() {
       speed -= 5;
     },
@@ -131,7 +135,21 @@ declare module '../../world/types' {
 /** The basketball hoop, on the west wall between the exit door and the kitchen. */
 export const hoop: Fixture<'hoop'> = (site) => {
   const built = buildHoop();
-  site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
+  const mark = site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
+  // A floor has the hoop or it doesn't (the office builder takes it down and puts it back): with it go what you bump into
+  // of it, the ball, and its stretch of wall, which pictures can hang on while it's down.
+  site.get('furniture').adopt('hoop', {
+    group: built.group,
+    moved: (p) => {
+      built.away = !p;
+      mark.off = !p;
+      for (const c of built.colliders) {
+        const i = site.colliders.indexOf(c);
+        if (!p && i >= 0) site.colliders.splice(i, 1);
+        else if (p && i < 0) site.colliders.push(c);
+      }
+    },
+  });
   return { group: built.group, colliders: built.colliders, update: (_t, dt) => built.update(dt), handle: { hoop: built } };
 };
 
@@ -334,7 +352,7 @@ export class Basketball {
       for (const h of hits) this.onHit?.(h, pos);
       if (s.scored && !was && this.shot) {
         this.settled = true;
-        const distance = Math.hypot(this.shot.x - HOOP.rim.x, this.shot.z - HOOP.rim.z);
+        const distance = rimDistance(this.shot);
         this.onBasket?.({ by: this.shot.by, distance, swish: !s.touched.rim && !s.touched.board, bank: s.touched.board, three: distance > THREE_POINT });
       }
       const gone = s.lost || (s.still && outOfReach(s));

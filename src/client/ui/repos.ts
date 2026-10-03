@@ -28,7 +28,7 @@ export interface RepoPullsActions {
  */
 export function openRepoPulls(workerId: string, actions: RepoPullsActions) {
   const title = h('h2');
-  const note = h('p', { style: 'margin:0 0 12px;font-weight:700' });
+  const note = h('p', { style: 'margin:0 0 12px' });
   const list = h('ul.repo-pulls');
   const close = h('button.btn', { type: 'button' }, 'Close');
   const missing = h('button.btn.primary', { type: 'button' }, '🔀 Open the missing PRs');

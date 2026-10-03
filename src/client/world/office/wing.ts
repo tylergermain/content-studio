@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DESKS, DESK_SIZE, FLOOR, SLAB, WALL_HEIGHT, WALL_T, WING, WING_DESKS, deskSeat, wingMinZ, wingRowZ } from '../../../shared/layout';
+import { FACADE } from '../facade';
 import type { NightParts } from '../outside';
 import { mesh, roundedBox, toon } from '../toon';
 import { wingWindows } from '../tower';
@@ -55,14 +56,14 @@ function paintGrowSign(c: HTMLCanvasElement, level: number) {
   g.font = '800 88px Nunito, ui-rounded, system-ui, sans-serif';
   g.fillText(full ? '🏢 As big as it gets' : '🚧 Room to grow', w / 2, h * 0.4);
   g.font = '700 46px Nunito, ui-rounded, system-ui, sans-serif';
-  g.fillText(full ? 'The back office is built all the way out' : level ? 'Press E to go back another row: 2 more desks' : 'Press E to knock through: 2 more desks', w / 2, h * 0.68);
+  g.fillText(full ? 'The back office is built all the way out' : level ? 'Admins press E for another row: 2 more desks' : 'Admins press E to knock through: 2 more desks', w / 2, h * 0.68);
 }
 
 /**
  * The back office: the bit of north wall between the gong and the east wall, which comes down when
  * the floor's built out, and behind it the bay, a row deeper each time, with a pair of desks down the
- * middle of each row, a rug under them, a lamp over them and a window in the east wall. The sign that
- * says there's room to grow hangs on whichever wall is at the back.
+ * middle of each row, a rug under them in the floor's colors, a lamp over them and a window in the east
+ * wall. The sign that says there's room to grow hangs on whichever wall is at the back.
  */
 export function buildWing(group: THREE.Group, colliders: Collider[], interactables: Interactable[], desks: Map<string, DeskView>, looks: Looks, trimMat: THREE.Material, planks: THREE.Material, ceiling: THREE.Material, night: NightParts): WingView {
   const T = WALL_T;
@@ -79,7 +80,8 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
     const row = i + 1;
     const z = wingRowZ(row);
     const extras = new THREE.Group();
-    extras.add(mesh(roundedBox(3.4, 0.02, WING.row - 1, 0.5), toon(PALETTE.rugs[(row + 1) % PALETTE.rugs.length]), midX, 0.011, z, false));
+    // Its rug is the floor's own paint, the rows taking turns between its walls' and its trim's (as the Steps' cushions do).
+    extras.add(mesh(roundedBox(3.4, 0.02, WING.row - 1, 0.5), row % 2 ? looks.wall : looks.trim, midX, 0.011, z, false));
     const lamp = pendant(WALL_HEIGHT - 4.05);
     lamp.position.set(midX, 4.05, z);
     extras.add(lamp);
@@ -182,9 +184,9 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
         for (let k = 0; k < pos.count; k++) uv.setXY(k, (pos.getX(k) - FLOOR.minX) / (FLOOR.maxX - FLOOR.minX), (FLOOR.maxZ - pos.getZ(k)) / (FLOOR.maxZ - FLOOR.minZ));
         const floor = take(new THREE.Mesh(floorGeo, planks)) as THREE.Mesh;
         floor.receiveShadow = true;
-        // Its edges are the band between the floors outside, its underside concrete.
-        const band = toon('#e8a87c');
-        const concrete = toon('#d3d6dd');
+        // Its edges are the band between the floors outside, in the floor's trim; its underside concrete.
+        const band = looks.trim;
+        const concrete = toon(FACADE.concrete);
         const slab = new THREE.Mesh(box(w + 2 * T, SLAB - 0.01, d), [band, band, concrete, concrete, band, band]);
         slab.position.set(midX, -SLAB / 2 - 0.005, (back - T + FLOOR.minZ - T) / 2);
         slab.receiveShadow = true;
@@ -195,7 +197,7 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
         for (let k = 0; k < cpos.count; k++) cuv.setXY(k, cpos.getX(k), cpos.getZ(k));
         take(new THREE.Mesh(ceilGeo, ceiling)).receiveShadow = false;
         // Its roof, flush with the tops of its walls, for when there's no floor over it.
-        take(mesh(box(w + 2 * T, 0.02, d + T), toon('#fffaf3'), midX, WALL_HEIGHT + 0.03, (back - T + FLOOR.minZ) / 2, false));
+        take(mesh(box(w + 2 * T, 0.02, d + T), concrete, midX, WALL_HEIGHT + 0.03, (back - T + FLOOR.minZ) / 2, false));
         mine.push({ minX: WING.minX - T, maxX: FLOOR.maxX + T, minZ: back - T, maxZ: FLOOR.minZ - T, bottom: -SLAB, top: 0 });
         mine.push({ minX: WING.minX, maxX: FLOOR.maxX, minZ: back, maxZ: FLOOR.minZ, bottom: WALL_HEIGHT, top: WALL_HEIGHT + SLAB });
       }
@@ -221,7 +223,7 @@ declare module '../types' {
   interface OfficeHandles {
     /** The back office through the north wall, as far as this floor's built out (see WING). */
     wing: WingView;
-    /** Builds the back office out `level` rows, or walls it up: the plants in the way go too. */
+    /** Builds the back office out `level` rows, or walls it up. The furniture in the way is put away by whoever arranges it (see furnish.ts). */
     setWing(level: number): void;
   }
 }
@@ -230,16 +232,6 @@ declare module '../types' {
 export const wing: Fixture<'wing' | 'setWing'> = (site) => {
   const built = buildWing(site.group, site.colliders, site.interactables, site.desks, site.looks, site.looks.trim, site.planks, site.get('stack').ceiling, site.get('night'));
   site.wall('north', (WING.minX + FLOOR.maxX) / 2, WALL_HEIGHT / 2, FLOOR.maxX - WING.minX, WALL_HEIGHT);
-  const setWing = (level: number) => {
-    built.set(level);
-    for (const p of site.inTheWay) {
-      const out = built.level === 0;
-      if (p.group.visible === out) continue;
-      p.group.visible = out;
-      const i = site.colliders.indexOf(p.collider);
-      if (out && i < 0) site.colliders.push(p.collider);
-      else if (!out && i >= 0) site.colliders.splice(i, 1);
-    }
-  };
+  const setWing = (level: number) => built.set(level);
   return { handle: { wing: built, setWing } };
 };

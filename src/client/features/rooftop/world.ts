@@ -291,7 +291,7 @@ export function buildRooftop(night: NightParts, floors: number): Rooftop {
     colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: 99 });
   }
 
-  // The elevator, in its housing: a back wall and a roof over the shaft (as tall as a floor), with a light on top.
+  // The elevator, in its housing: a back wall and a roof over the shaft (as tall as a floor), and the light on top of its mast (mast.ts).
   const elevator = buildElevator();
   elevator.setSign('🍸 Rooftop bar');
   group.add(elevator.group);
@@ -302,7 +302,7 @@ export function buildRooftop(night: NightParts, floors: number): Rooftop {
   statics.add(mesh(new THREE.BoxGeometry(ELEVATOR.width, WALL_HEIGHT + 0.3, WALL_T), housing, ELEVATOR.x, (WALL_HEIGHT + 0.3) / 2, FLOOR.minZ - WALL_T / 2));
   statics.add(mesh(new THREE.BoxGeometry(ELEVATOR.width + 0.3, 0.3, ELEVATOR_FRONT - B.minZ + 0.2), toon('#8d99ae'), ELEVATOR.x, WALL_HEIGHT + 0.15, (B.minZ + ELEVATOR_FRONT) / 2 + 0.05));
   const beacon = bulb(night, '#ff5d5d', 0.6);
-  statics.add(mesh(new THREE.SphereGeometry(0.12, 10, 8), beacon, ELEVATOR.x, WALL_HEIGHT + 0.4, (B.minZ + ELEVATOR_FRONT) / 2, false));
+  statics.add(mesh(new THREE.SphereGeometry(0.32, 12, 9), beacon, ELEVATOR.x, WALL_HEIGHT + 0.3 + 14.2, (B.minZ + ELEVATOR_FRONT) / 2, false));
   colliders.push({ minX: ELEVATOR.x - hw, maxX: ELEVATOR.x + hw, minZ: B.minZ, maxZ: FLOOR.minZ, top: 99 });
 
   // ---- The stage ----------------------------------------------------------------------------------

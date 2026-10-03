@@ -92,11 +92,11 @@ class Browser {
     this.inbox = [];
   }
 
-  /** The types of the next `n` messages, in the order they came, leaving out the elevator's list and the dog, who goes about its day. */
+  /** The types of the next `n` messages, in the order they came, leaving out the elevator's list, and the dog and the goat, who go about their day. */
   async next(n: number, ms = 5000): Promise<string[]> {
     const until = Date.now() + ms;
     for (;;) {
-      const got = this.inbox.filter((m) => m.t !== 'floors' && m.t !== 'dog');
+      const got = this.inbox.filter((m) => m.t !== 'floors' && m.t !== 'dog' && m.t !== 'goat');
       if (got.length >= n) {
         this.inbox = [];
         return got.slice(0, n).map((m) => m.t);
@@ -146,6 +146,14 @@ before(async () => {
   const claude = path.join(bin, 'claude');
   writeFileSync(claude, '#!/bin/sh\nexit 0\n');
   chmodSync(claude, 0o755);
+
+  // What an office from before there was only the office kept: a map picked for the building, one of
+  // its own to pick, and who was locked up under it. None of it is read any more.
+  const kept = path.join(project, '.agent-office');
+  mkdirSync(path.join(kept, 'maps'), { recursive: true });
+  writeFileSync(path.join(kept, 'map.json'), JSON.stringify({ pick: 'keep', by: 'Ada', at: 1 }));
+  writeFileSync(path.join(kept, 'maps', 'keep.json'), '{ "id": "keep", not json');
+  writeFileSync(path.join(kept, 'jail.json'), JSON.stringify({ prisoners: [{ id: 'w1', name: 'Pixel', color: '#ef476f', at: 1 }], bones: 2 }));
 
   for (const k of Object.keys(process.env)) if (k.startsWith('AGENT_OFFICE_')) delete process.env[k];
   const port = await freePort();
@@ -267,7 +275,10 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-17), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'ball', 'cars', 'jail', 'jukebox', 'whiteboard', 'meeting', 'cabinet']);
+  assert.deepEqual(Object.keys(welcome).slice(-22), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'hoop', 'cars', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch', 'whisky']);
+  assert.deepEqual(welcome.whisky, [], 'nobody has a dram yet');
+  // It's the office, whatever map the building was on once.
+  assert.ok(!('map' in welcome) && !('jail' in welcome));
 
   a.send({ t: 'ping', at: 42 });
   const pong = await a.take('pong');
@@ -394,8 +405,8 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'theme.set', pick: 'off' });
   assert.equal((await a.take('theme')).state.pick, 'off');
   assert.equal(await told('Eve took'), 'Eve took the holiday decorations down');
-  a.send({ t: 'map.set', map: 'nowhere' });
-  await warned('There’s no map by that name, or it won’t load: see ⚙️ Settings');
+  // A page from before the Map setting went can still ask for one: nothing comes of it.
+  a.send({ t: 'map.set', map: 'keep' });
   a.send({ t: 'machine.limit', limit: 0 });
   await warned('The worker limit is a whole number from 1 to 500');
   a.send({ t: 'machine.limit', limit: 3 });
@@ -470,6 +481,98 @@ test('settings, accounts, sign-ins and the boards answer as before', async () =>
   a.send({ t: 'machine.limit', limit: null });
   await a.take('machine', (m) => m.state.limit === undefined);
   await a.close();
+});
+
+/** An account of its own, from an invite `boss` hands out: the cookie its browser signs in with. */
+async function joinAs(boss: Browser, name: string, role: 'admin' | 'member'): Promise<string> {
+  boss.send({ t: 'accounts.invite', name, role });
+  const invite = (await boss.take('accounts.invited')).invite;
+  assert.equal(invite?.role, role);
+  const joined = await post('/api/join', { token: invite?.token, password: `${name}-own-password` });
+  assert.equal(joined.status, 200);
+  return (joined.headers.get('set-cookie') ?? '').split(';')[0];
+}
+
+test('only admins manage the building: a member rides the elevator and is refused the rest', async () => {
+  const floor = office.floors()[0];
+  // On the shared password: an admin.
+  const boss = await Browser.open('?name=Gil');
+  await boss.take('welcome');
+  const member = await Browser.open('', { cookie: await joinAs(boss, 'Fay', 'member'), origin: base });
+  assert.deepEqual((await member.take('welcome')).me, { account: { name: 'Fay', role: 'member' }, admin: false });
+  await boss.take('peer.join');
+  const refused = async (text: string) => assert.equal((await member.take('toast', (m) => m.level === 'warn')).text, text);
+  const ADD = 'Only admins can add a project to the building';
+  const BUILD = 'Only admins can build the back office out or wall it up';
+
+  // Adding a project: no list of repositories to pick from, no clone, nothing to stop.
+  member.send({ t: 'floor.repos' });
+  assert.deepEqual(await member.take('floor.repos'), { t: 'floor.repos', repos: [], error: ADD });
+  member.send({ t: 'floor.repos', refresh: true });
+  assert.deepEqual(await member.take('floor.repos'), { t: 'floor.repos', repos: [], error: ADD });
+  member.send({ t: 'floor.add', repo: 'octocat/hello-world' });
+  assert.deepEqual(await member.take('floor.added'), { t: 'floor.added', repo: 'octocat/hello-world', error: ADD });
+  member.send({ t: 'floor.folder', dir: path.join(tmp, 'a-folder'), name: 'A folder' });
+  assert.deepEqual(await member.take('floor.added'), { t: 'floor.added', repo: path.join(tmp, 'a-folder'), error: 'Only admins can make a folder a floor' });
+  member.send({ t: 'floor.cancel', floor: floor.id });
+  await refused('Only admins can stop a floor being cloned');
+  // The floors there are: not renamed, moved or taken off, and the workspace folder stays put.
+  member.send({ t: 'floor.edit', floor: floor.id, name: 'Mine now' });
+  await refused('Only admins can rename or move a floor');
+  member.send({ t: 'floor.remove', floor: floor.id });
+  await refused('Only admins can take a floor off the building');
+  member.send({ t: 'floor.projectsDir', dir: path.join(tmp, 'elsewhere') });
+  await refused('Only admins can move the workspace folder');
+  // The floor's shape: the back office and the layout.
+  member.send({ t: 'floor.expand' });
+  await refused(BUILD);
+  member.send({ t: 'floor.shrink' });
+  await refused(BUILD);
+  member.send({ t: 'floor.layout', desks: {}, furniture: [], revision: 0 });
+  await refused('Only admins can change the office layout');
+  assert.deepEqual(office.floors().map((f) => [f.id, f.project.name, f.plan.state().wing]), [[floor.id, floor.project.name, 0]]);
+  assert.deepEqual(boss.pending('plan'), []);
+  assert.deepEqual(boss.pending('toast'), []);
+
+  // What's still everyone's: a sign over a desk, and riding the elevator.
+  member.send({ t: 'desk.label', deskId: 'desk-2', text: 'Editing' });
+  assert.equal((await boss.take('plan')).plan.labels['desk-2']?.text, 'Editing');
+  assert.equal((await boss.take('toast', (m) => m.text.includes('Editing'))).text, '🪧 Fay hung a sign over Desk 2: “Editing”');
+  member.send({ t: 'floor.go', floor: '@roof' });
+  assert.equal((await member.take('floor.enter')).floor, '@roof');
+  member.send({ t: 'floor.go', floor: floor.id });
+  assert.equal((await member.take('floor.enter')).floor, floor.id);
+  assert.deepEqual(member.pending('toast').filter((m) => m.t === 'toast' && m.level === 'warn'), []);
+
+  // An admin with an account of their own does all of it: here, the back office and adding a floor.
+  const admin = await Browser.open('', { cookie: await joinAs(boss, 'Gav', 'admin'), origin: base });
+  assert.deepEqual((await admin.take('welcome')).me, { account: { name: 'Gav', role: 'admin' }, admin: true });
+  admin.send({ t: 'floor.expand' });
+  assert.equal((await member.take('plan', (m) => m.plan.wing === 1)).plan.wing, 1);
+  assert.match((await member.take('toast', (m) => m.text.startsWith('🔨'))).text, /^🔨 Gav knocked out the back wall/);
+  admin.send({ t: 'floor.shrink' });
+  assert.equal((await member.take('plan', (m) => m.plan.wing === 0)).plan.wing, 0);
+  admin.send({ t: 'floor.add', repo: '' });
+  assert.deepEqual(await admin.take('floor.added'), { t: 'floor.added', repo: '', error: 'Pick a repository, or type it as owner/name' });
+  admin.send({ t: 'floor.cancel', floor: 'nope' });
+  assert.equal((await admin.take('toast', (m) => m.level === 'warn')).text, 'No such floor');
+
+  // Made a member, the same browser is refused from then on.
+  boss.send({ t: 'accounts.get' });
+  const accounts = (await boss.take('accounts', (m) => m.state.accounts.length === 2)).state.accounts;
+  const idOf = (name: string) => accounts.find((a) => a.name === name)?.id;
+  boss.send({ t: 'accounts.role', accountId: idOf('Gav'), role: 'member' });
+  assert.deepEqual(await admin.take('me'), { t: 'me', me: { account: { name: 'Gav', role: 'member' }, admin: false } });
+  admin.send({ t: 'floor.expand' });
+  assert.equal((await admin.take('toast', (m) => m.level === 'warn')).text, BUILD);
+  admin.send({ t: 'floor.add', repo: 'octocat/hello-world' });
+  assert.equal((await admin.take('floor.added')).error, ADD);
+
+  // Their accounts go again, and they're signed out with them.
+  for (const name of ['Fay', 'Gav']) boss.send({ t: 'accounts.revoke', accountId: idOf(name) });
+  await boss.take('accounts', (m) => m.state.accounts.length === 0);
+  await Promise.all([member.close(), admin.close()]);
+  await boss.close();
 });
 
 test('the hook server answers only workers, with their own token', async () => {

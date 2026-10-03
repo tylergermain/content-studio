@@ -11,14 +11,13 @@ import { COLOR_RE, spotFrom, str } from '../office/input.js';
 import { floorView, roofView, screensOf } from '../office/views.js';
 import { dispatch } from './dispatch.js';
 import { features } from './handlers/index.js';
-import { mapNews } from './handlers/settings.js';
 
 /**
  * Someone came in: where they arrive and who they are, the welcome with everything they see, and
  * then whatever they send, until they leave.
  */
 export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session) {
-  const { cfg, accounts, clients, chat, building, floors, maps, team, upgrader, ledger, webhook, machine, sky, themes, prompts, leaveOnMerge, signins } = ctx;
+  const { cfg, accounts, clients, chat, building, floors, team, upgrader, ledger, webhook, machine, sky, themes, prompts, leaveOnMerge, signins } = ctx;
   const { sendTo, broadcast, floorInfos, floorsChanged, arrivalFloor, meOf, accountsChanged, limitsOf } = ctx;
   const id = randomBytes(5).toString('hex');
   // Back on the floor they were on before a reload, a restart or closing the tab, else the first floor.
@@ -55,9 +54,6 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     ...(url.searchParams.get('lite') === '1' ? { lite: true } : {}),
     ...(onRoof ? { floor: ROOF } : floor ? { floor: floor.id } : {}),
   });
-  // Maps of your own may have been added or edited since: everyone already in hears first.
-  const mapWas = maps.pick();
-  if (maps.reload()) mapNews(ctx, mapWas);
   clients.set(id, client);
   if (account) accounts.seen(account.id);
   ws.on('pong', () => (client.isAlive = true));
@@ -80,7 +76,7 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
     machine: machine.state(),
     sky: sky.state,
     theme: themes.state(),
-    map: maps.state(),
+    integrations: ctx.feeds.state(),
     prompts: prompts.state(),
     leaveOnMerge: leaveOnMerge.state(),
     ...(onRoof ? roofView(ctx) : floorView(ctx, floor)),

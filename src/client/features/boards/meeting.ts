@@ -6,6 +6,14 @@ const FONT = 'Nunito, ui-rounded, system-ui, sans-serif';
 const MONO = 'ui-monospace, SFMono-Regular, Menlo, monospace';
 const INK = '#2b2d42';
 
+/** What a free board and a free sign call the place the floor's workers meet at: its name ("🎤 Stage"), and its name in a sentence ("the stage"). */
+export interface MeetingNamed {
+  title: string;
+  name: string;
+}
+/** The glass room, where the office's workers meet unless the floor says otherwise (see shared/meeting-place.ts). */
+const GLASS_ROOM: MeetingNamed = { title: '🤝 Meeting room', name: 'the meeting room' };
+
 function canvasTexture(w: number, h: number): { canvas: HTMLCanvasElement; g: CanvasRenderingContext2D; texture: THREE.CanvasTexture } {
   const canvas = document.createElement('canvas');
   canvas.width = w;
@@ -58,7 +66,7 @@ export class MeetingBoardTexture {
     this.texture = c.texture;
   }
 
-  render(state: MeetingState) {
+  render(state: MeetingState, place: MeetingNamed = GLASS_ROOM) {
     const { g } = this;
     const W = this.canvas.width;
     const H = this.canvas.height;
@@ -70,7 +78,7 @@ export class MeetingBoardTexture {
       g.fillStyle = INK;
       g.textAlign = 'center';
       g.font = `900 64px ${FONT}`;
-      g.fillText('🤝 The meeting room is free', W / 2, H / 2 - 10);
+      g.fillText(`${place.title.split(' ')[0]} ${place.name[0].toUpperCase()}${place.name.slice(1)} is free`, W / 2, H / 2 - 10);
       g.font = `700 36px ${FONT}`;
       g.fillStyle = '#5c5f73';
       g.fillText('Press E at the table to call a meeting: whatever it writes shows up here.', W / 2, H / 2 + 50);
@@ -141,7 +149,7 @@ export class MeetingSignTexture {
     this.texture = c.texture;
   }
 
-  render(state: MeetingState) {
+  render(state: MeetingState, place: MeetingNamed = GLASS_ROOM) {
     const { g } = this;
     const W = this.canvas.width;
     const H = this.canvas.height;
@@ -167,7 +175,7 @@ export class MeetingSignTexture {
     g.font = `900 38px ${FONT}`;
     g.fillText(label, pad, 53);
     if (!m) {
-      let y = lines('🤝 Meeting room', `900 50px ${FONT}`, '#fffaf3', 160, 2, 58);
+      let y = lines(place.title, `900 50px ${FONT}`, '#fffaf3', 160, 2, 58);
       lines('Press E at the table to call a meeting: a debate, lead & team, map-reduce, red / blue or a review panel.', `700 32px ${FONT}`, '#e9ecef', y + 30, 8, 42);
       this.texture.needsUpdate = true;
       return;

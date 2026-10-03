@@ -123,5 +123,7 @@ export function buildBookshelf(): BookshelfModel {
 export const bookshelf: Fixture = (site) => {
   const built = buildBookshelf();
   site.wall('south', BOOKSHELF.x, (BOOKSHELF.height + 0.55) / 2, BOOKSHELF.width + 0.2, BOOKSHELF.height + 0.55);
+  // The office builder stands it wherever the floor wants it.
+  site.get('furniture').adopt('docs', { group: built.group, collider: built.collider, use: built.interactable });
   return { group: built.group, colliders: [built.collider], interactables: [built.interactable] };
 };

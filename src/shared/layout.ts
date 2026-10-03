@@ -2,6 +2,8 @@
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,
 // upstairs over a garage whose floor is level with the street (STREET_Y).
 
+import { CLERESTORY } from './clerestory.js';
+
 export const FLOOR = { minX: -18, maxX: 18, minZ: -13, maxZ: 13 } as const;
 /** How high the ceiling is: a meter over the loft's roof (LOFT.y + LOFT.height), all the way across the room. */
 export const WALL_HEIGHT = 6.8;
@@ -341,12 +343,13 @@ export interface Opening {
   y1: number;
 }
 
-/** Windows you can see out of, and the loft's two, which sit higher up. */
+/** Windows you can see out of, the loft's two, which sit higher up, and a row of upper windows round the room (CLERESTORY). */
 export const WINDOWS: Opening[] = [
   ...[-14, -9, 1].map((u) => ({ wall: 'south' as const, u, width: 3, y0: 1.1, y1: 3.3 })),
   ...[-9, -3, 3].map((u) => ({ wall: 'west' as const, u, width: 3, y0: 1.1, y1: 3.3 })),
   { wall: 'south', u: LOFT.minX + 2, width: 2.8, y0: LOFT.y + 0.9, y1: LOFT.y + 2.5 },
   { wall: 'east', u: (LOFT.minZ + LOFT.maxZ) / 2, width: 2.8, y0: LOFT.y + 0.9, y1: LOFT.y + 2.5 },
+  ...CLERESTORY,
 ];
 
 /**
@@ -444,17 +447,20 @@ export interface SeatDef {
   out: number;
   /** It faces the lounge TV: sitting down there puts whatever's being shared up on your screen. */
   tv?: boolean;
-  /** It faces the boss's monitor: E there, sitting down, plays Minesweeper on it. */
+  /** The boss's chair: E there, sitting down, opens the desk's menu (see features/boss-desk). */
   game?: boolean;
   /** Up on the rooftop bar, not in the office. */
   roof?: boolean;
   /** At the bar: E there, sitting down, orders a drink. */
   bar?: boolean;
+  /** A desk of your own (a team desk, see shared/furniture.ts): sitting down there puts your screen up on its monitor. */
+  share?: boolean;
 }
 
 /**
  * Where people can sit: the office's couches, beanbags, chairs and the balcony bench (buildOffice puts
- * them there). Workers have their own seats, the desks and bean bags in SEATS.
+ * them there). Workers have their own seats, the desks and bean bags in SEATS. The lounge's are
+ * furniture, so a floor that's been rearranged has its own in their place (see setFloorSeats).
  */
 export const SEATING: SeatDef[] = [
   // The lounge couch, its back to the room, facing the TV.
@@ -465,6 +471,8 @@ export const SEATING: SeatDef[] = [
   // Up in the boss office: the couch against the east wall, and the chair at the big desk, facing the glass.
   { id: 'loft-couch', label: '🛋️ Couch', x: LOFT.maxX - 0.65, y: LOFT.y, z: (LOFT.minZ + LOFT.maxZ) / 2, rotY: -Math.PI / 2, places: [-0.5, 0.5], hips: 0.5, depth: -0.05, out: 0.9 },
   { id: 'boss-chair', label: "🪑 Boss's chair", x: (LOFT.minX + LOFT.maxX) / 2 + 0.5, y: LOFT.y, z: (LOFT.minZ + LOFT.maxZ) / 2 + 0.7, rotY: Math.PI, places: [0], hips: 0.62, depth: -0.05, out: -0.8, game: true },
+  // Across the boss's desk: two chairs for whoever's meeting with them, turned in toward it (features/boss-desk).
+  ...[-1, 1].map((s, i) => ({ id: `boss-guest-${i + 1}`, label: '🪑 Guest chair', x: (LOFT.minX + LOFT.maxX) / 2 + 0.5 + s * 0.9, y: LOFT.y, z: LOFT.minZ + 1, rotY: -s * 0.5, places: [0], hips: 0.62, depth: -0.05, out: -0.45 })),
   // Out on the balcony: the bench under the window, looking out over the street, and a stool either side of the bistro table.
   { id: 'bench', label: '🪑 Bench', x: -9, y: 0, z: BALCONY.minZ + 0.3, rotY: 0, places: [-0.5, 0.5], hips: 0.47, depth: 0, out: 0.8 },
   { id: 'stool-1', label: '🪑 Stool', x: -0.6, y: 0, z: (BALCONY.minZ + BALCONY.maxZ) / 2 + 0.2, rotY: Math.PI / 2, places: [0], hips: 0.5, depth: 0, out: -0.7 },

@@ -40,7 +40,7 @@ test('dsh is a provider the wire accepts, and the others still are', () => {
 test('Pi can be selected with model patterns and thinking levels', () => {
   assert.ok(agentProviders('claude').includes('pi'));
   assert.ok(agentProviders('custom').includes('pi'));
-  assert.equal(validateWorkerModel('agent', 'pi', 'anthropic/claude-sonnet-4'), undefined);
+  assert.match(validateWorkerModel('agent', 'pi', 'anthropic/claude-sonnet-4') ?? '', /only supports studio-local/);
   assert.equal(validateWorkerModel('agent', 'pi', 'sonnet'), undefined);
   assert.match(validateWorkerModel('agent', 'pi', '--print') ?? '', /Invalid Pi model/);
   assert.match(validateWorkerModel('agent', 'pi', 'bad\u0000model') ?? '', /Invalid Pi model/);
@@ -49,7 +49,7 @@ test('Pi can be selected with model patterns and thinking levels', () => {
 });
 
 test('Cursor can be selected with a model, runs as cursor-agent, and takes no effort', () => {
-  assert.ok(agentProviders('claude').includes('cursor'));
+  assert.ok(!agentProviders('claude').includes('cursor'));
   assert.equal(isAgentProvider('cursor'), true);
   assert.equal(PROVIDER_META.cursor.label, 'Cursor');
   assert.equal(providerCommand('cursor', 'claude'), 'cursor-agent');

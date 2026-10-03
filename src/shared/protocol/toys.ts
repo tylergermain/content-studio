@@ -1,6 +1,6 @@
 // The toys on every floor: pictures, the jukebox, the arcade, the whiteboard, the ball, the cars and the dog.
 
-import type { CabinetFrame, CabinetState } from '../cabinet.js';
+import type { CabinetState, GameFrame, GameTitle } from '../cabinet.js';
 import type { DecorPlacement, Decoration } from '../decor.js';
 import type { DogState } from '../dog.js';
 import type { CarSeat, CarState } from '../garage.js';
@@ -16,25 +16,32 @@ export type DecorClientMsg =
   | { t: 'decor.remove'; id: string };
 
 export type JukeboxClientMsg =
-  /** Put a tune on the jukebox (a JUKEBOX_TUNES id), or a stream; with neither, turn it back on. */
-  | { t: 'jukebox.play'; track?: string; url?: string }
+  /**
+   * Put a tune on the jukebox (a JUKEBOX_TUNES id), or a pasted link: a stream, an audio file or a YouTube
+   * video, with `name` to call it something of your own; with neither, turn it back on.
+   */
+  | { t: 'jukebox.play'; track?: string; url?: string; name?: string }
   /** On to the next tune. */
   | { t: 'jukebox.skip' }
   | { t: 'jukebox.stop' };
 
 export type CabinetClientMsg =
   /**
-   * Step up to the arcade cabinet on your floor to carry on with `game` (one the office started for
-   * you), or to start a new game, even while you're at it; the office answers with `cabinet`, naming
-   * who got it and their game.
+   * Step up to the arcade cabinet on your floor to play `title` (Blockfall when it doesn't say): to
+   * carry on with `game` (one the office started for you), or to start a new game, even while you're
+   * at it. The office answers `cabinet`, naming who got the cabinet and their game, and `cabinet.game`
+   * to you. With `away` you're playing it on the boss's monitor instead: the office follows your game
+   * for the high scores just the same, but you don't take the cabinet and nobody watches.
    */
-  | { t: 'cabinet.play'; game?: string }
+  | { t: 'cabinet.play'; game?: string; title?: GameTitle; away?: boolean }
+  /** You put your game down, wherever you were playing it. */
   | { t: 'cabinet.leave' }
   /**
-   * Your game as it looks now, for everyone else on the floor to watch over your shoulder. It's also
-   * how your score gets on the high-score table: the office follows the game frame by frame.
+   * Your game as it looks now. It's how your score gets on the high-score table: the office follows
+   * the game frame by frame. At the cabinet it's also for everyone else on the floor to watch over
+   * your shoulder.
    */
-  | { t: 'cabinet.frame'; frame: CabinetFrame };
+  | { t: 'cabinet.frame'; frame: GameFrame };
 
 export type WhiteboardClientMsg =
   /** You opened the whiteboard (or closed it): everyone on the floor sees who's drawing. */
@@ -82,8 +89,13 @@ export type ToysServerMsg =
   | { t: 'jukebox'; state: JukeboxState }
   /** Who's at the arcade cabinet on your floor now, and the building's high scores. */
   | { t: 'cabinet'; state: CabinetState }
+  /**
+   * The office's name for the game of yours it's following now (its answer to cabinet.play), or ''
+   * when a frame of yours came and it's following none: ask again.
+   */
+  | { t: 'cabinet.game'; game: string; title: GameTitle }
   /** The game on your floor's cabinet, as its player sees it (sent to everyone else on the floor). */
-  | { t: 'cabinet.frame'; frame: CabinetFrame }
+  | { t: 'cabinet.frame'; frame: GameFrame }
   /** Someone changed these elements on the floor's whiteboard (sent to everyone else on the floor). */
   | { t: 'wb.update'; elements: WbElement[] }
   /** Who has the floor's whiteboard open now. */

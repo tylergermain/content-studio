@@ -6,8 +6,8 @@ import { openModel } from './glb';
 
 // lounge.glb (exported by blender/scripts/build_lounge.py) against what world/office/props.ts counts on: its four
 // pieces by name, each a root standing on the floor at the origin and facing +z, the materials it paints, and
-// the old code-built lounge's sizes, which the couch's and the table's colliders, the seats' hips (SEATING in
-// shared/layout.ts) and the holiday pumpkin on the table (holiday.ts) are placed by.
+// the old code-built lounge's sizes, which the couch's and the table's colliders and the seats' hips (SEATING
+// in shared/layout.ts) are placed by.
 
 const FILE = new URL('../src/client/models/lounge.glb', import.meta.url);
 const lounge = openModel('lounge');
@@ -139,7 +139,7 @@ test('the pouf is about the old floor seat\'s size, its top where a sitter\'s hi
 
 test('the coffee table\'s top is 0.9 round at 0.46, on a pedestal inside its collider', () => {
   const top = boundsOf('coffee_table', ['Wood']);
-  assert.ok(near(top.max.y, 0.46, 0.002), `its top is at ${top.max.y.toFixed(3)}, where the pumpkin stands`);
+  assert.ok(near(top.max.y, 0.46, 0.002), `its top is at ${top.max.y.toFixed(3)}`);
   assert.ok(near(reach(top), 0.9, 0.01), `its top is ${reach(top).toFixed(3)} m round`);
   const pedestal = boundsOf('coffee_table', ['Frame']);
   assert.ok(pedestal.max.y < top.max.y - 0.05, `the pedestal stays under the top (${pedestal.max.y.toFixed(3)})`);

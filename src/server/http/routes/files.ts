@@ -1,3 +1,4 @@
+import { employeeWorkerError } from '../../org-chart/access.js';
 // Files a floor's windows show or take: pictures on the walls and the whiteboard, files dropped into
 // a terminal, changed pictures in the Changes window, and the bookshelf's Markdown.
 import type { Floor } from '../../floor.js';
@@ -6,6 +7,7 @@ import { DROP_MAX_BYTES } from '../../../shared/drops.js';
 import type { Ctx } from '../../office/context.js';
 import { repoOf, str } from '../../office/input.js';
 import { readBody, readBytes, sameOrigin, send } from '../util.js';
+import { listMedia, sendMedia } from '../../media.js';
 import type { Route } from '../router.js';
 
 // Which floor a request is about: its boards and its workers.
@@ -30,6 +32,18 @@ export const fileRoutes = {
         'cross-origin-resource-policy': 'same-origin',
       });
       res.end(r.body);
+    },
+  },
+  media: {
+    method: 'GET',
+    path: '/api/media',
+    auth: 'session',
+    handle(ctx, { req, res, url }) {
+      // A floor's own pictures and videos, for its walls and its screens (see media.ts).
+      const floor = floorParam(ctx, url);
+      if (!floor) return send(res, 404, { error: 'No such floor' });
+      if (url.searchParams.has('list')) return send(res, 200, { media: listMedia(floor.dir) });
+      sendMedia(req, res, floor.dir, url.searchParams.get('name'));
     },
   },
   whiteboardFile: {
@@ -60,7 +74,7 @@ export const fileRoutes = {
   termDrop: {
     path: '/api/term/drop',
     auth: 'session',
-    async handle(ctx, { req, res, url }) {
+    async handle(ctx, { req, res, url, session }) {
       const floor = floorParam(ctx, url);
       // A file dropped or pasted into a worker's terminal, kept on this machine for the terminal to type its path.
       if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
@@ -68,6 +82,7 @@ export const fileRoutes = {
       if (!floor) return send(res, 404, { error: 'No such floor' });
       const workerId = str(url.searchParams.get('worker'), 32);
       if (!floor.workers.get(workerId)) return send(res, 404, { error: 'No such worker' });
+      const denied=employeeWorkerError(ctx,floor,session.account?.id,workerId);if(denied)return send(res,403,{error:denied});
       const tooBig = `That file is too big to drop into a terminal (${DROP_MAX_BYTES / 1024 / 1024} MB at most)`;
       if (Number(req.headers['content-length']) > DROP_MAX_BYTES) return send(res, 413, { error: tooBig });
       let body: Buffer;

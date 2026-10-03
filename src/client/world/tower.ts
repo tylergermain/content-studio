@@ -1,27 +1,39 @@
 import * as THREE from 'three';
+import { columnsOf } from '../../shared/clerestory';
 import { BALCONY, BALCONY_DOOR, ELEVATOR, ELEVATOR_FRONT, EXIT_DOOR, FLOOR, ROOF_BAR, SLAB, STAGE, STOREY, STREET_Y, WALL_HEIGHT, WALL_T, WINDOWS, WING, wingMinZ, wingRowZ, type Opening, type Side } from '../../shared/layout';
+import { FACADE, TOWER, storeys } from './facade';
 import type { Collider } from './types';
 import type { Fixture } from './office/fixture';
 import { bulb, type NightParts } from './outside';
 import { mergeByMaterial, mesh, toon, toonUnique } from './toon';
+import { barOf, buildTowerBars } from './tower-bars';
+import { buildTowerSigns } from './tower-signs';
 
-// The rest of the building, from outside: a floor per project, stacked into a tower. Only the floor
-// you're on is really there; the others are its outside (walls, windows, a balcony off each, a
-// cornice round the top and the rooftop bar over it, roughly), rebuilt whenever floors come and go or
-// you change floors. Up on the roof it's every floor, under your feet.
+export { storeysKey } from './facade';
+
+// The rest of the building, from outside: a floor per project at the bottom, in graphite with each
+// floor's color on its slab and its name on its wall, and over them the tower, three bars of glass
+// (world/tower-bars.ts) up to TOWER.storeys, however many floors there are. Only the floor you're on
+// is really there; the others are its outside (walls, windows, a balcony off each, the parapet round
+// the top, the rooftop bar and its mast over it, roughly), rebuilt whenever floors come and go or you
+// change floors. Up on the roof it's every storey, under your feet.
 
 /** The building, walls included. */
 const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T } as const;
 /** The outside's planes stand this far off the walls, so they never fight the floor you're on for a pixel. */
 const OFF = 0.01;
+/** How tall the mast on the elevator's housing is, with the beacon on top (features/rooftop/mast.ts is the roof's own, with the same numbers). */
+const MAST = 14;
 
 export interface Tower {
   group: THREE.Group;
   /**
-   * Builds the outside of every floor but `index`, of `count` stacked from the bottom one (0). An
-   * `index` of `count` is the roof: every floor, below it, and no top (the roof is its own). `wings`
-   * is how far each floor's back office is built out (see WING), yours included: the others' are
-   * drawn, and all of them stand on posts down to the street.
+   * Builds the outside of every storey but `index`: the `count` real floors from the bottom one (0),
+   * and the tower's over them up to TOWER.storeys (or as many as there are floors, if that's more).
+   * An `index` of that many or more is the roof: everything below it, and no top (the roof is its
+   * own). `wings` is how far each floor's back office is built out (see WING), yours included: the
+   * others' are drawn, and all of them stand on posts down to the street. The storeys' colors and
+   * names are facade.ts's storeys(), set before.
    */
   set(index: number, count: number, wings?: readonly number[]): void;
 }
@@ -65,20 +77,27 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
     m.userData.outlineParameters = { visible: false };
     return m;
   };
-  const paint = flat('#e07a5f');
-  const band = flat('#e8a87c');
-  const frame = toon('#ffffff');
+  const paint = flat(FACADE.skin);
+  const frame = toon(FACADE.frame);
   const alu = toon('#aab4be');
   const ink = toon('#3d405b');
   const wood = toon('#c98b5a');
-  const deck = toon('#e8a87c');
-  const cornice = toon('#fffaf3');
+  const deck = flat('#d6a574');
+  const edge = flat(FACADE.ink);
   const behind = flat('#2b2d42');
-  const concrete = flat('#d3d6dd');
-  // Glass you can't see into; at night some of it glows, as though someone upstairs is still at it.
-  const dark = toon('#a9d8f5');
-  const lit = ['#ffd27a', '#ffe6b0', '#9ec9ff'].map((glow) => {
-    const m = toonUnique('#a9d8f5');
+  const concrete = flat(FACADE.concrete);
+  // Each storey's slab band (and its balcony's and back office's edges) in its floor's color.
+  const bands = new Map<string, THREE.Material>();
+  const bandOf = (k: number) => {
+    const color = storeys()[k]?.accent ?? FACADE.band;
+    let m = bands.get(color);
+    if (!m) bands.set(color, (m = flat(color)));
+    return m;
+  };
+  // Glass you can't see into; at night most of it glows, as though everyone's still at it.
+  const dark = toon(FACADE.glass);
+  const lit = FACADE.lit.map((glow) => {
+    const m = toonUnique(FACADE.glass);
     m.emissive.set(glow);
     m.emissiveIntensity = 0;
     night.windows.push(m);
@@ -96,8 +115,11 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
     return seed / 2147483647;
   };
 
-  /** One floor's outside on `side`, `y0` up from the floor you're on: the band of its slab, then its wall round its windows and doors. */
-  const facade = (parts: THREE.Group, side: Side, y0: number, holes: Opening[]) => {
+  /**
+   * One floor's outside on `side`, `y0` up from the floor you're on: the band of its slab, then its
+   * wall round its windows and doors, under, between and over the ones in a column (see columnsOf).
+   */
+  const facade = (parts: THREE.Group, side: Side, y0: number, holes: Opening[], band: THREE.Material) => {
     const f = FACES[side];
     const piece = (u0: number, u1: number, y1: number, y2: number, mat: THREE.Material) => {
       if (u1 - u0 < 0.001 || y2 - y1 < 0.001) return;
@@ -108,12 +130,14 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
     };
     piece(f.u0, f.u1, y0 - SLAB, y0, band);
     let u = f.u0;
-    for (const o of [...holes].sort((a, b) => a.u - b.u)) {
-      const h0 = o.u - o.width / 2;
-      const h1 = o.u + o.width / 2;
+    for (const { u0: h0, u1: h1, holes: column } of columnsOf(holes)) {
       piece(u, h0, y0, y0 + WALL_HEIGHT, paint);
-      piece(h0, h1, y0, y0 + o.y0, paint);
-      piece(h0, h1, y0 + o.y1, y0 + WALL_HEIGHT, paint);
+      let y = 0;
+      for (const o of column) {
+        piece(h0, h1, y0 + y, y0 + o.y0, paint);
+        y = o.y1;
+      }
+      piece(h0, h1, y0 + y, y0 + WALL_HEIGHT, paint);
       u = h1;
     }
     piece(u, f.u1, y0, y0 + WALL_HEIGHT, paint);
@@ -125,27 +149,33 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
     const w = o.width;
     const h = o.y1 - o.y0;
     const F = door ? 0.08 : 0.09;
-    const edge = door ? alu : frame;
-    const glass = random() < 0.4 ? lit[Math.floor(random() * lit.length)] : dark;
+    const rim = door ? alu : frame;
+    // Most of the real floors are lit at night, warm; here and there it's a screen's blue.
+    const r = random();
+    const glass = r < 0.08 ? lit[2] : r < 0.36 ? lit[0] : r < 0.68 ? lit[1] : dark;
     const mid = y0 + (o.y0 + o.y1) / 2;
     g.add(mesh(new THREE.PlaneGeometry(w - 2 * F, h - 2 * F), glass, 0, mid, -0.06, false));
     const s = mesh(new THREE.PlaneGeometry(0.16, h * 0.55), glint, -w * 0.18, mid + h * 0.05, -0.05, false);
     s.rotation.z = -0.5;
     g.add(s);
-    g.add(mesh(new THREE.BoxGeometry(w, F, 0.14), edge, 0, y0 + o.y1 - F / 2, -0.05, false));
-    g.add(mesh(new THREE.BoxGeometry(w, F, 0.14), edge, 0, y0 + o.y0 + F / 2, -0.05, false));
-    for (const sx of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(F, h, 0.14), edge, sx * (w / 2 - F / 2), mid, -0.05, false));
-    g.add(mesh(new THREE.BoxGeometry(F * (door ? 1 : 0.8), h - 2 * F, 0.08), edge, 0, mid, -0.05, false));
+    g.add(mesh(new THREE.BoxGeometry(w, F, 0.14), rim, 0, y0 + o.y1 - F / 2, -0.05, false));
+    g.add(mesh(new THREE.BoxGeometry(w, F, 0.14), rim, 0, y0 + o.y0 + F / 2, -0.05, false));
+    for (const sx of [-1, 1]) g.add(mesh(new THREE.BoxGeometry(F, h, 0.14), rim, sx * (w / 2 - F / 2), mid, -0.05, false));
+    g.add(mesh(new THREE.BoxGeometry(F * (door ? 1 : 0.8), h - 2 * F, 0.08), rim, 0, mid, -0.05, false));
     if (!door) g.add(mesh(new THREE.BoxGeometry(w + 0.2, 0.06, 0.16), frame, 0, y0 + o.y0 - 0.03, 0.06, false));
     parts.add(onFace(g, o.wall, o.u));
   };
 
-  /** The balcony off a floor `y0` up: its deck, and a railing with glass in it round the three open sides. */
-  const balcony = (parts: THREE.Group, y0: number) => {
+  /** The balcony off a floor `y0` up: its slab (edged in `band`, planks on top, concrete under), and a railing with glass in it round the three open sides. */
+  const balcony = (parts: THREE.Group, y0: number, band: THREE.Material) => {
     const { minX, maxX, minZ, maxZ } = BALCONY;
     const w = maxX - minX;
     const d = maxZ - minZ;
-    parts.add(mesh(new THREE.BoxGeometry(w, SLAB - 0.01, d), deck, (minX + maxX) / 2, y0 - SLAB / 2 - 0.005, (minZ + maxZ) / 2, false));
+    const cx = (minX + maxX) / 2;
+    const cz = (minZ + maxZ) / 2;
+    parts.add(mesh(new THREE.BoxGeometry(w, SLAB - 0.01, d), band, cx, y0 - SLAB / 2 - 0.005, cz, false));
+    parts.add(mesh(new THREE.PlaneGeometry(w - 0.02, d - 0.02).rotateX(-Math.PI / 2), deck, cx, y0 - 0.008, cz, false));
+    parts.add(mesh(new THREE.PlaneGeometry(w - 0.02, d - 0.02).rotateX(Math.PI / 2), concrete, cx, y0 - SLAB - 0.002, cz, false));
     const railH = 1.05;
     const inset = 0.06;
     const sides: [number, number, number, number][] = [
@@ -165,16 +195,13 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
     }
   };
 
-  /** A cornice round the top of the building, `top` up: along each wall, and out past it at both corners so the four meet. */
+  /** A slim parapet round the top of the building, `top` up: the roof's edge in night ink, just proud of the walls and meeting at the corners. */
   const crown = (parts: THREE.Group, top: number) => {
-    const H = 0.45;
-    const out = 0.22;
+    const out = 0.06;
     for (const side of Object.keys(FACES) as Side[]) {
       const f = FACES[side];
       const g = new THREE.Group();
-      const len = f.u1 - f.u0 + 2 * out;
-      g.add(mesh(new THREE.BoxGeometry(len, H, WALL_T + out), cornice, 0, top + H / 2, out / 2 - WALL_T / 2 - OFF, false));
-      g.add(mesh(new THREE.BoxGeometry(len, 0.08, 0.06), band, 0, top + 0.1, out - OFF + 0.03, false));
+      g.add(mesh(new THREE.BoxGeometry(f.u1 - f.u0 + 2 * out, SLAB, out + OFF), edge, 0, top + SLAB / 2, (out - OFF) / 2, false));
       parts.add(onFace(g, side, (f.u0 + f.u1) / 2));
     }
   };
@@ -195,12 +222,14 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
   const parasol = toon('#ef476f');
 
   /**
-   * The rooftop bar on the roof, `y` up, roughly: a curb round the edge with glass on it and a steel
-   * rail along the top, the elevator's housing, the DJ's stage with the LED wall behind it and the
-   * rig over it, the bar and its back bar under a pergola, and the parasols along the south edge.
+   * The rooftop bar on the roof, `y` up, roughly: the deck, a curb round the edge with glass on it
+   * and a steel rail along the top, the elevator's housing with the mast on it, the DJ's stage with
+   * the LED wall behind it and the rig over it, the bar and its back bar under a pergola, and the
+   * parasols along the south edge.
    */
   const roofTop = (parts: THREE.Group, y: number) => {
     const box = (w: number, h: number, d: number, mat: THREE.Material, x: number, y0: number, z: number) => parts.add(mesh(new THREE.BoxGeometry(w, h, d), mat, x, y0 + h / 2, z, false));
+    parts.add(mesh(new THREE.PlaneGeometry(B.maxX - B.minX, B.maxZ - B.minZ).rotateX(-Math.PI / 2), curb, (B.minX + B.maxX) / 2, y + 0.002, (B.minZ + B.maxZ) / 2, false));
     const edges: [number, number, number, number][] = [
       [B.minX, B.maxX, B.minZ, FLOOR.minZ],
       [B.minX, B.maxX, FLOOR.maxZ, B.maxZ],
@@ -220,11 +249,14 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
       for (let a = 0; a <= len + 0.01; a += 2.4) box(0.06, 0.75, 0.06, steel, alongX ? x0 + a : ex, y + 0.425, alongX ? ez : z0 + a);
     }
 
-    // The elevator's housing, as tall as a floor, with a light on top.
+    // The elevator's housing, as tall as a floor, and on it the mast, with the light at its top.
     const hz = (B.minZ + ELEVATOR_FRONT) / 2;
     box(ELEVATOR.width, WALL_HEIGHT, ELEVATOR_FRONT - B.minZ, steel, ELEVATOR.x, y, hz);
     box(ELEVATOR.width + 0.3, 0.3, ELEVATOR_FRONT - B.minZ + 0.2, steelDark, ELEVATOR.x, y + WALL_HEIGHT, hz + 0.05);
-    parts.add(mesh(new THREE.SphereGeometry(0.12, 10, 8), beacon, ELEVATOR.x, y + WALL_HEIGHT + 0.4, hz, false));
+    const foot = y + WALL_HEIGHT + 0.3;
+    parts.add(mesh(new THREE.CylinderGeometry(0.06, 0.22, MAST, 8), steel, ELEVATOR.x, foot + MAST / 2, hz, false));
+    for (const [at, r] of [[0.3, 0.55], [0.62, 0.42]]) parts.add(mesh(new THREE.CylinderGeometry(r, r, 0.14, 12), steelDark, ELEVATOR.x, foot + MAST * at, hz, false));
+    parts.add(mesh(new THREE.SphereGeometry(0.32, 12, 9), beacon, ELEVATOR.x, foot + MAST + 0.2, hz, false));
 
     // The stage, the LED wall behind the DJ, and the rig: a truss tower either side and a beam across.
     const sw = STAGE.maxX - STAGE.minX;
@@ -266,7 +298,7 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
    * east one), the band of its slab, and a roof over the rows the floor above doesn't cover, or an
    * underside under the ones the floor below doesn't.
    */
-  const bay = (parts: THREE.Group, y0: number, level: number, above: number, below: number) => {
+  const bay = (parts: THREE.Group, y0: number, level: number, above: number, below: number, band: THREE.Material) => {
     const back = wingMinZ(level) - WALL_T;
     const west = WING.minX - WALL_T;
     const east = B.maxX;
@@ -305,10 +337,54 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
       const z0 = wingMinZ(level) - WALL_T;
       const z1 = from > 0 ? wingMinZ(from) - WALL_T : B.minZ;
       const g = new THREE.PlaneGeometry(east - west, z1 - z0).rotateX(up ? -Math.PI / 2 : Math.PI / 2);
-      parts.add(mesh(g, up ? cornice : concrete, (west + east) / 2, y, (z0 + z1) / 2, false));
+      parts.add(mesh(g, concrete, (west + east) / 2, y, (z0 + z1) / 2, false));
     };
     flat(above, y0 + WALL_HEIGHT, true);
     flat(below, y0 - SLAB, false);
+  };
+
+  /**
+   * Storey `k`'s outside as one of the base's, its floor `y0` up from the floor you're on: its walls
+   * round its windows and doors, the glass in them, its balcony and its back office (if `wings` has one).
+   */
+  const floor = (parts: THREE.Group, k: number, y0: number, wings: readonly number[]) => {
+    const band = bandOf(k);
+    // The same windows light up whichever floor you're looking from.
+    seed = 20260927 + k * 7919;
+    for (const side of Object.keys(FACES) as Side[]) {
+      const holes: Opening[] = WINDOWS.filter((o) => o.wall === side);
+      if (side === 'south') holes.push(BALCONY_DOOR);
+      // Only the bottom floor has a way out on the west side; its door stands in the hole (see world/office/shell.ts).
+      if (side === 'west' && k === 0) holes.push(EXIT_DOOR);
+      facade(parts, side, y0, holes, band);
+    }
+    for (const o of WINDOWS) glazing(parts, o, y0, false);
+    glazing(parts, BALCONY_DOOR, y0, true);
+    balcony(parts, y0, band);
+    const wing = wings[k] ?? 0;
+    if (wing > 0) bay(parts, y0, wing, wings[k + 1] ?? 0, k > 0 ? (wings[k - 1] ?? 0) : 0, band);
+    if (k === 0) {
+      // Dark behind the exit door, through its porthole.
+      const back = mesh(new THREE.PlaneGeometry(EXIT_DOOR.width, EXIT_DOOR.y1), behind, FLOOR.minX - 0.02, y0 + EXIT_DOOR.y1 / 2, EXIT_DOOR.u, false);
+      back.rotation.y = -Math.PI / 2;
+      parts.add(back);
+    }
+  };
+
+  const bars = buildTowerBars(night);
+  const signs = buildTowerSigns(night);
+  // The bars go by nothing but how many floors are real: drawn once for that many, from the bottom
+  // floor's level, and only moved to where you are after that.
+  let glass: { count: number; group: THREE.Group } | null = null;
+  const barsOver = (count: number, total: number) => {
+    if (glass?.count === count) return glass.group;
+    glass?.group.removeFromParent();
+    glass?.group.traverse((m) => (m as THREE.Mesh).isMesh && (m as THREE.Mesh).geometry.dispose());
+    const parts = new THREE.Group();
+    for (let k = count; k < total; k++) if (barOf(k)) bars.storey(parts, k, k * STOREY, count);
+    glass = { count, group: mergeByMaterial(parts) };
+    glass.group.traverse((o) => (o.receiveShadow = false));
+    return glass.group;
   };
 
   const set = (index: number, count: number, wings: readonly number[] = []) => {
@@ -324,35 +400,19 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
       if (i >= 0) colliders.splice(i, 1);
     }
     mine = [];
-    seed = 20260927;
 
+    const total = Math.max(count, TOWER.storeys);
     const parts = new THREE.Group();
-    for (let k = 0; k < count; k++) {
-      const r = k - index;
-      if (r === 0) continue;
-      const y0 = r * STOREY;
-      for (const side of Object.keys(FACES) as Side[]) {
-        const holes: Opening[] = WINDOWS.filter((o) => o.wall === side);
-        if (side === 'south') holes.push(BALCONY_DOOR);
-        // Only the bottom floor has a way out on the west side; its door stands in the hole (see world/office/shell.ts).
-        if (side === 'west' && k === 0) holes.push(EXIT_DOOR);
-        facade(parts, side, y0, holes);
-      }
-      for (const o of WINDOWS) glazing(parts, o, y0, false);
-      glazing(parts, BALCONY_DOOR, y0, true);
-      balcony(parts, y0);
-      const wing = wings[k] ?? 0;
-      if (wing > 0) bay(parts, y0, wing, k + 1 < count ? (wings[k + 1] ?? 0) : 0, k > 0 ? (wings[k - 1] ?? 0) : 0);
-      if (k === 0) {
-        // Dark behind the exit door, through its porthole.
-        const back = mesh(new THREE.PlaneGeometry(EXIT_DOOR.width, EXIT_DOOR.y1), behind, FLOOR.minX - 0.02, y0 + EXIT_DOOR.y1 / 2, EXIT_DOOR.u, false);
-        back.rotation.y = -Math.PI / 2;
-        parts.add(back);
-      }
-    }
-    // On top, a cornice, and the rooftop bar over it; but up on the roof, it's the roof's own.
-    if (index < count) {
-      const top = (count - 1 - index) * STOREY + WALL_HEIGHT;
+    // A real floor, or one drawn under the first bar, is the base's; over that, the bars'.
+    for (let k = 0; k < total; k++) if (k !== index && (k < count || !barOf(k))) floor(parts, k, (k - index) * STOREY, k < count ? wings : []);
+    const over = barsOver(count, total);
+    over.position.y = -index * STOREY;
+    group.add(over);
+    // Each real floor's name on its wall (yours too), and the sign on the top bar.
+    signs.draw(parts, index, count, total);
+    // On top, a parapet, and the rooftop bar over it; but up on the roof, it's the roof's own.
+    if (index < total) {
+      const top = (total - 1 - index) * STOREY + WALL_HEIGHT;
       crown(parts, top);
       roofTop(parts, top + SLAB);
     }
@@ -377,10 +437,20 @@ export function buildTower(colliders: Collider[], night: NightParts): Tower {
 
     // None of it casts a shadow (the sun lights the office through where its roof would be), and none
     // takes one from the floor you're on, which would fall on it as though nothing were in between.
-    const merged = mergeByMaterial(parts);
-    merged.traverse((o) => (o.receiveShadow = false));
-    group.add(merged);
-    built.push(merged);
+    // What's a picture (the signs' letters) stays as it is: merging would lose where on it each corner is.
+    parts.updateMatrixWorld(true);
+    const pictures = new THREE.Group();
+    const kept: THREE.Mesh[] = [];
+    parts.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (m.isMesh && (Array.isArray(m.material) || (m.material as THREE.MeshBasicMaterial).map)) kept.push(m);
+    });
+    for (const m of kept) pictures.attach(m);
+    for (const g of [mergeByMaterial(parts), pictures]) {
+      g.traverse((o) => (o.receiveShadow = false));
+      group.add(g);
+      built.push(g);
+    }
 
     // Below you, the outside walls down to the garage, which you can't walk into from the steps
     // outside the bottom floor's door, and the bottom floor's slab, which is the garage's ceiling.

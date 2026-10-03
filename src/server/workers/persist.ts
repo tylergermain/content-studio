@@ -6,7 +6,6 @@ import { isAgentProvider, savedEffort, savedModel } from '../../shared/providers
 import { providerAdapter } from '../providers/index.js';
 import { reportedUsage } from '../reported-usage.js';
 import { restoreTracker, trackerUsage } from '../usage.js';
-import { workedMs } from './clock.js';
 import { midTurn } from './lifecycle.js';
 import type { Worker } from './types.js';
 import { COLORS, newWorker } from './worker.js';
@@ -24,6 +23,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     provider: info.provider,
     model: info.model,
     effort: info.effort,
+    specialist: info.specialist,
     deskId: info.deskId,
     name: info.name,
     color: info.color,
@@ -39,7 +39,6 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     pr: info.pr,
     pastPrs: info.pastPrs,
     meeting: info.meeting,
-    workedMs: workedMs(info),
     tracker: info.kind === 'agent' ? tracker : undefined,
     usage: providerAdapter(info.provider)?.usage?.persisted ? info.usage : undefined,
     ...providerAdapter(info.provider)?.usage?.save?.(state),
@@ -78,6 +77,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         provider,
         model: savedModel(provider, s.model),
         effort: savedEffort(provider, s.effort),
+        specialist: typeof s.specialist === 'string' && /^[a-z][a-z0-9-]{0,47}$/.test(s.specialist) ? s.specialist : undefined,
         deskId: s.deskId,
         name: s.name ?? 'Worker',
         color: s.color ?? COLORS[0],
@@ -100,7 +100,6 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         viewers: [],
         viewerIds: [],
         meeting: typeof s.meeting === 'string' && DESK_BY_ID.get(s.deskId)?.room ? s.meeting : undefined,
-        workedMs: typeof s.workedMs === 'number' && Number.isFinite(s.workedMs) && s.workedMs > 0 ? s.workedMs : undefined,
       };
       const w = newWorker(info, tracker, typeof s.hookToken === 'string' && s.hookToken ? s.hookToken : undefined);
       if (typeof s.owner === 'string' && s.owner) w.owner = s.owner;

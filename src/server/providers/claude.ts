@@ -1,3 +1,4 @@
+import { studioPermissionArgs } from './studio-launch.js';
 // Claude Code: hooks from a settings file the office writes (its own hook route, /hooks/claude),
 // usage read off the session transcript and booked in the budget, and tasks the office names.
 import { writeFileSync } from 'node:fs';
@@ -199,7 +200,7 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     mcp: mcpScript ? writeClaudeMcpConfig(dataDir, mcpScript) : undefined,
   }),
   launch({ h: { info }, args, prompt, resumeSessionId, station, setup }) {
-    args.unshift('--settings', setup.settings);
+    args = studioPermissionArgs('claude', args); args.unshift('--settings', setup.settings);
     // The office's MCP server: its workers, to list, hire, send home and tell (see office-workers.ts).
     // Ahead of --settings, which ends the list --mcp-config takes.
     if (setup.mcp) args.unshift('--mcp-config', setup.mcp);

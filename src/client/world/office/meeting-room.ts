@@ -1,47 +1,35 @@
 import * as THREE from 'three';
-import { MEETING_BOARD, MEETING_LAPTOP, MEETING_ROOM, MEETING_SEATS, MEETING_TABLE, deskSeat, type DeskDef } from '../../../shared/layout';
+import { MEETING_ROOM, MEETING_TABLE, WALL_HEIGHT } from '../../../shared/layout';
 import type { NightParts } from '../outside';
-import { mesh, roundedBox, textPlane, toon } from '../toon';
-import type { Collider, DeskView, Interactable } from '../types';
-import type { Fixture } from './fixture';
+import { mesh, textPlane, toon } from '../toon';
+import type { Collider } from '../types';
+import { keep, type Fixture } from './fixture';
 import { PALETTE, box, glassPane } from './materials';
-import { wallBoard } from './props';
-import { chair } from './seats';
+import { buildMeetingPlace } from './meeting-place';
 import type { Door } from './shell';
 
-/** A chair at the meeting table, with its laptop on the table in front of it. */
-function buildMeetingSeat(def: DeskDef, index: number): DeskView {
-  const group = new THREE.Group();
-  group.position.set(def.x, 0, def.z);
-  group.rotation.y = def.rotY;
-  const laptopAnchor = new THREE.Object3D();
-  laptopAnchor.position.set(0, MEETING_TABLE.height, MEETING_LAPTOP.z);
-  laptopAnchor.scale.setScalar(MEETING_LAPTOP.scale);
-  group.add(laptopAnchor);
-  const seatAnchor = new THREE.Object3D();
-  seatAnchor.position.set(0, 0.4, 0.85);
-  seatAnchor.rotation.y = Math.PI;
-  seatAnchor.scale.setScalar(0.82);
-  group.add(seatAnchor);
-  const ch = chair(['#2b2d42', '#ef476f', '#118ab2', '#06d6a0', '#ffd166'][index % 5]);
-  ch.position.set(0, 0, 0.85);
-  group.add(ch);
-  // A merge's dance party: up on its chair rather than the table, where the laptops are close together.
-  const stage = new THREE.Object3D();
-  stage.position.set(0, 0.48, 0.85);
-  group.add(stage);
-  // Nobody is hired here from the floor, so there's no '+' over a free chair: a meeting fills them.
-  const vacancy = new THREE.Group();
-  group.add(vacancy);
-  return { def, group, laptopAnchor, seatAnchor, stage, chair: ch, vacancy, vacancyY: 0 };
+/** The two lights over the glass room's table: how far either side of its middle. */
+const LIGHTS = [-0.95, 0.95];
+
+/** The glass room as it's built: all of it in a group of its own, with what's in the way of it and its door. */
+interface GlassRoom {
+  group: THREE.Group;
+  colliders: Collider[];
+  door: Door;
+  /** What finishes it off on a floor with nothing over it (see buildGlassRoom). */
+  open: THREE.Group;
 }
 
 /**
- * The meeting room under the loft: glass walls from the loft's posts round to the outside walls, a
- * sliding glass door facing the lounge, a long table with its chairs (MEETING_SEATS), a board on the
- * back wall for the meeting's output and a sign by the door for how it's going.
+ * The meeting room under the loft: glass walls from the loft's posts round to the outside walls and a
+ * sliding glass door facing the lounge. It's the glass only: the table, its chairs, the board and the
+ * sign are the floor's meeting place (meeting-place.ts), which stands in here on a floor that meets in
+ * the glass room. On a floor with nothing over it, it's a glass room open to the ceiling, its walls
+ * capped with a rail.
  */
-export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], interactables: Interactable[], desks: Map<string, DeskView>, doors: Door[], night: NightParts): { board: THREE.Mesh; sign: THREE.Mesh } {
+export function buildGlassRoom(): GlassRoom {
+  const group = new THREE.Group();
+  const colliders: Collider[] = [];
   const R = MEETING_ROOM;
   const H = R.height;
   const T = 0.1;
@@ -99,7 +87,7 @@ export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], inte
     group.add(leaf);
     leaves.push([leaf, x0]);
   }
-  doors.push({
+  const door: Door = {
     x: dx,
     y: 0,
     z: R.minZ,
@@ -108,7 +96,7 @@ export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], inte
       const e = k * k * (3 - 2 * k);
       for (const [leaf, x0] of leaves) leaf.position.x = x0 + Math.sign(x0 - dx) * e * (half - 0.06);
     },
-  });
+  };
   const label = textPlane('🤝 Meeting room', { bg: '#2b2d42', color: '#fffaf3', size: 56, border: '#fffaf3' });
   label.scale.multiplyScalar(0.62);
   // In front of the glass wall's frame (out to R.minZ - 0.08) and the sliding leaves (to R.minZ - 0.11),
@@ -117,74 +105,69 @@ export function buildMeetingRoom(group: THREE.Group, colliders: Collider[], inte
   label.rotation.y = Math.PI;
   group.add(label);
 
-  // The table, on two pedestals, and its chairs.
-  const table = new THREE.Group();
-  const top = MEETING_TABLE;
-  table.add(mesh(roundedBox(top.width, 0.08, top.depth, 0.1), toon(PALETTE.wood), 0, top.height - 0.04, 0));
-  for (const sx of [-1, 1]) {
-    table.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, top.height - 0.08, 10), toon(PALETTE.deskLeg), sx * (top.width / 2 - 0.7), (top.height - 0.08) / 2, 0));
-    table.add(mesh(roundedBox(0.9, 0.05, 0.8, 0.05), toon(PALETTE.deskLeg), sx * (top.width / 2 - 0.7), 0.025, 0));
+  // With no loft over it the room's open to the ceiling, and finished off where the loft's floor was:
+  // a slim rail capping the glass, right along both walls and over the door, and a beam from the
+  // front wall to the back one over each light, which is set in it instead.
+  const open = new THREE.Group();
+  const cap = (w: number, h: number, d: number, x: number, y: number, z: number) => open.add(mesh(box(w, h, d), frameMat, x, y, z, false));
+  const RAIL = 0.07;
+  const lip = (T + 0.1) / 2;
+  cap(R.maxX - R.minX + lip, RAIL, lip * 2, (R.minX - lip + R.maxX) / 2, H + RAIL / 2, R.minZ);
+  cap(lip * 2, RAIL, R.maxZ - R.minZ - lip, R.minX, H + RAIL / 2, (R.minZ + lip + R.maxZ) / 2);
+  for (const dx of LIGHTS) cap(0.14, RAIL - 0.01, R.maxZ - R.minZ - lip, MEETING_TABLE.x + dx, H + RAIL / 2, (R.minZ + lip + R.maxZ) / 2);
+  group.add(open);
+  return { group, colliders, door, open };
+}
+
+/**
+ * Flat lights where the glass room's table is, at the height of the loft's floor: a hanging lamp would
+ * be in front of the board. Their glow at night is there on every floor (the halos are made once), so
+ * the lights are too, whatever the floor has in that corner: set in the floor over them (a loft's or
+ * the big mezzanine's), in the glass room's beams where it's open to the ceiling, and where there's
+ * neither, on the cords this hands back, long ones down from the ceiling.
+ */
+function buildLights(group: THREE.Group, night: NightParts): THREE.Group {
+  const H = MEETING_ROOM.height;
+  const cords = new THREE.Group();
+  for (const dx of LIGHTS) {
+    const x = MEETING_TABLE.x + dx;
+    group.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 20), toon('#fff7d6', { emissive: '#ffe08a' }), x, H - 0.02, MEETING_TABLE.z, false));
+    night.halos.push({ at: new THREE.Vector3(x, H - 0.08, MEETING_TABLE.z), size: 0.9, color: '#ffe08a' });
+    cords.add(mesh(new THREE.CylinderGeometry(0.012, 0.012, WALL_HEIGHT - H, 6), toon(PALETTE.ink), x, (WALL_HEIGHT + H) / 2, MEETING_TABLE.z, false));
+    cords.add(mesh(new THREE.CylinderGeometry(0.08, 0.37, 0.07, 20), toon(PALETTE.ink), x, H + 0.035, MEETING_TABLE.z, false));
   }
-  table.position.set(top.x, 0, top.z);
-  group.add(table);
-  colliders.push({ minX: top.x - top.width / 2, maxX: top.x + top.width / 2, minZ: top.z - top.depth / 2, maxZ: top.z + top.depth / 2, top: top.height });
-  const talk: Interactable = { kind: 'meeting', x: top.x, z: top.z, radius: 2.9 };
-  interactables.push(talk);
-  table.userData.interact = talk;
-  MEETING_SEATS.forEach((def, i) => {
-    const view = buildMeetingSeat(def, i);
-    group.add(view.group);
-    desks.set(def.id, view);
-    const at = deskSeat(def, 1.2);
-    const it: Interactable = { kind: 'desk', deskId: def.id, x: at.x, z: at.z, radius: 1 };
-    interactables.push(it);
-    view.group.userData.interact = it;
-  });
-
-  // The board on the back wall: the meeting's output file as it's being written.
-  const b = MEETING_BOARD;
-  const { group: frame, face } = wallBoard(b.width, b.height, '#aab4be');
-  frame.position.set(b.x, b.y, b.z);
-  frame.rotation.y = Math.PI;
-  group.add(frame);
-  const read: Interactable = { kind: 'meeting', x: b.x, z: b.z - 1.4, radius: 2.4 };
-  interactables.push(read);
-  frame.userData.interact = read;
-
-  // The panel on the glass beside the door, like a room-booking screen: what's on, the round, the
-  // tokens, and the summary once it's over. Beside the door rather than past it, so the board shows.
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.6, 0.96), new THREE.MeshBasicMaterial({ color: '#ffffff' }));
-  // Inside the glass, facing out: the door's left leaf slides across outside it (out to R.minZ - 0.125)
-  // and would cut through a panel on the outer face, its glints flickering with the screen.
-  sign.position.set((R.minX + R.door.x0) / 2 + 0.01, 1.45, R.minZ + T / 2 + 0.03);
-  sign.rotation.y = Math.PI;
-  group.add(sign);
-  const plate = mesh(roundedBox(0.66, 1.03, 0.03, 0.03), toon(PALETTE.ink), sign.position.x, sign.position.y, R.minZ + T / 2 + 0.05, false);
-  group.add(plate);
-  const door: Interactable = { kind: 'meeting', x: sign.position.x, z: R.minZ - 1.2, radius: 1.8 };
-  interactables.push(door);
-  sign.userData.interact = door;
-  plate.userData.interact = door;
-
-  // Flat lights set in the loft's floor over the table: a hanging lamp would be in front of the board.
-  for (const dx of [-0.95, 0.95]) {
-    group.add(mesh(new THREE.CylinderGeometry(0.34, 0.34, 0.04, 20), toon('#fff7d6', { emissive: '#ffe08a' }), top.x + dx, H - 0.02, top.z, false));
-    night.halos.push({ at: new THREE.Vector3(top.x + dx, H - 0.08, top.z), size: 0.9, color: '#ffe08a' });
-  }
-  return { board: face, sign };
+  group.add(cords);
+  return cords;
 }
 
 declare module '../types' {
   interface OfficeHandles {
-    /** The meeting room's board, showing the meeting's output as it's written, and the sign by its door. */
+    /** The meeting's board, showing its output as it's written, and the sign that says how it's going: wherever the floor's workers meet. */
     meetingBoard: THREE.Mesh;
     meetingSign: THREE.Mesh;
   }
 }
 
-/** Under the loft: the meeting room. */
+/**
+ * Where the floor's workers meet. It's the floor's choice (see RoomOptions.meeting): the glass room
+ * under the loft (or, on a floor without one, open to the ceiling), which is put away with what you'd
+ * bump into of it on a floor that meets on the stage or at the anchor desk instead, its door kept
+ * shut. The table, the chairs, the board and the sign are meeting-place.ts's, and move with the choice.
+ */
 export const meetingRoom: Fixture<'meetingBoard' | 'meetingSign'> = (site) => {
-  const built = buildMeetingRoom(site.group, site.colliders, site.interactables, site.desks, site.doors, site.get('night'));
-  site.wall('south', MEETING_BOARD.x, MEETING_BOARD.y, MEETING_BOARD.width + 0.4, MEETING_BOARD.height + 0.4);
-  return { handle: { meetingBoard: built.board, meetingSign: built.sign } };
+  const glass = buildGlassRoom();
+  site.group.add(glass.group);
+  site.doors.push(glass.door);
+  const place = buildMeetingPlace(site);
+  const cords = buildLights(site.group, site.get('night'));
+  site.get('room').on((room) => {
+    const there = room.meeting === 'room';
+    const overhead = room.mezzanine !== 'none';
+    glass.group.visible = there;
+    glass.open.visible = !overhead;
+    glass.door.locked = !there;
+    keep(site.colliders, glass.colliders, there);
+    cords.visible = !there && !overhead;
+  });
+  return { handle: { meetingBoard: place.board, meetingSign: place.sign } };
 };

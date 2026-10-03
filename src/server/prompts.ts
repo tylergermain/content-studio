@@ -2,6 +2,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { isAgentEffort, isAgentProvider, type AgentChoice, type AgentProvider, type PromptsState } from '../shared/protocol.js';
 import { PROMPTS, PROMPT_MAX, fillPrompt, isPromptId, promptText, type PromptId, type PromptVars } from '../shared/prompts.js';
+import type { StationKind } from '../shared/layout.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 
 /** What the floors read: a prompt as the office has it now, and what workers start on. */
@@ -9,6 +10,8 @@ export interface PromptSource {
   text(id: PromptId): string;
   /** The worker picked in ⚙️ Settings, when one was. */
   agent(): AgentChoice | undefined;
+  /** What a floor calls the agent at one of its kiosks, when it has a name of its own for it (see server/studio.ts). */
+  stationName?(kind: StationKind): string | undefined;
 }
 
 /** A prompt's text, from `source` when there is one, else the default. */

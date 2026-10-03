@@ -1,0 +1,7 @@
+/* The elevator's folder floors, and the tools on each floor's row (see elevator-folder.ts). */
+.elevator .folder-floor { margin-top: 12px; }
+.elevator .folder-form { display: grid; gap: 8px; margin-top: 10px; }
+.elevator .folder-form label { margin: 0; font-size: 12px; }
+.elevator .folder-form .btn { justify-self: start; }
+.elevator .floor-tools { display: flex; gap: 6px; align-items: stretch; }
+.elevator .floor-tool { padding: 0 9px; font-size: 13px; }

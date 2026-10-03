@@ -115,7 +115,7 @@ export function installWaiting(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'wo
     if (!w) return;
     const { actions } = parts;
     if (w.lost) return actions.fixLostWorktree(w);
-    if (isAsleep(w.status)) actions.resumeWorker(w);
+    if (isAsleep(w.status) && (w.kind === 'shell' || find)) actions.resumeWorker(w);
     openTerminal(net, id, () => openWorkerChanges(id), find);
   }
 

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { DESKS, DESK_BY_ID, DESK_SIZE, WALL_HEIGHT, WING_DESKS, type DeskDef } from '../../shared/layout';
-import { signInk, type DeskLabel } from '../../shared/floorplan';
+import { signInk, type DeskLabel, type RoomOptions } from '../../shared/floorplan';
+import { onDeck } from '../../shared/mezzanine';
 import type { Fixture } from './office/fixture';
 import { mergeByMaterial, mesh, roundedBox, toon } from './toon';
 
@@ -16,11 +17,26 @@ export const SIGN = { width: 1.9, height: 0.62, depth: 0.04, y: 3.35, cords: 1.3
 
 const PX = 1024;
 
-/** Each desk's partner, back to back with it across the pair. */
-const PARTNER = new Map<string, string>();
-for (const d of [...DESKS, ...WING_DESKS]) {
-  const p = [...DESKS, ...WING_DESKS].find((e) => e !== d && Math.abs(e.x - d.x) < 0.01 && Math.abs(Math.abs(e.z - d.z) - DESK_SIZE.depth) < 0.01 && Math.abs(Math.cos(e.rotY) + Math.cos(d.rotY)) < 0.01);
-  if (p) PARTNER.set(d.id, p.id);
+/**
+ * Whether the sign over `desk` would come through the room's upstairs. A sign hangs from the ceiling
+ * to just above head height, which is where a deck's floor is: so not over a desk that stands under
+ * the deck (the big mezzanine's, or the corner loft's), nor where the sign's own board, off the desk's
+ * far edge, would be over it.
+ */
+export function signThroughDeck(room: RoomOptions, desk: Pick<DeskDef, 'x' | 'z' | 'rotY'>): boolean {
+  if (onDeck(room, desk.x, desk.z)) return true;
+  const sin = Math.sin(desk.rotY);
+  const cos = Math.cos(desk.rotY);
+  const z = -DESK_SIZE.depth / 2;
+  return [-SIGN.width / 2, 0, SIGN.width / 2].some((x) => onDeck(room, desk.x + x * cos + z * sin, desk.z - x * sin + z * cos));
+}
+
+/** The current partner across a back-to-back pair, after a layout edit. */
+function partner(id: string): string | undefined {
+  const desks = [...DESKS, ...WING_DESKS];
+  const d = desks.find(d => d.id === id);
+  if (!d) return;
+  return desks.find(e => e !== d && Math.hypot(e.x - d.x + Math.sin(d.rotY) * DESK_SIZE.depth, e.z - d.z + Math.cos(d.rotY) * DESK_SIZE.depth) < 0.02 && Math.abs(Math.cos(e.rotY - d.rotY) + 1) < 0.01)?.id;
 }
 const FONT = (size: number) => `800 ${size}px Nunito, ui-rounded, system-ui, sans-serif`;
 
@@ -87,11 +103,16 @@ export interface DeskSigns {
   set(labels: Record<string, DeskLabel>, built: (desk: DeskDef) => boolean): void;
   /** The sign over a desk, if it has one. */
   get(deskId: string): THREE.Object3D | undefined;
+  /** Shows the signs that hang clear where their desks stand now, and hides the rest (see `hidden`). */
+  show(): void;
 }
 
-export function buildDeskSigns(): DeskSigns {
+/** `hidden` says which desks go without their sign for now, whatever their label: where it has nowhere to hang. */
+export function buildDeskSigns(hidden: (desk: DeskDef) => boolean = () => false): DeskSigns {
   const group = new THREE.Group();
   const hung = new Map<string, Hung>();
+  /** Which desks are there, as the last `set` had it. */
+  let there: (desk: DeskDef) => boolean = () => true;
   const cordMat = toon('#2b2d42');
 
   const make = (desk: DeskDef, label: DeskLabel, back: boolean): Hung => {
@@ -143,7 +164,7 @@ export function buildDeskSigns(): DeskSigns {
   };
   /** Whether the sign over `id` says it on its back too: its partner across the pair has no sign of its own there. */
   const twoSided = (id: string, labels: Record<string, DeskLabel>, built: (desk: DeskDef) => boolean) => {
-    const other = PARTNER.get(id);
+    const other = partner(id);
     const desk = other ? DESK_BY_ID.get(other) : undefined;
     return !!desk && built(desk) && !labels[desk.id];
   };
@@ -156,10 +177,19 @@ export function buildDeskSigns(): DeskSigns {
     }
   });
 
+  const show = () => {
+    for (const [id, h] of hung) {
+      const desk = DESK_BY_ID.get(id);
+      h.root.visible = !!desk && there(desk) && !hidden(desk);
+    }
+  };
+
   return {
     group,
     get: (deskId) => hung.get(deskId)?.root,
+    show,
     set(labels, built) {
+      there = built;
       for (const [id, h] of hung) {
         const l = labels[id];
         if (l && keyOf(l, twoSided(id, labels, built)) === h.key) continue;
@@ -169,10 +199,9 @@ export function buildDeskSigns(): DeskSigns {
       for (const [id, label] of Object.entries(labels)) {
         const desk = DESK_BY_ID.get(id);
         if (!desk) continue;
-        let h = hung.get(id);
-        if (!h) hung.set(id, (h = make(desk, label, twoSided(id, labels, built))));
-        h.root.visible = built(desk);
+        if (!hung.has(id)) hung.set(id, make(desk, label, twoSided(id, labels, built)));
       }
+      show();
     },
   };
 }
@@ -184,8 +213,13 @@ declare module './types' {
   }
 }
 
-/** The signs over the desks. */
-export const signs: Fixture<'signs'> = () => {
-  const built = buildDeskSigns();
-  return { group: built.group, handle: { signs: built } };
+/**
+ * The signs over the desks. One whose desk stands under the floor's upstairs is put away (see
+ * signThroughDeck): looked at every frame, since the room can change and the office builder moves a
+ * desk, sign and all, without a word to the signs.
+ */
+export const signs: Fixture<'signs'> = (site) => {
+  const room = site.get('room');
+  const built = buildDeskSigns((desk) => signThroughDeck(room.get(), desk));
+  return { group: built.group, handle: { signs: built }, update: () => built.show() };
 };

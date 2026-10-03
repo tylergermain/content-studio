@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { STUDIO_PROVIDERS, studioChoiceError } from '../shared/studio-policy.js';
 import { AGENT_PROVIDERS, PROVIDER_META, isAgentEffort, providerMeta, providerNames, type AgentProvider } from '../shared/providers.js';
 
 /**
@@ -13,8 +14,8 @@ export function configuredProvider(command: string): AgentProvider {
 }
 
 /** The providers an office started with `configured` can hire: the ones it knows, and a custom --agent only when that's what it was started with. */
-export function agentProviders(configured: AgentProvider): AgentProvider[] {
-  return AGENT_PROVIDERS.filter((p) => p !== 'custom' || configured === 'custom');
+export function agentProviders(_configured: AgentProvider): AgentProvider[] {
+  return [...STUDIO_PROVIDERS];
 }
 
 /** The command a provider's CLI runs as: the office's --agent when that's this provider, else its own executable. */
@@ -25,6 +26,7 @@ export function providerCommand(provider: AgentProvider, agentCmd: string): stri
 export function validateWorkerModel(kind: 'agent' | 'shell', provider: AgentProvider | undefined, model: unknown): string | undefined {
   if (model === undefined) return undefined;
   if (kind === 'shell') return 'Shell workers do not have an agent model';
+  if (provider === 'pi' && studioChoiceError(provider, model)) return studioChoiceError(provider, model);
   const meta = providerMeta(provider);
   if (!meta?.validModel) return `Models can only be selected for ${providerNames((m) => !!m.validModel)} workers`;
   return meta.validModel(model) ? undefined : meta.invalidModel;

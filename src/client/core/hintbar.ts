@@ -5,10 +5,9 @@
 import { $, modalOpen } from '../ui/dom';
 import type { Ctx } from './context';
 import type { CoreState } from './ctx';
-import { key } from './hint';
 import type { Parts } from './parts';
 
-export function installHintBar(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'pointer' | 'focus' | 'place' | 'hoops' | 'cards'>) {
+export function installHintBar(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'pointer' | 'focus' | 'hoops' | 'cards'>) {
   const { player } = ctx;
 
   function renderHint() {
@@ -29,13 +28,7 @@ export function installHintBar(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'po
       return;
     }
     const hint = withBall ? hoops.ballHint() : carrying ? parts.cards.carryHint(carrying, target) : ctx.interactions.hint(target!);
-    // On the throne, whoever's in line: the herald's a key away, and how to get up.
-    const throne = parts.place.onThrone() && !carrying && !withBall;
-    if (throne) {
-      if (ctx.world().herald && target?.kind !== 'herald') hint.parts.push(key('K', ctx.plan().herald!.name));
-      if (target?.kind !== 'seat') hint.parts.push(key('W A S D', 'Get up'));
-    }
-    const k = `${withBall ? 'ball!' : `${target?.kind}${target?.deskId ?? ''}`}|${carrying?.issue ?? ''}|${throne}|${hint.k}`;
+    const k = `${withBall ? 'ball!' : `${target?.kind}${target?.deskId ?? ''}`}|${carrying?.issue ?? ''}|${hint.k}`;
     if (k === core.hintKey) return;
     core.hintKey = k;
     el.replaceChildren(...hint.parts);

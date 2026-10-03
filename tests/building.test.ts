@@ -83,3 +83,32 @@ test('the floor the office was started in comes off too, stays off after a resta
   assert.equal(third.ensureLocal(defs[0].dir, 'the office')?.id, 'api');
   assert.deepEqual(third.list().map((d) => d.id), ['web', 'docs', 'api']);
 });
+
+test('a folder becomes a floor with a name of its own and no repository; floors are renamed and moved', () => {
+  const root = mkdtempSync(path.join(tmpdir(), 'agent-office-folder-floors-'));
+  try {
+    const data = path.join(root, 'office');
+    mkdirSync(data, { recursive: true });
+    const building = new Building(data, path.join(root, 'projects'));
+    const labs = building.addFolder(path.join(root, 'work', 'friday-labs'), 'Friday Labs', 'Tyler');
+    assert.ok(typeof labs === 'object', String(labs));
+    assert.deepEqual([labs.id, labs.name, labs.repo], ['friday-labs', 'Friday Labs', undefined]);
+    assert.ok(existsSync(labs.dir), 'the folder is made');
+    // A second floor takes the next palette; the same folder twice is refused, and so is a path that isn't whole.
+    const content = building.addFolder(path.join(root, 'work', 'content'), '', 'Tyler');
+    assert.ok(typeof content === 'object' && content.name === 'content' && content.palette !== labs.palette);
+    assert.match(building.addFolder(labs.dir, 'Again', 'Tyler') as string, /already has a floor/);
+    assert.match(building.addFolder('work/relative', 'Nope', 'Tyler') as string, /full path/);
+
+    // Renamed, and moved to the bottom of the building: its id stays what it was.
+    const moved = building.edit('content', { name: 'Content', to: 0 });
+    assert.ok(typeof moved === 'object');
+    assert.deepEqual(building.list().map((d) => [d.id, d.name]), [['content', 'Content'], ['friday-labs', 'Friday Labs']]);
+    assert.equal(building.edit('nowhere', { name: 'x' }), 'No such floor');
+    // Across a restart.
+    const again = new Building(data, path.join(root, 'projects'));
+    assert.deepEqual(again.list().map((d) => [d.id, d.name, d.repo]), [['content', 'Content', undefined], ['friday-labs', 'Friday Labs', undefined]]);
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});

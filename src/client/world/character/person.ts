@@ -8,7 +8,7 @@ import { HIPS, type PersonRig } from './rig';
 import { axeModel, dartModel } from '../../features/bargames/world';
 import { OpenBook } from '../../features/bookshelf/book';
 import { HeldCard } from '../../features/carrying/card';
-import { UNDEAD_SKIN, santaHat, warlockHat } from '../costumes';
+import { santaHat } from '../costumes';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
 import { cigarette, coffeeMug, drinkGlass, putDownGlass, undress } from './props';
@@ -110,13 +110,9 @@ export class Person {
    * `top`) or taking it back all by itself first (`autoT`), and how long until the next is in hand.
    */
   private oche: Oche | null = null;
-  /** Dressed up for a holiday (see setCostume): a warlock's hat and undead skin, or a Santa hat. */
+  /** Dressed up for a holiday (see setCostume): a Santa hat. */
   private costume: Theme | null = null;
   private hat: THREE.Object3D[] = [];
-  /** A hand on someone's shoulder, marching them along (see holdOn). */
-  private gripping = false;
-  /** Something they're saying (see say), and for how many more seconds. */
-  private speech: { sprite: THREE.Sprite; left: number } | null = null;
 
   constructor(
     private name: string,
@@ -232,12 +228,12 @@ export class Person {
     this.dress();
   }
 
-  /** Dresses up for a holiday: a crooked warlock's hat and undead skin for Halloween, a Santa hat for Christmas. Null takes it off. */
+  /** Dresses up for a holiday: a Santa hat for Christmas. Null takes it off. */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
     undress(this.hat);
-    const hat = theme === 'halloween' ? warlockHat() : theme === 'christmas' ? santaHat() : null;
+    const hat = theme === 'christmas' ? santaHat() : null;
     if (hat) {
       hat.traverse((o) => ((o as THREE.Mesh).castShadow = true));
       this.head.add(hat);
@@ -249,7 +245,6 @@ export class Person {
   /** The skin and hair under the costume: hair that would poke through a hat's crown hides under it. */
   private dress() {
     this.skin.color.set(SKIN_TONES[this.look.skin]);
-    if (this.costume === 'halloween') this.skin.color.lerp(UNDEAD_SKIN, 0.7);
     const style = HAIR_STYLES[this.look.style];
     this.hair.visible = !this.costume || !(style === 'Spiky' || style === 'Bun' || style === 'Curly');
   }
@@ -324,26 +319,6 @@ export class Person {
     o.traverse((m) => ((m as THREE.Mesh).castShadow = true));
     // Forward is +z, so the character's right arm is the one on -x (see reach).
     (on === 'head' ? this.head : on === 'hand' ? this.armL : on === 'offhand' ? this.armR : this.body).add(o);
-  }
-
-  /** Keeps a hand out in front, on the shoulder of someone they're marching along (or lets go). */
-  holdOn(on: boolean) {
-    this.gripping = on;
-  }
-
-  /** Says something in a bubble over their head for `seconds` (the one before goes). */
-  say(text: string, seconds = 3.5) {
-    this.hush();
-    this.speech = { sprite: textSprite(text, { bg: '#fffaf3', size: 34 }), left: seconds };
-    this.speech.sprite.position.y = this.bubbleY;
-    this.root.add(this.speech.sprite);
-  }
-
-  private hush() {
-    if (!this.speech) return;
-    this.root.remove(this.speech.sprite);
-    disposeSprite(this.speech.sprite);
-    this.speech = null;
   }
 
   /** A mug of coffee in the left hand, or not. */
@@ -647,15 +622,6 @@ export class Person {
       this.armL.rotation.x = THREE.MathUtils.lerp(this.armL.rotation.x, -1.65, reach);
       this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.22, reach);
       if (this.reachT >= REACH_TIME) this.reachT = -1;
-    }
-    if (this.gripping && !this.book && !this.card.held && !this.ball) {
-      // The right arm out and a little down, onto the shoulder of whoever's in front.
-      this.armL.rotation.x = THREE.MathUtils.lerp(this.armL.rotation.x, -1.15, Math.min(1, dt * 10));
-      this.armL.rotation.z = THREE.MathUtils.lerp(this.armL.rotation.z, 0.3, Math.min(1, dt * 10));
-    }
-    if (this.speech) {
-      this.speech.left -= dt;
-      if (this.speech.left <= 0) this.hush();
     }
     // Lean into the reach a little.
     this.body.rotation.x = reach * 0.12;

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { GONG } from '../../../shared/layout';
+import { GONG_AT } from '../../sound/places';
 import { mesh, roundedBox, textPlane, toon, toonUnique } from '../../world/toon';
 import type { Collider, Interactable } from '../../world/types';
 import type { Fixture } from '../../world/office/fixture';
-import { boxFootprint } from '../../../shared/maps/props';
 
 // The gong: a brass disc hung in a red lacquered frame, next to the PR board. It rings when a pull
 // request merges, and anyone can walk up and hit it.
@@ -24,15 +24,11 @@ export interface Gong {
   update(dt: number): void;
 }
 
-/** The gong, where the office has it, or at (x, z) facing `rotY` (0 is +z, the office's way), on a floor `y` up. */
-export function buildGong(at: { x: number; y?: number; z: number; rotY?: number } = GONG): Gong {
-  const { width, height } = GONG;
-  const { x, z } = at;
-  const y = at.y ?? 0;
-  const rotY = at.rotY ?? 0;
+/** The gong, where the office has it, facing +z into the room. */
+export function buildGong(): Gong {
+  const { x, z, width, height } = GONG;
   const group = new THREE.Group();
-  group.position.set(x, y, z);
-  group.rotation.y = rotY;
+  group.position.set(x, 0, z);
   const lacquer = toon(LACQUER);
   const ink = toon(INK);
   const half = width / 2;
@@ -94,10 +90,8 @@ export function buildGong(at: { x: number; y?: number; z: number; rotY?: number 
   wave.visible = false;
   group.add(wave);
 
-  const [minX, maxX, minZ, maxZ] = rotY ? boxFootprint(x, z, width + 0.42, 0.6, rotY) : [x - half - 0.12, x + half + 0.3, z - 0.3, z + 0.3];
-  const colliders: Collider[] = [{ minX, maxX, minZ, maxZ, top: y + height + 0.1, ...(y ? { bottom: y } : {}) }];
-  const ahead = { x: Math.sin(rotY), z: Math.cos(rotY) };
-  const interactable: Interactable = { kind: 'gong', x: x + ahead.x * 1.3, ...(y ? { y } : {}), z: z + ahead.z * 1.3, radius: 1.5 };
+  const colliders: Collider[] = [{ minX: x - half - 0.12, maxX: x + half + 0.3, minZ: z - 0.3, maxZ: z + 0.3, top: height + 0.1 }];
+  const interactable: Interactable = { kind: 'gong', x, z: z + 1.3, radius: 1.5 };
   group.userData.interact = interactable;
 
   let swing = 0;
@@ -110,7 +104,7 @@ export function buildGong(at: { x: number; y?: number; z: number; rotY?: number 
     group,
     colliders,
     interactable,
-    top: new THREE.Vector3(x + ahead.x * 0.3, y + height + 0.4, z + ahead.z * 0.3),
+    top: new THREE.Vector3(x, height + 0.4, z + 0.3),
     strike(strength = 1) {
       // Hit from the front, it swings back towards the wall first.
       swing = Math.min(0.3, swing * 0.5 + 0.16 * strength);
@@ -156,5 +150,7 @@ declare module '../../world/types' {
 export const gong: Fixture<'gong'> = (site) => {
   const built = buildGong();
   site.wall('north', GONG.x, (GONG.height + 0.3) / 2, GONG.width + 1.2, GONG.height + 0.3);
+  // The office builder stands it wherever the floor wants it, and it rings from there.
+  site.get('furniture').adopt('gong', { group: built.group, collider: built.colliders[0], use: built.interactable, moved: (p) => p && Object.assign(GONG_AT, { x: p.x, z: p.z }) });
   return { group: built.group, colliders: built.colliders, interactables: [built.interactable], update: (_t, dt) => built.update(dt), handle: { gong: built } };
 };

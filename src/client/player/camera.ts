@@ -17,8 +17,6 @@ export interface Room {
   minZ: number;
   maxZ: number;
   wall: number;
-  enclosed: boolean;
-  vault?: { minX: number; maxX: number; minZ: number; maxZ: number; top: number };
 }
 
 /** What the camera follows you by: where you are and look, and the room you're in (see PlayerController). */
@@ -64,14 +62,9 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
   const rigged = !!p.rig && !p.riding;
   const under = p.pos.x > R.minX && p.pos.x < R.maxX && p.pos.z > R.minZ && p.pos.z < R.maxZ;
   // In the office's back office, between its walls, and out through where the north wall was into the room.
-  const back = !R.enclosed && p.pos.y > -SLAB - 0.5 && inWing(p.pos.x, p.pos.z, p.wing);
+  const back = p.pos.y > -SLAB - 0.5 && inWing(p.pos.x, p.pos.z, p.wing);
   const indoors = ((rigged || p.pos.y > -SLAB - 0.5) && under) || back;
-  // Down in a room under the floor (the castle's dungeon): the camera keeps inside that.
-  const V = R.vault;
-  if (V && p.pos.y < V.top - 0.5 && p.pos.x > V.minX && p.pos.x < V.maxX && p.pos.z > V.minZ && p.pos.z < V.maxZ) {
-    cam.x = THREE.MathUtils.clamp(cam.x, V.minX + m, V.maxX - m);
-    cam.z = THREE.MathUtils.clamp(cam.z, V.minZ + m, V.maxZ - m);
-  } else if (back) {
+  if (back) {
     cam.x = THREE.MathUtils.clamp(cam.x, WING.minX + m, WING.maxX - m);
     cam.z = THREE.MathUtils.clamp(cam.z, wingMinZ(p.wing) + m, FLOOR.maxZ - m);
   } else if (indoors) {
@@ -84,7 +77,7 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
   // Down on the street, stay under the garage ceiling so its edge never cuts across the view; in the
   // garage, on this side of its back and west walls too (the elevator comes down in the back one).
   const garage = p.street - STREET_Y - SLAB;
-  if (!R.enclosed && p.pos.y < garage - 1 && !rigged) {
+  if (p.pos.y < garage - 1 && !rigged) {
     cam.y = Math.min(cam.y, Math.max(floorY + 0.6, garage - 0.3));
     if (under) {
       cam.x = Math.max(cam.x, R.minX + m);
@@ -98,7 +91,7 @@ export function aimCamera(camera: THREE.PerspectiveCamera, p: Followed, bob: num
   const camIn = Math.min(cam.x - (R.minX - e), R.maxX + e - cam.x, cam.z - (R.minZ - e), R.maxZ + e - cam.z) > 0;
   // Outside, back the camera out through the wall you're standing beyond: above the garage always,
   // and down in it where it's walled in (the west and north sides).
-  if (!indoors && out[side] > 0 && camIn && (R.enclosed || cam.y > garage || side === 0 || side === 2)) {
+  if (!indoors && out[side] > 0 && camIn && (cam.y > garage || side === 0 || side === 2)) {
     if (side === 0) cam.x = R.minX - e;
     else if (side === 1) cam.x = R.maxX + e;
     else if (side === 2) cam.z = R.minZ - e;

@@ -7,9 +7,16 @@ import dogDachshundUrl from '../models/dog-dachshund.glb?url';
 import dogPugUrl from '../models/dog-pug.glb?url';
 import dogPupUrl from '../models/dog-pup.glb?url';
 import dogShibaUrl from '../models/dog-shiba.glb?url';
+import goatUrl from '../models/goat.glb?url';
+import greeneryUrl from '../models/greenery.glb?url';
 import kitchenUrl from '../models/kitchen.glb?url';
 import loungeUrl from '../models/lounge.glb?url';
+import playUrl from '../models/play.glb?url';
 import plantsUrl from '../models/plants.glb?url';
+import roomsUrl from '../models/rooms.glb?url';
+import studioUrl from '../models/studio.glb?url';
+import toppersUrl from '../models/toppers.glb?url';
+import whiskyUrl from '../models/whisky.glb?url';
 import { toon } from './toon';
 
 // The things in the world modelled in Blender rather than built in code. Each .glb is exported by a
@@ -22,10 +29,17 @@ const MODELS = {
   'dog-dachshund': { url: dogDachshundUrl, preload: false },
   'dog-pug': { url: dogPugUrl, preload: false },
   'dog-shiba': { url: dogShibaUrl, preload: false },
+  goat: { url: goatUrl, preload: false },
   desk_props: { url: deskPropsUrl, preload: true },
   kitchen: { url: kitchenUrl, preload: true },
   lounge: { url: loungeUrl, preload: true },
+  play: { url: playUrl, preload: true },
   plants: { url: plantsUrl, preload: true },
+  greenery: { url: greeneryUrl, preload: true },
+  rooms: { url: roomsUrl, preload: true },
+  studio: { url: studioUrl, preload: true },
+  toppers: { url: toppersUrl, preload: true },
+  whisky: { url: whiskyUrl, preload: true },
 } satisfies Record<string, { url: string; preload: boolean }>;
 
 export type ModelName = keyof typeof MODELS;
@@ -123,6 +137,8 @@ export function piece(name: ModelName, part: string, paint: (name: string) => TH
   const copy = loaded.get(name)?.scene.getObjectByName(part)?.clone();
   if (!copy) return new THREE.Group();
   paintModel(copy, paint, castShadow);
+  // Every copy shares the model's shapes: whoever takes a copy down mustn't let go of them (see disposePiece in world/office/furniture.ts).
+  copy.traverse((o) => (o.userData.shared = true));
   return copy;
 }
 

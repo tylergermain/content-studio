@@ -12,6 +12,7 @@ export const queueHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (!floor) return;
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Employees must hire an allowed specialist at a desk; automatic general-agent hiring is admin-only');
     if (msg.provider !== undefined && (!isAgentProvider(msg.provider) || !floor.project.agentProviders.includes(msg.provider))) {
       ctx.warn(c, 'Unknown agent provider');
       return;
@@ -27,20 +28,25 @@ export const queueHandlers = {
     });
   },
   'queue.remove'(ctx, c, msg) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'The general-agent task queue is admin-only; hire an allowed specialist at a desk');
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.queue.remove(str(msg.taskId, 32)));
   },
   'queue.move'(ctx, c, msg) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'The general-agent task queue is admin-only; hire an allowed specialist at a desk');
     ctx.floorOf(c)?.queue.move(str(msg.taskId, 32), num(msg.delta) < 0 ? -1 : 1);
   },
   'queue.retry'(ctx, c, msg) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'The general-agent task queue is admin-only; hire an allowed specialist at a desk');
     const floor = here(ctx, c);
     if (floor) ctx.warn(c, floor.queue.retry(str(msg.taskId, 32)));
   },
   'queue.clear'(ctx, c) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'The general-agent task queue is admin-only; hire an allowed specialist at a desk');
     ctx.floorOf(c)?.queue.clear();
   },
   'queue.limit'(ctx, c, msg) {
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'The general-agent task queue is admin-only; hire an allowed specialist at a desk');
     ctx.floorOf(c)?.queue.setLimit(num(msg.maxWorkers));
   },
 } satisfies HandlerMap<QueueClientMsg>;

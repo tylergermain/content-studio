@@ -98,7 +98,7 @@ export function installClimbing(ctx: Ctx, deps: ClimbingDeps) {
   /** E at the ladder: onto it, facing the wall. */
   function grabLadder() {
     if (ctx.trip() || climber.active) return;
-    if (!floorThere(1) && !floorThere(-1)) return toast('No other floors yet — add a project in the elevator', 'warn');
+    if (!floorThere(1) && !floorThere(-1)) return toast(store.me.admin ? 'No other floors yet — add a project in the elevator' : 'No other floors yet — an admin adds them in the elevator', 'warn');
     if (ctx.player.seat) deps.standUp();
     ctx.activities.stopAll('start');
     deps.stopWalking();
@@ -119,7 +119,7 @@ export function installClimbing(ctx: Ctx, deps: ClimbingDeps) {
   ctx.ticks.add('moved', () => {
     const player = ctx.player;
     // Walked into a pole's hole: you grab the pole on your way down it.
-    const hole = ctx.inOffice() && office.stack.polesGoDown() ? office.stack.poles().find((s) => Math.hypot(player.pos.x - s.x, player.pos.z - s.z) < POLE.hole - 0.15) : undefined;
+    const hole = office.stack.polesGoDown() ? office.stack.poles().find((s) => Math.hypot(player.pos.x - s.x, player.pos.z - s.z) < POLE.hole - 0.15) : undefined;
     if (hole && !climber.active && !ctx.trip() && !player.seat && player.enabled && player.pos.y > -1.35 && player.pos.y < 0.6) climber.slide(hole);
   });
 
