@@ -36,7 +36,7 @@ const WALLS: Record<Side, PanelRegion> = {
 test('the south wall is wood from the baseboard to the ceiling, less its windows and the balcony doors', () => {
   const regions = panelRegions('south', false);
   const holes = [...WINDOWS.filter((o) => o.wall === 'south'), BALCONY_DOOR];
-  assert.equal(holes.length, 5, "three low windows, the loft's, and the doors");
+  assert.equal(holes.length, 8, "three low windows, the upper ones over them, the loft's, and the doors");
   tidy(regions, WALLS.south, 'south');
   assert.equal(Math.min(...regions.map((r) => r.u0)), -18);
   assert.equal(Math.max(...regions.map((r) => r.u1)), 18);
@@ -61,8 +61,8 @@ test('no wood covers an opening, on any wall, plugged or not', () => {
       }
     }
   }
-  // The east wall has only the loft's window.
-  near(total(panelRegions('east', false)), area(WALLS.east) - 2.8 * 1.6, 'east');
+  // The east wall has the loft's window and three upper ones (shared/clerestory.ts).
+  near(total(panelRegions('east', false)), area(WALLS.east) - 2.8 * 1.6 - 3 * 3 * 1.4, 'east');
 });
 
 test('the north wall stops at the back office and leaves out the elevator', () => {
@@ -73,7 +73,7 @@ test('the north wall stops at the back office and leaves out the elevator', () =
   const shaft = { u0: ELEVATOR.x - ELEVATOR.width / 2, u1: ELEVATOR.x + ELEVATOR.width / 2, y0: 0, y1: WALL_HEIGHT };
   assert.deepEqual([shaft.u0, shaft.u1], [7.2, 9.8]);
   for (const r of regions) near(shared(r, shaft), 0, 'the shaft');
-  near(total(regions), area(WALLS.north) - 2.6 * (WALL_HEIGHT - PANEL_BASE), 'the wall less the shaft');
+  near(total(regions), area(WALLS.north) - 2.6 * (WALL_HEIGHT - PANEL_BASE) - 3 * 3 * 1.4, 'the wall less the shaft and the three upper windows');
   assert.deepEqual(panelRegions('north', true), regions, 'the same on every floor');
 });
 

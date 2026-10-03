@@ -4,7 +4,7 @@ import { mulberry32 } from '../../shared/rng';
 import type { NightParts } from './outside';
 import { tilingCanvasTexture } from './texture';
 import { mergeByMaterial, mesh, toon } from './toon';
-import { buildTower } from './tower';
+import { buildTower, storeysKey } from './tower';
 
 // The city around the rooftop bar: the building's own floors going down to the street (as the tower
 // looks from outside, world/tower.ts), a grid of streets with cars running along them, parks, and
@@ -573,12 +573,12 @@ export function buildCity(night: NightParts): City {
     group,
     setFloors(floors, wings = []) {
       floors = Math.max(1, floors);
-      if (floors === floorsNow && wings.join() === wingsNow) return;
+      if (floors === floorsNow && wings.join() + storeysKey() === wingsNow) return;
       floorsNow = floors;
-      wingsNow = wings.join();
+      wingsNow = wings.join() + storeysKey();
       const drop = roofDrop(floors);
       street.position.y = -drop;
-      building.set(floors, floors, wings);
+      building.set(floors, wings.length || floors, wings);
       // The buildings only change height up to six floors (see rise).
       const k = Math.min(1, drop / LAID_OUT);
       if (k !== riseNow) {

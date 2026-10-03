@@ -47,6 +47,8 @@ export interface FloorInfo {
   branch?: string;
   /** Which of FLOOR_PALETTES it's painted in. */
   palette: number;
+  /** Which of FLOOR_PALETTES the office builder painted it over its own (FloorPlan.look): its color on the building's outside too. */
+  look?: number;
   /** Being cloned: on the elevator panel, but nobody can go there yet. */
   cloning?: boolean;
   /** How the clone is getting on, once git says. */

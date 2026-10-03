@@ -1,7 +1,8 @@
 /**
- * Floors and the elevator: the building as tall as its floors, riding the elevator (up to the roof,
- * down to the garage), straight to another floor from the floor list, through the ceiling up the
- * ladder or down a pole; and arriving, up on the roof or on a floor, with the doors opening onto it.
+ * Floors and the elevator: the building's storeys as its floors have them, riding the elevator (up
+ * to the roof, down to the garage), straight to another floor from the floor list, through the
+ * ceiling up the ladder or down a pole; and arriving, up on the roof or on a floor, with the doors
+ * opening onto it.
  */
 import { inElevator, roofDrop, streetBelow } from '../../shared/layout';
 import { ROOF } from '../../shared/rooftop';
@@ -9,9 +10,10 @@ import type { Arrival, Grip } from '../features/climbing/controller';
 import { store } from '../state';
 import { $, clip, closeAllModals, modalOpen } from '../ui/dom';
 import { GARAGE, openElevator } from '../ui/elevator';
+import { setStoreys, storeysKey } from '../world/facade';
 import type { Ctx, TripKind } from './context';
 import type { CoreState } from './ctx';
-import { builtFloors, floorWings } from './floors';
+import { builtFloors, floorStoreys, floorWings } from './floors';
 import { aside, hintTitle, key, onE } from './hint';
 import type { Parts } from './parts';
 import { FAR } from './scene';
@@ -31,10 +33,12 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
   const { holiday } = parts.stage;
   const { placeInCar, downstairs, indoors, standingAt, unstick } = parts.place;
 
-  let wingsShown = '';
+  /** What the building's outside was last drawn with: how far each floor's back office goes, and each storey's look. */
+  let outsideShown = '';
   /**
-   * The ladder and the poles go where there are floors to go to from this one, and the building is as
-   * tall as there are floors, with the street as far down as this one is up.
+   * The ladder and the poles go where there are floors to go to from this one, the street is as far
+   * down as this one is up, and each floor's storey on the building's outside takes its name and its
+   * paint (the tower over them is as tall either way, see TOWER).
    */
   function syncStack() {
     const floors = builtFloors();
@@ -44,11 +48,13 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
     const down = index > 0 ? floors[index - 1]?.name : undefined;
     const count = index < 0 ? 1 : floors.length;
     const wings = floorWings(floors);
+    setStoreys(floorStoreys(floors));
     player.street = streetBelow(index);
     const s = office.stack.state;
     const same = s.index === Math.max(0, index) && s.count === count && s.up === up && s.down === down;
-    if (same && wings.join() === wingsShown) return;
-    wingsShown = wings.join();
+    const outside = wings.join() + storeysKey();
+    if (same && outside === outsideShown) return;
+    outsideShown = outside;
     if (!same) office.stack.set({ index: Math.max(0, index), count, up, down });
     office.setLevel(Math.max(0, index), count, wings);
   }

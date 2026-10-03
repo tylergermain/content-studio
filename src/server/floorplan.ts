@@ -28,6 +28,11 @@ export class FloorPlanStore {
     return this.plan.wing;
   }
 
+  /** The paint the office builder gave the floor over its own (one of FLOOR_PALETTES), if it did. */
+  get look(): number | undefined {
+    return this.plan.look;
+  }
+
   /** How the floor's arranged now, and the room it's in, for whoever gets round it (the dog): not copies, so not to be changed. */
   layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; room: FloorRoom; revision: number } {
     return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), room: roomOf(this.plan), revision: this.plan.layoutRevision ?? 0 };

@@ -3,6 +3,7 @@ import type { FloorPalette } from '../../../shared/floors';
 import { street } from '../outside';
 import { cars } from '../../features/cars/world';
 import { scenic } from '../scenic';
+import { forecourt } from '../forecourt';
 import { toon, toonUnique } from '../toon';
 import { elevator, garageLift } from '../elevator';
 import { gong } from '../../features/gong/world';
@@ -54,7 +55,7 @@ function floorPlan() {
     panelling,
     balcony,
     tee,
-    ...downstairs(cars, street, green, scenic),
+    ...downstairs(cars, street, green, scenic, forecourt),
     plug,
     tower,
     desks,

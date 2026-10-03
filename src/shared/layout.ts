@@ -2,6 +2,8 @@
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,
 // upstairs over a garage whose floor is level with the street (STREET_Y).
 
+import { CLERESTORY } from './clerestory.js';
+
 export const FLOOR = { minX: -18, maxX: 18, minZ: -13, maxZ: 13 } as const;
 /** How high the ceiling is: a meter over the loft's roof (LOFT.y + LOFT.height), all the way across the room. */
 export const WALL_HEIGHT = 6.8;
@@ -341,12 +343,13 @@ export interface Opening {
   y1: number;
 }
 
-/** Windows you can see out of, and the loft's two, which sit higher up. */
+/** Windows you can see out of, the loft's two, which sit higher up, and a row of upper windows round the room (CLERESTORY). */
 export const WINDOWS: Opening[] = [
   ...[-14, -9, 1].map((u) => ({ wall: 'south' as const, u, width: 3, y0: 1.1, y1: 3.3 })),
   ...[-9, -3, 3].map((u) => ({ wall: 'west' as const, u, width: 3, y0: 1.1, y1: 3.3 })),
   { wall: 'south', u: LOFT.minX + 2, width: 2.8, y0: LOFT.y + 0.9, y1: LOFT.y + 2.5 },
   { wall: 'east', u: (LOFT.minZ + LOFT.maxZ) / 2, width: 2.8, y0: LOFT.y + 0.9, y1: LOFT.y + 2.5 },
+  ...CLERESTORY,
 ];
 
 /**

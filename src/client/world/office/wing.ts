@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { DESKS, DESK_SIZE, FLOOR, SLAB, WALL_HEIGHT, WALL_T, WING, WING_DESKS, deskSeat, wingMinZ, wingRowZ } from '../../../shared/layout';
+import { FACADE } from '../facade';
 import type { NightParts } from '../outside';
 import { mesh, roundedBox, toon } from '../toon';
 import { wingWindows } from '../tower';
@@ -182,9 +183,9 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
         for (let k = 0; k < pos.count; k++) uv.setXY(k, (pos.getX(k) - FLOOR.minX) / (FLOOR.maxX - FLOOR.minX), (FLOOR.maxZ - pos.getZ(k)) / (FLOOR.maxZ - FLOOR.minZ));
         const floor = take(new THREE.Mesh(floorGeo, planks)) as THREE.Mesh;
         floor.receiveShadow = true;
-        // Its edges are the band between the floors outside, its underside concrete.
-        const band = toon('#e8a87c');
-        const concrete = toon('#d3d6dd');
+        // Its edges are the band between the floors outside, in the floor's trim; its underside concrete.
+        const band = looks.trim;
+        const concrete = toon(FACADE.concrete);
         const slab = new THREE.Mesh(box(w + 2 * T, SLAB - 0.01, d), [band, band, concrete, concrete, band, band]);
         slab.position.set(midX, -SLAB / 2 - 0.005, (back - T + FLOOR.minZ - T) / 2);
         slab.receiveShadow = true;
@@ -195,7 +196,7 @@ export function buildWing(group: THREE.Group, colliders: Collider[], interactabl
         for (let k = 0; k < cpos.count; k++) cuv.setXY(k, cpos.getX(k), cpos.getZ(k));
         take(new THREE.Mesh(ceilGeo, ceiling)).receiveShadow = false;
         // Its roof, flush with the tops of its walls, for when there's no floor over it.
-        take(mesh(box(w + 2 * T, 0.02, d + T), toon('#fffaf3'), midX, WALL_HEIGHT + 0.03, (back - T + FLOOR.minZ) / 2, false));
+        take(mesh(box(w + 2 * T, 0.02, d + T), concrete, midX, WALL_HEIGHT + 0.03, (back - T + FLOOR.minZ) / 2, false));
         mine.push({ minX: WING.minX - T, maxX: FLOOR.maxX + T, minZ: back - T, maxZ: FLOOR.minZ - T, bottom: -SLAB, top: 0 });
         mine.push({ minX: WING.minX, maxX: FLOOR.maxX, minZ: back, maxZ: FLOOR.minZ, bottom: WALL_HEIGHT, top: WALL_HEIGHT + SLAB });
       }

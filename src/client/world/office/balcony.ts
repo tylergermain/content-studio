@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { ASHTRAY, BALCONY, EXIT_STAIRS, SLAB, STREET_Y } from '../../../shared/layout';
 import { teeBays } from '../../../shared/tees';
+import { FACADE } from '../facade';
 import { bulb, type NightParts } from '../outside';
 import { mergeByMaterial, mesh, roundedBox, textPlane, toon } from '../toon';
 import type { Collider, Interactable } from '../types';
@@ -32,11 +33,12 @@ function stringLights(a: THREE.Vector3, b: THREE.Vector3, sag: number, bulbs: [s
 /**
  * The smoking balcony off the south wall, over the garage entrance: a deck with a glass railing on
  * its three open sides, string lights, a bench under the window, a bistro table, plants and the
- * ashtray, where you take a smoke break. It hands back what brings the bistro table and its stools
+ * ashtray, where you take a smoke break. The edges of its slab are `fascia` (the floor's trim, like
+ * the band between the floors outside). It hands back what brings the bistro table and its stools
  * out or puts them away: a floor with a second driving tee has that where they stand (see TEES in
  * shared/tees.ts).
  */
-export function buildBalcony(group: THREE.Group, colliders: Collider[], interactables: Interactable[], night: NightParts): (bistro: boolean) => void {
+export function buildBalcony(group: THREE.Group, colliders: Collider[], interactables: Interactable[], night: NightParts, fascia: THREE.Material): (bistro: boolean) => void {
   const { minX, maxX, minZ, maxZ } = BALCONY;
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -44,7 +46,12 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
   const cz = (minZ + maxZ) / 2;
   // Everything that doesn't move and isn't textured goes in here, merged at the end.
   const parts = new THREE.Group();
-  parts.add(mesh(box(w, SLAB - 0.01, d), toon(PALETTE.wallTrim), cx, -SLAB / 2 - 0.005, cz));
+  // Its slab: the edges in the floor's color, the underside concrete (a box's faces go +x, -x, +y, -y, +z, -z).
+  const concrete = toon(FACADE.concrete);
+  const slab = new THREE.Mesh(box(w, SLAB - 0.01, d), [fascia, fascia, concrete, concrete, fascia, fascia]);
+  slab.position.set(cx, -SLAB / 2 - 0.005, cz);
+  slab.castShadow = slab.receiveShadow = true;
+  group.add(slab);
   const deck = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshToonMaterial({ map: floorTexture(w, d), color: '#d6a574', gradientMap: (toon('#fff') as THREE.MeshToonMaterial).gradientMap }));
   deck.rotation.x = -Math.PI / 2;
   deck.position.set(cx, 0.002, cz);
@@ -188,7 +195,7 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
 
 /** The smoking balcony, out the glass doors on the south wall: its bistro table makes way for a floor's second tee. */
 export const balcony: Fixture = (site) => {
-  const setBistro = buildBalcony(site.group, site.colliders, site.interactables, site.get('night'));
+  const setBistro = buildBalcony(site.group, site.colliders, site.interactables, site.get('night'), site.looks.trim);
   site.get('room').on((room) => setBistro(teeBays(room.tees) < 2));
   return {};
 };

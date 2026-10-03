@@ -22,6 +22,8 @@ export const officeBuilderHandlers = {
       ctx.broadcast({ t: 'peer.update', peer: o.peer });
     }
     ctx.toFloor(floor, { t: 'plan', plan });
+    // Its paint is its storey's color on the building's outside, which everyone sees.
+    ctx.floorsChanged();
     ctx.toastFloor(floor, `📐 ${c.peer.name} rearranged the office`);
   },
 } satisfies HandlerMap<Extract<PlanClientMsg, { t: 'floor.layout' }>>;

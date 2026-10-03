@@ -404,6 +404,7 @@ export class Floor {
       dir: this.dir,
       branch: this.project.branch,
       palette: this.def.palette,
+      ...(this.plan.look !== undefined ? { look: this.plan.look } : {}),
       addedBy: this.def.addedBy,
       addedAt: this.def.addedAt,
       workers: ws.filter((w) => !DESK_BY_ID.get(w.deskId)?.station).length,

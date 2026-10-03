@@ -1,13 +1,14 @@
 /**
  * The building's floors as the office and its parts see them: which are built, how far each one's
- * back office goes, and which seats are there to sit at. Also the paint of the floor you're on, and
- * who's waiting on another floor.
+ * back office goes, what each one's storey looks like from outside, and which seats are there to sit
+ * at. Also the paint of the floor you're on, and who's waiting on another floor.
  */
 import { floorPalette } from '../../shared/floors';
 import { DESK_BY_ID, FLOOR, WING, deskBuilt, inWing } from '../../shared/layout';
 import type { FloorInfo } from '../../shared/protocol';
 import { store } from '../state';
 import { $, toast } from '../ui/dom';
+import type { StoreyLook } from '../world/facade';
 import type { Ctx } from './context';
 
 /** The floors of the building from the bottom up (not the ones still being cloned: nobody can go there yet). */
@@ -18,6 +19,15 @@ export function builtFloors(): FloorInfo[] {
 /** How far each floor's back office goes, for the building's outside (the one you're on as you see it). */
 export function floorWings(floors: FloorInfo[]): number[] {
   return floors.map((f) => (f.id === store.floor ? store.floorPlan.wing : (f.wing ?? 0)));
+}
+
+/**
+ * Each floor as the building's outside shows it, from the bottom up: its name, and the color of its
+ * paint's trim for its slab band and its sign. That's the paint the office builder gave it (its look),
+ * else its own; the one you're on as its plan has it.
+ */
+export function floorStoreys(floors: FloorInfo[]): StoreyLook[] {
+  return floors.map((f) => ({ name: f.name, accent: floorPalette((f.id === store.floor ? store.floorPlan.look : f.look) ?? f.palette).trim }));
 }
 
 /** Whether seat `id` is there to sit at on this floor: a back office desk only once the floor's built out that far. */
