@@ -1,0 +1,106 @@
+/* The Designer's board (board.ts): a bar with the view and the actions, the stage, the sheet a pick or a request
+   for variations opens under it, and the grid of thumbnails. It sits inside the chat window, so it takes the
+   surfaces that go on glass (--surface, --control, --wash), never a blur of its own. */
+.ws-board { display:flex; flex-direction:column; flex:1; min-width:0; min-height:0; height:100%; }
+.ws-board .btn.small { padding:5px 11px; font-size:13px; border-radius:var(--r-sm); }
+
+.board-bar { flex-shrink:0; display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:10px 16px; border-bottom:1px solid var(--hairline); }
+.board-view { display:flex; gap:2px; padding:2px; border-radius:var(--r-md); background:var(--wash); }
+.board-view .btn.small { border-color:transparent; background-color:transparent; box-shadow:none; color:var(--muted); }
+.board-view .btn.small.on { background-color:var(--control); background-image:none; border-color:var(--hairline); box-shadow:var(--shadow-1); color:var(--ink); }
+.board-count { font-size:12px; color:var(--muted); }
+.board-actions { margin-left:auto; display:flex; flex-wrap:wrap; gap:8px; }
+.board-readonly { flex-shrink:0; margin:0; padding:8px 16px; font-size:12px; line-height:1.45; color:var(--muted); border-bottom:1px solid var(--hairline); }
+
+/* The stage: one image as large as fits, two to four side by side, or each at YouTube's sizes. */
+.board-stage { flex:1 1 auto; min-height:160px; display:flex; flex-direction:column; overflow:auto; padding:14px 16px; background:var(--wash); }
+.board-stage > .board-empty { margin:auto; text-align:center; }
+.board-empty { margin:0; padding:16px 8px; color:var(--muted); font-size:13px; line-height:1.6; }
+.board-frame { position:relative; display:block; width:100%; min-height:0; padding:0; border:0; border-radius:var(--r-md); background:var(--surface); box-shadow:var(--shadow-1); overflow:hidden; }
+.board-frame img { position:absolute; inset:0; display:block; width:100%; height:100%; object-fit:contain; }
+.board-one { flex:1; min-height:0; margin:0; display:flex; flex-direction:column; gap:10px; }
+.board-one .board-frame { flex:1; min-height:180px; cursor:zoom-in; }
+.board-one .board-frame:focus-visible { outline:3px solid var(--accent-ring); outline-offset:2px; }
+/* Actual pixels, to check small type: the image keeps its own size and the frame scrolls. */
+.board-one .board-frame.actual { overflow:auto; cursor:zoom-out; }
+.board-one .board-frame.actual img { position:static; width:auto; height:auto; max-width:none; }
+.board-one figcaption { flex-shrink:0; display:flex; flex-direction:column; gap:3px; font-size:13px; min-width:0; }
+.board-caption-top { display:flex; align-items:center; flex-wrap:wrap; gap:6px; min-width:0; }
+.board-caption-top strong { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.board-meta { display:flex; align-items:center; flex-wrap:wrap; gap:2px 6px; font-size:12px; color:var(--muted); font-variant-numeric:tabular-nums; }
+.board-folder { font-size:11px; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+
+.board-compare { flex:1; min-height:0; display:grid; gap:12px; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; }
+.board-compare[data-n="3"] { grid-template-columns:repeat(3,minmax(0,1fr)); }
+.board-option { margin:0; min-width:0; min-height:0; display:flex; flex-direction:column; gap:6px; }
+.board-option .board-frame { aspect-ratio:16/9; }
+.board-option figcaption { display:flex; align-items:center; gap:6px; min-width:0; font-size:12px; }
+.board-option .board-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.board-letter { flex:none; display:inline-grid; place-items:center; width:20px; height:20px; margin-right:2px; border-radius:50%; background:var(--accent); color:var(--accent-ink); font-size:11px; font-weight:600; }
+.board-drop { flex:none; width:22px; height:22px; padding:0; border:0; border-radius:50%; background:var(--wash); color:var(--muted); font-size:10px; cursor:pointer; }
+.board-drop:hover { background:var(--wash-2); color:var(--ink); }
+
+/* At YouTube size. The two pages are YouTube's own white and near-black, the one place on the board that isn't
+   the office's glass: the point is to see a thumbnail where a viewer will. */
+.board-yt { display:flex; flex-direction:column; gap:16px; }
+.board-yt-note { margin:0; font-size:12px; line-height:1.5; color:var(--muted); }
+.yt-row h5 { display:flex; align-items:center; gap:6px; margin:0 0 8px; font-size:13px; font-weight:600; }
+.yt-pages { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,392px),1fr)); gap:10px; }
+.yt-page { display:flex; flex-wrap:wrap; align-items:flex-start; gap:16px; padding:16px; border-radius:var(--r-lg); box-shadow:var(--shadow-1); }
+.yt-page.light { background:#fff; --yt-line:rgba(0,0,0,.1); }
+.yt-page.dark { background:#0f0f0f; --yt-line:rgba(255,255,255,.16); }
+.yt-home { width:360px; max-width:100%; display:flex; flex-direction:column; gap:12px; }
+.yt-side { display:flex; gap:8px; width:100%; max-width:360px; }
+.yt-thumb { position:relative; flex:none; overflow:hidden; background:var(--yt-line); }
+.yt-thumb-home { width:360px; max-width:100%; aspect-ratio:360/202; border-radius:12px; }
+.yt-thumb-side { width:168px; height:94px; border-radius:8px; }
+.yt-thumb img { display:block; width:100%; height:100%; object-fit:cover; }
+.yt-time { position:absolute; right:6px; bottom:6px; padding:1px 4px; border-radius:4px; background:rgba(0,0,0,.8); color:#fff; font:500 12px/18px var(--font); }
+.yt-thumb-side .yt-time { right:4px; bottom:4px; font-size:11px; line-height:16px; }
+.yt-info { display:flex; gap:12px; }
+.yt-avatar { flex:none; width:36px; height:36px; border-radius:50%; background:var(--yt-line); }
+.yt-lines { flex:1; display:flex; flex-direction:column; gap:7px; padding-top:2px; }
+.yt-line { height:10px; border-radius:5px; background:var(--yt-line); }
+.yt-line.short { width:70%; }
+.yt-line.meta { width:45%; height:8px; margin-top:3px; }
+
+/* A pick to confirm, or what should change for variations. */
+.board-sheet { flex-shrink:0; display:flex; flex-direction:column; gap:8px; padding:12px 16px; border-top:1px solid var(--hairline); background:var(--surface); font-size:13px; line-height:1.5; }
+.board-sheet p { margin:0; }
+.ws-board .board-sheet label { margin:0; font-size:13px; font-weight:600; }
+.ws-board .board-sheet textarea { min-height:64px; max-height:160px; font-size:14px; }
+.board-sheet-actions { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.board-hint { font-size:11px; color:var(--muted); }
+.board-status { flex-shrink:0; margin:0; padding:0 16px; font-size:12px; line-height:1.5; color:var(--muted); }
+.board-status:not(:empty) { padding:8px 16px; border-top:1px solid var(--hairline); }
+.board-status.error { color:var(--bad-ink); }
+
+/* The grid: the worker's images first, then the floor's. */
+.board-grid { flex:0 1 auto; max-height:clamp(150px,30vh,300px); min-height:96px; overflow:auto; padding:4px 16px 14px; border-top:1px solid var(--hairline); }
+.board-section { margin:10px 0 8px; font-size:11px; font-weight:600; letter-spacing:.04em; text-transform:uppercase; color:var(--muted); }
+.board-tiles { display:grid; grid-template-columns:repeat(auto-fill,minmax(138px,1fr)); gap:10px; }
+.board-tile { position:relative; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.board-thumb { display:block; width:100%; aspect-ratio:16/9; padding:0; border:1px solid var(--hairline); border-radius:var(--r-sm); background:var(--wash); overflow:hidden; cursor:pointer; transition:border-color .15s var(--ease), box-shadow .15s var(--ease); }
+.board-thumb:hover { border-color:var(--hairline-2); }
+.board-thumb:focus-visible { outline:3px solid var(--accent-ring); outline-offset:1px; }
+.board-thumb img { display:block; width:100%; height:100%; object-fit:contain; }
+.board-tile.chosen .board-thumb { border-color:var(--accent); box-shadow:0 0 0 2px var(--accent-ring); }
+.board-check { position:absolute; top:6px; left:6px; width:22px; height:22px; padding:0; display:grid; place-items:center; border:1.5px solid rgba(255,255,255,.95); border-radius:50%; background:rgba(0,0,0,.28); color:var(--accent-ink); font-size:11px; font-weight:600; cursor:pointer; opacity:0; transition:opacity .15s var(--ease); }
+.board-tile:hover .board-check, .board-check:focus-visible, .board-check[aria-pressed=true] { opacity:1; }
+.board-check[aria-pressed=true] { background:var(--accent); border-color:var(--accent-ink); }
+.board-label { display:flex; flex-direction:column; min-width:0; font-size:12px; }
+.board-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.board-label .board-meta { font-size:11px; }
+.board-pills { display:flex; flex-wrap:wrap; gap:4px; }
+.board-pills:empty { display:none; }
+
+@media (hover:none) { .board-check { opacity:1; } }
+@media (max-width:900px) {
+  .board-bar, .board-sheet { padding-left:12px; padding-right:12px; }
+  .board-stage { padding:10px 12px; min-height:200px; }
+  .board-grid { padding:4px 12px 12px; max-height:none; flex-shrink:0; }
+  .ws-board { overflow:auto; }
+  .board-compare, .board-compare[data-n="3"] { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .board-tiles { grid-template-columns:repeat(auto-fill,minmax(112px,1fr)); }
+  .yt-page { padding:12px; }
+}

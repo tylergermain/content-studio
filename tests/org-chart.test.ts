@@ -6,7 +6,7 @@ import path from 'node:path';
 import http from 'node:http';
 import { allowedSpecialists, below, type OrgChart } from '../src/shared/org-chart.js';
 import { employeeHireError, readChart, saveChart, validateChart } from '../src/server/org-chart/policy.js';
-import { employeeWorkerError } from '../src/server/org-chart/access.js';
+import { employeeViewError, employeeWorkerError } from '../src/server/org-chart/access.js';
 import { orgChartRoute } from '../src/server/http/routes/org-chart.js';
 import { specialistRoute } from '../src/server/http/routes/specialists.js';
 import { officeWorkers } from '../src/server/hooks/office-workers.js';
@@ -49,6 +49,19 @@ test('employees cannot use another account’s agent as an unrestricted hiring p
  assert.match(employeeWorkerError(ctx as never,floor as never,'employee','worker')!,/own account/);
  assert.equal(employeeWorkerError(ctx as never,floor as never,'admin','worker'),undefined);
  floor.workers.ownerOf=()=> 'employee';assert.equal(employeeWorkerError(ctx as never,floor as never,'employee','worker'),undefined);
+});
+test('files a worker linked in a shared folder open for admins, its owner, and the employees above an unowned specialist',t=>{
+ const dir=fixture(t);let info:{specialist?:string;kind:string}={specialist:'video-editor',kind:'agent'};let owner:string|undefined='employee';
+ const ctx={accounts,meOf:(id:string|undefined)=>({admin:!id || id==='admin'})};
+ const floor={dir,workers:{get:()=>info,ownerOf:()=>owner}};
+ const view=(account:string|undefined)=>employeeViewError(ctx as never,floor as never,account,'worker');
+ assert.equal(view('admin'),undefined);assert.equal(view(undefined),undefined);
+ assert.equal(view('employee'),undefined);assert.match(view('peer')!,/admin or the employee/);
+ owner='peer';assert.match(view('employee')!,/admin or the employee/);
+ owner=undefined;info={specialist:'researcher',kind:'agent'};assert.equal(view('employee'),undefined);assert.match(view('peer')!,/not below/);
+ info={specialist:'designer',kind:'agent'};assert.match(view('employee')!,/not below/);
+ info={kind:'agent'};assert.match(view('employee')!,/admin or the employee/);
+ info={specialist:'researcher',kind:'agent'};fs.writeFileSync(path.join(dir,'.agent-office','org-chart.json'),'{invalid');assert.match(view('employee')!,/repair/);
 });
 test('HTTP org editing is admin-only, and employee hire menus contain only allowed roles',async t=>{
  const dir=fixture(t);let caller='employee';const floor={dir};const ctx={accounts,cfg:{trustProxy:false},floors:new Map([['floor',floor]]),meOf:()=>({admin:caller==='admin'})};

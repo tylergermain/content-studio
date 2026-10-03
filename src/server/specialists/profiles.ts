@@ -1,12 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { specialistId, type SpecialistProfile } from '../../shared/specialists.js';
+import { STARTER_WORKSPACES, isWorkspaceKind, workspaceOf, type WorkspaceKind } from '../../shared/workspace.js';
 
-const common = `The floor root is ../../ from this specialist folder. Resolve shared content and output paths relative to that floor root. Read the floor's README.md and AGENTS.md and follow its relevant profiles and playbooks. Keep work in the existing content project, with each YouTube video's files together under outputs/youtube/<slug>/. Do not publish or send messages without explicit authorization. Never commit credentials or local authentication. Never use em dashes or choppy slogans. This folder is your working context, not an enforced sandbox. Coordinate shared files with other workers.\n`;
+const common = `The floor root is ../../ from this specialist folder. Resolve shared content and output paths relative to that floor root. Read the floor's README.md and AGENTS.md and follow its relevant profiles and playbooks. Keep work in the existing content project, with each YouTube video's files together under outputs/youtube/<slug>/. Do not publish or send messages without explicit authorization. Never commit credentials or local authentication. Never use em dashes or choppy slogans. This folder is your working context, not an enforced sandbox. Coordinate shared files with other workers. Link each deliverable in your reply as a Markdown link to its full path, in angle brackets when the path has spaces, and save each new version as a new file (name-v02, name-v03) instead of overwriting one you already shared.\n`;
 export const starters: SpecialistProfile[] = [
-  { id:'video-editor',name:'Video Editor',instructions:common+'Edit footage non-destructively, preview the result, and report the output path. Use installed editing skills and tools when available. On the Mac Studio, production assets are in /Users/fridaylabs/Desktop/Content. Inspect the relevant project before using assets and never move or overwrite originals. Keep renders and project files in the relevant content project.\n',tools:[] },
-  { id:'researcher',name:'Researcher',instructions:common+'Research content ideas and claims using primary sources, record source links and dates, and distinguish verified facts from assumptions. Read the content archive strategist skill before proposing new ideas when available. Keep research notes in the relevant existing project.\n',tools:[] },
-  { id:'designer',name:'Designer',instructions:common+'Create thumbnails, graphics, and content layouts using the relevant brand and design skills. Read the voice, audience, and content pillar profiles. Preserve editable source files, preview your work, and keep exports in the relevant content project.\n',tools:[] },
+  { id:'video-editor',name:'Video Editor',instructions:common+'Edit footage non-destructively, preview the result, and report the output path. Use installed editing skills and tools when available. On the Mac Studio, production assets are in /Users/fridaylabs/Desktop/Content. Inspect the relevant project before using assets and never move or overwrite originals. Keep renders and project files in the relevant content project.\n',tools:[],workspace:STARTER_WORKSPACES['video-editor'] },
+  { id:'researcher',name:'Researcher',instructions:common+'Research content ideas and claims using primary sources, record source links and dates, and distinguish verified facts from assumptions. Read the content archive strategist skill before proposing new ideas when available. Keep research notes in the relevant existing project.\n',tools:[],workspace:STARTER_WORKSPACES.researcher },
+  { id:'designer',name:'Designer',instructions:common+'Create thumbnails, graphics, and content layouts using the relevant brand and design skills. Read the voice, audience, and content pillar profiles. Preserve editable source files, preview your work, and keep exports in the relevant content project.\n',tools:[],workspace:STARTER_WORKSPACES.designer },
 ];
 
 export function specialistFolder(root: string, id: string): string {
@@ -43,7 +44,7 @@ export function profiles(root: string): SpecialistProfile[] {
       const instructionsFile=path.join(folder,'AGENTS.md');
       if(!fs.existsSync(instructionsFile)) continue;
       if(fs.lstatSync(instructionsFile).isSymbolicLink()) throw new Error('Instructions must be a local file');
-      list.set(id,{id,name:String(data.name).slice(0,60),instructions:fs.readFileSync(instructionsFile,'utf8'),tools:toolNames(folder)});
+      list.set(id,{id,name:String(data.name).slice(0,60),instructions:fs.readFileSync(instructionsFile,'utf8'),tools:toolNames(folder),workspace:workspaceOf(id,data.workspace)});
     }
   }
   return [...list.values()];
@@ -51,6 +52,7 @@ export function profiles(root: string): SpecialistProfile[] {
 export function saveProfile(root: string, data: unknown): SpecialistProfile {
   const p=data as Partial<SpecialistProfile>;
   if(!p || !specialistId(p.id) || typeof p.name!=='string' || !p.name.trim() || p.name.length>60 || typeof p.instructions!=='string' || !p.instructions.trim() || p.instructions.length>30000) throw new Error('Enter an ID, a name up to 60 characters, and instructions up to 30,000 characters');
+  if(p.workspace!=null && !isWorkspaceKind(p.workspace)) throw new Error('Choose an interface for this specialist');
   const folder=specialistFolder(root,p.id);fs.mkdirSync(folder,{recursive:true});
   for(const name of ['AGENTS.md','CLAUDE.md','profile.json']) if(fs.existsSync(path.join(folder,name)) && fs.lstatSync(path.join(folder,name)).isSymbolicLink()) throw new Error('Profile files must be ordinary local files');
   const ignore=path.join(root,'.gitignore');
@@ -60,8 +62,35 @@ export function saveProfile(root: string, data: unknown): SpecialistProfile {
   if(!fs.existsSync(local)) fs.writeFileSync(local,'{"mcpServers":{}}\n',{mode:0o600});
   fs.writeFileSync(path.join(folder,'AGENTS.md'),p.instructions.trim()+'\n');
   if(!fs.existsSync(path.join(folder,'CLAUDE.md'))) fs.writeFileSync(path.join(folder,'CLAUDE.md'),'Read and follow AGENTS.md in this folder and the parent content workspace.\n');
-  fs.writeFileSync(path.join(folder,'profile.json'),JSON.stringify({id:p.id,name:p.name.trim()},null,2)+'\n');
-  return {id:p.id,name:p.name.trim(),instructions:p.instructions.trim(),tools:toolNames(folder)};
+  // A save that names no interface keeps the one the role has.
+  const workspace=p.workspace ?? declaredWorkspace(path.join(folder,'profile.json'));
+  fs.writeFileSync(path.join(folder,'profile.json'),JSON.stringify({id:p.id,name:p.name.trim(),...(workspace?{workspace}:{})},null,2)+'\n');
+  roles.delete(`${p.id}:${root}`);
+  return {id:p.id,name:p.name.trim(),instructions:p.instructions.trim(),tools:toolNames(folder),workspace:workspaceOf(p.id,workspace)};
+}
+/** The interface a profile.json names, when it is a local file that names a real one. */
+function declaredWorkspace(file: string): WorkspaceKind | undefined {
+  try {
+    if(!fs.existsSync(file) || fs.lstatSync(file).isSymbolicLink()) return undefined;
+    const kind=readSpecialistJson(file)?.workspace;
+    return isWorkspaceKind(kind)?kind:undefined;
+  } catch { return undefined; }
+}
+const roles=new Map<string,{at:number;kind:WorkspaceKind}>();
+/**
+ * The interface a role's workers open with, for the chat snapshot: what its profile.json declares, else
+ * its starter's, else Files. It reads only that role's profile, keeps the answer 10 seconds, and never
+ * throws: a broken role folder opens as Files (or its starter's kind).
+ */
+export function roleWorkspace(root: string, specialist: string | undefined): WorkspaceKind {
+  if(!specialist) return 'files';
+  const key=`${specialist}:${root}`, hit=roles.get(key);
+  if(hit && Date.now()-hit.at<10000) return hit.kind;
+  let kind=workspaceOf(specialist);
+  try { kind=workspaceOf(specialist,declaredWorkspace(path.join(specialistFolder(root,specialist),'profile.json'))); } catch { /* An invalid ID or a symlinked agents/ folder. */ }
+  if(roles.size>256) roles.clear();
+  roles.set(key,{at:Date.now(),kind});
+  return kind;
 }
 export function prepareSpecialist(root: string, id: string, provider?: string): SpecialistProfile {
   const p=profiles(root).find(p=>p.id===id);if(!p) throw new Error('No such specialist');
