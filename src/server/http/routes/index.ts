@@ -5,6 +5,7 @@ import { spotifyRoutes } from './spotify.js';
 import { orgChartRoute } from './org-chart.js';
 import { specialistRoute } from './specialists.js';
 import { workerChatRoutes } from './worker-chat.js';
+import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
 import { authRoutes } from './auth.js';
@@ -35,6 +36,7 @@ export const routes: readonly Route[] = [
   authRoutes.whoami,
   agentRoutes.models,
   workerChatRoutes.chat,
+  sharesRoute,
   specialistRoute,
   orgChartRoute,
   fileRoutes.image,

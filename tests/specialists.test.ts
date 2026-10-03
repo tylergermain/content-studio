@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync,readFileSync,writeFileSync,statSync,symlinkSync,rmSync,mkdirSync } from 'node:fs';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
-import {profiles,prepareSpecialist,saveProfile,specialistFolder} from '../src/server/specialists/profiles.js';
+import {profiles,prepareSpecialist,roleWorkspace,saveProfile,specialistFolder} from '../src/server/specialists/profiles.js';
 import {specialistLaunch} from '../src/server/specialists/launch.js';
 import {artifactPath,listArtifacts,publicArtifact} from '../src/server/worker-chat/artifacts.js';
 import type {WorkerInfo} from '../src/shared/protocol.js';
@@ -56,4 +56,52 @@ test('shared content previews cannot list or open private specialist tool config
  writeFileSync(path.join(dir,file),JSON.stringify({mcpServers:{research:{command:'node',env:{TOKEN:'private-token'}}}}));
  assert.equal(publicArtifact(file),false);assert.equal(await artifactPath(dir,file),undefined);
  assert.ok(!(await listArtifacts(dir)).some(a=>a.path===file));
+});
+
+test('a role keeps the interface an admin picks, and older profiles open with their starter one',t=>{
+ const dir=fixture(t);
+ const saved=saveProfile(dir,{id:'thumbnails',name:'Thumbnails',instructions:'Make thumbnails.',workspace:'board'});
+ assert.equal(saved.workspace,'board');
+ assert.deepEqual(JSON.parse(readFileSync(path.join(specialistFolder(dir,'thumbnails'),'profile.json'),'utf8')),{id:'thumbnails',name:'Thumbnails',workspace:'board'});
+ assert.equal(profiles(dir).find(p=>p.id==='thumbnails')?.workspace,'board');
+ assert.equal(roleWorkspace(dir,'thumbnails'),'board');
+ // A save that names no interface keeps the one the role has; a new pick shows at once.
+ saveProfile(dir,{id:'thumbnails',name:'Thumbnails',instructions:'Make better thumbnails.'});
+ assert.equal(profiles(dir).find(p=>p.id==='thumbnails')?.workspace,'board');
+ saveProfile(dir,{id:'thumbnails',name:'Thumbnails',instructions:'Make thumbnails.',workspace:'reader'});
+ assert.equal(roleWorkspace(dir,'thumbnails'),'reader');
+ assert.throws(()=>saveProfile(dir,{id:'thumbnails',name:'Thumbnails',instructions:'Make thumbnails.',workspace:'theater'}),/Choose an interface/);
+ assert.throws(()=>saveProfile(dir,{id:'thumbnails',name:'Thumbnails',instructions:'Make thumbnails.',workspace:['board']}),/Choose an interface/);
+ assert.equal(profiles(dir).find(p=>p.id==='thumbnails')?.workspace,'reader');
+ // The Content floor's Video Editor was saved as {id, name} before interfaces came in.
+ const editor=specialistFolder(dir,'video-editor');mkdirSync(editor,{recursive:true});
+ writeFileSync(path.join(editor,'profile.json'),JSON.stringify({id:'video-editor',name:'Video Editor'}));writeFileSync(path.join(editor,'AGENTS.md'),'Edit.');
+ assert.equal(profiles(dir).find(p=>p.id==='video-editor')?.workspace,'screening');
+ assert.equal(roleWorkspace(dir,'video-editor'),'screening');
+ // A custom role with no interface, or one hand-edited to something that isn't one, opens with Files.
+ const custom=specialistFolder(dir,'podcast');mkdirSync(custom,{recursive:true});
+ writeFileSync(path.join(custom,'profile.json'),JSON.stringify({id:'podcast',name:'Podcast',workspace:'stage'}));writeFileSync(path.join(custom,'AGENTS.md'),'Produce.');
+ assert.equal(profiles(dir).find(p=>p.id==='podcast')?.workspace,'files');
+ assert.equal(roleWorkspace(dir,'podcast'),'files');
+ assert.equal(roleWorkspace(dir,undefined),'files');
+ // Every starter carries its interface, and is told to link what it makes and keep each version.
+ for(const p of profiles(fixture(t))) {assert.ok(p.workspace,p.id);assert.match(p.instructions,/Markdown link to its full path/);assert.match(p.instructions,/new file \(name-v02/);}
+ assert.equal(prepareSpecialist(fixture(t),'designer','codex').workspace,'board');
+});
+
+test('the chat never fails over a broken role folder',t=>{
+ const dir=fixture(t);
+ assert.equal(roleWorkspace(dir,'../outside'),'files');
+ assert.equal(roleWorkspace(path.join(dir,'missing'),'video-editor'),'screening');
+ const broken=specialistFolder(dir,'designer');mkdirSync(broken,{recursive:true});writeFileSync(path.join(broken,'profile.json'),'{not json');
+ assert.equal(roleWorkspace(dir,'designer'),'board');
+ const folder=specialistFolder(dir,'reels');mkdirSync(path.join(folder,'profile.json'),{recursive:true});
+ assert.equal(roleWorkspace(dir,'reels'),'files');
+ const elsewhere=fixture(t);writeFileSync(path.join(elsewhere,'profile.json'),JSON.stringify({workspace:'board'}));
+ const linked=specialistFolder(dir,'linked');mkdirSync(linked,{recursive:true});symlinkSync(path.join(elsewhere,'profile.json'),path.join(linked,'profile.json'));
+ assert.equal(roleWorkspace(dir,'linked'),'files');
+ const symlinked=fixture(t),outside=fixture(t);symlinkSync(outside,path.join(symlinked,'agents'));
+ assert.equal(roleWorkspace(symlinked,'video-editor'),'screening');
+ const file=fixture(t);writeFileSync(path.join(file,'agents'),'not a folder');
+ assert.equal(roleWorkspace(file,'researcher'),'reader');
 });

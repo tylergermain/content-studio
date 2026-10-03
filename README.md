@@ -1,6 +1,6 @@
 # Content Studio
 
-Worker desks now open a conversation panel with content previews and optional GPT-Live 1 voice. Click **Talk live** to configure an OpenAI project API key privately on the Studio. Text chat works without an API key. See [Worker chat and live voice](docs/worker-chat.md).
+Worker desks now open a conversation panel with content previews and optional GPT-Live 1 voice. Files a worker links in its messages open in that panel, and an admin can share a folder outside the floor, such as the one a render was saved to, so the links into it open there too. Click **Talk live** to configure an OpenAI project API key privately on the Studio. Text chat works without an API key. See [Worker chat and live voice](docs/worker-chat.md).
 
 Content Studio offers only **Claude Code**, **Codex**, and **Pi (local)** for new workers, queue tasks, meetings, and the office default. Claude starts with `--dangerously-skip-permissions`; Codex starts with `--dangerously-bypass-approvals-and-sandbox` and trusts the office hooks. Pi uses its normal unrestricted tools with `--approve` for project trust. These defaults apply to fresh and resumed launches. Restart existing workers to apply them.
 
@@ -427,11 +427,13 @@ Footsteps and jump landings are muted by default. Enable them under Settings →
 Spotify Connect controls are available in the jukebox, with a private connection for each signed-in account. Configure a Spotify developer app and connect your account there; playback uses your chosen Spotify device and requires Premium. See [Spotify setup](docs/spotify.md).
 Live voice requires microphone permission. If the in-app browser leaves permission pending, open Content Studio in Chrome and allow microphone access there.
 
-Worker chat adapts to smaller windows with Updates and Content preview views, keeping the composer accessible without scrolling through the preview.
+Worker chat adapts to smaller windows with Updates and workspace views (the role's Screening room, Design board, Reports, or Files), keeping the composer accessible without scrolling through the workspace.
 
 ### Specialist agents
 
 Hire a Video Editor, Researcher, Designer, or custom specialist from an empty desk. Each role has its own `agents/<id>/AGENTS.md`, saved provider session, and optional native MCP configuration while sharing the floor's content. Admins can edit roles in **Manage specialists**. See [specialist setup and tool configuration](docs/specialists.md). This version uses local processes with shared access; role folders are not computer sandboxes.
+
+Each role opens with an interface of its own beside the conversation. The Video Editor's **Screening room** plays each render in a 2D player that streams 4K by byte range, lists its versions, and sends notes taken at timestamps back as one revision request; the Designer's **Design board** compares images side by side and at YouTube size; the Researcher's **Reports** list their sources. An approval only tells the worker the file is final, never to publish it. Admins choose a custom role's interface in **Manage specialists**. See [interfaces](docs/specialists.md#interfaces).
 
 ### Org chart and employee permissions
 
@@ -439,4 +441,4 @@ Admins can open **Org chart** to assign human member accounts to positions and p
 
 Look at an agent and press **Q** for an in-world live voice conversation. They turn to face you while you talk, and Q or Esc ends the conversation. See [worker chat](docs/worker-chat.md) for setup and controls.
 
-Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and content previews, with the raw Terminal available from that workspace.
+Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and its role's workspace, with the raw Terminal available from that window; the desk hint says which workspace E opens. A link in a worker's message opens the file in the workspace; a link into a folder outside the floor reads **Not shared with the office** until an admin clicks **Share … with this floor** under it, and **Stop sharing** at the foot of the workspace takes the folder back. See [content preview and links](docs/worker-chat.md#content-preview-and-links).

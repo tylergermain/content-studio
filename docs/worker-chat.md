@@ -1,10 +1,42 @@
 # Worker chat and live voice
 
-Open an agent worker to see its conversation, current activity, and recent workspace files. Send messages with the button or Command/Ctrl+Enter. They enter the same Codex, Claude Code, or local Pi session. Opening an offline worker does not restart it; sending a message resumes its session. Interrupt work sends the provider’s Escape key. The Terminal button opens the underlying CLI for login, menus, and advanced controls. Shell workers and terminal search results retain the terminal view.
+Open an agent worker to see its conversation, current activity, and its workspace: the files it links and makes, in an interface made for its role. Send messages with the button or Command/Ctrl+Enter. They enter the same Codex, Claude Code, or local Pi session. Opening an offline worker does not restart it; sending a message resumes its session. Interrupt work sends the provider’s Escape key. The Terminal button opens the underlying CLI for login, menus, and advanced controls. Shell workers and terminal search results retain the terminal view.
 
 The panel reads public user and assistant messages from the worker’s own session log. It omits private reasoning and tool arguments. Session logs are provider-specific and can change format, so an unreadable or not-yet-created log leaves the panel waiting while activity and submitted messages remain available. Context history is bounded to the most recent messages.
 
-The preview area lists recent supported files in the worker’s workspace, including images, video, audio, Markdown, text, PDF, and HTML. Video supports range requests. HTML is sandboxed with scripts and external network access disabled. Files outside the workspace, hidden configuration, authentication files, and escaping symlinks cannot be previewed. Directory scans are bounded. Relative Markdown images can use the same authenticated preview endpoint.
+## The workspace
+
+Beside the conversation is the worker's workspace, chosen by its role: the **Screening room** for the Video Editor, the **Design board** for the Designer, **Reports** for the Researcher, and **Files** for any other role and for general agents (see [interfaces](specialists.md#interfaces)). An admin can give a custom role any of them. Its tabs sort the files by kind: **Watch** (video and audio), **Board** (images), **Read** (Markdown, text, PDF, and HTML), and **Files** (everything). The role's own tab comes first, a tab shows when it has files, and until you pick one the window opens on the first tab holding a file the worker linked.
+
+Each list starts with **From** the worker: the files it linked, newest message first, then the files beside them in the same folders (earlier versions, chapters, notes). The newest linked file wears **Latest**. **On this floor** follows, from the folder scan. The office remembers the files a worker linked once it could open them, in `.agent-office/worker-chat/<id>.links.json` (mode 600, the newest 200), so earlier versions stay listed after their messages fall out of the part of the session log the chat reads.
+
+**Theater**, or F, hides the conversation so the workspace has the whole window. Keys act only while the workspace has focus (click it, or open the window at a desk with a role of its own): never while you type in a box, and never Esc, which always closes the window and puts you straight back in the office. Video and audio always play in the window's own 2D player, streamed in byte ranges; nothing is drawn onto a 3D screen.
+
+### Reviews
+
+Notes on a cut, **Approve this cut**, **Pick this one**, **Ask for variations**, and **Ask about this report** each send one message to the worker. The office writes it from what you chose, with each file's full path on the Mac so the agent finds it wherever it works. Notes go in time order at the times a player shows, and ask for a new version saved as a new file next to the old one, linked in the reply. An approval says the file is final, asks the worker to change nothing and not to publish, upload, or send it anywhere without your explicit go-ahead; the office itself never moves, renames, or tags a file. Notes you haven't sent stay in this browser for that worker and file.
+
+A review is sent the way a typed message is: it wakes an asleep worker, goes once however often the button is clicked, and stays in the conversation. The file then shows what was sent: **Approved**, **Picked**, **Notes sent · n**, or **Variations asked**. An approval also tells everyone on the floor. A review can name only files the window could open, one to four of them, with up to 50 notes of up to 1,000 characters. Only admins, and the worker's owner within their org-chart roles, may message a worker or send it reviews; anyone else who opens the window sees it read-only, and the composer says why.
+
+## Content preview and links
+
+The **Files** tab is the preview as it always was: a strip of every file, the worker's first, then the newest supported files in its folder: images, video, audio, Markdown, text, PDF, and HTML. A specialist's folder for this is the floor's project; any other agent's is its worktree. The folder scan is bounded (five levels deep, 3,000 entries, the newest 60), so a render saved deep in a project may only appear because a message links it. With nothing chosen, Files opens the newest linked video, else the newest linked picture, else a picture or the newest file from the folder.
+
+Links in the conversation stay in the office. A link to a file the office can serve opens it in the workspace, on its own tab (a render in Watch), and on narrow windows in the workspace's view; Command- or Ctrl-click opens a picture or a page in a browser tab of its own; a video or audio file plays only in the office, because every file served from a worker's folders is sandboxed and a sandboxed tab can't load its own video. This covers Markdown links and pictures, absolute or relative to the worker's folder, `<…>` links with spaces, `:12` line suffixes, and a path in backticks that names a supported file. Web and email links open in a new tab as before. Any other link becomes plain text marked **Not shared with the office**, so a click never takes the page to a path on the Mac. Only messages in the last 2 MB of the session log are read, so in a long session old messages fall out of the conversation; the files they linked stay in the workspace once remembered. `file://` links stay plain text, and paths written without a link or backticks are not matched.
+
+### Sharing a folder with the floor
+
+Workers often save outside the floor, as the Video Editor saves renders to `~/Desktop/Content OS/outputs`. When a message links a file in such a folder, an admin sees **Share … with this floor** under the message. The office suggests the `outputs` folder of the nearest git repository when the file is under it, else the repository, else the file's own folder. One click shares it, and the link opens on the next update. **Shared with this floor: … · Stop sharing** at the foot of the workspace lists each share for admins and takes it back. Members see **Not shared with the office** and are asked to have an admin share the folder; they never learn whether an unshared file exists.
+
+Only an admin can share a folder, and only from the office page: the hook server and the MCP tools have no way to add one. Shares are kept per floor in `.agent-office/shares.json` (mode 600, at most 8) and are checked again each time they are read. A shared folder must be an existing folder given by its absolute path, and is stored as its real path. It cannot be `/`, the home folder or a folder above it, the office's own data folder or anything inside or around it, a folder holding a floor's `.agent-office`, or a folder inside the floor, which is served already. No part of its path may be hidden or named `node_modules`, `vendor`, `credentials`, `secrets`, `auth`, or `tokens`.
+
+A share is never listed or browsed. The office serves a file in it only when the worker linked that file, or when it sits in a linked file's folder or below it; a file linked at the top of the share is served alone. Admins can open those files, and so can the worker's owner within their org-chart roles, and, for a worker hired on no account, the members the org chart lets hire its role. Anyone else sees the links as plain text, and the file request is refused.
+
+### What every preview still follows
+
+Every file, in the worker's folder or a share, passes the same checks: a supported type, its real path inside the folder, no hidden folder or file, no `node_modules`, `vendor`, credentials, secrets, authentication state, or `mcp.local.json`, and no symlink leading out. Video and audio stream in byte ranges with no size limit, so a 4K render plays and seeks without loading whole; other files are capped at 1 GiB, and text shows inline up to 2 MB. HTML and PDF open sandboxed, with scripts and network access disabled, so a review page's own buttons and relative videos do nothing; open the render it links instead. Relative Markdown pictures use the same authenticated preview endpoint, inside the same share when the Markdown file is in one.
+
+Agents run unsandboxed as the office's user, and folders are not computer sandboxes. Anyone who can prompt a worker can have it print any file, link any folder inside a share, or edit `shares.json` (which is checked again on every read, but can still name any folder the rules allow). The linked-folder rule narrows what viewers reach through the office; it is not a boundary against a prompted agent. The office's own boundary is the served folders and the exclusions above.
 
 ## GPT-Live 1
 
@@ -16,11 +48,11 @@ Microphone access requires HTTPS or localhost. The existing localhost SSH tunnel
 
 ## Verification limits
 
-Automated tests cover session parsing, private-content exclusion, workspace boundaries, key storage, same-origin checks, duplicate submissions, and the GPT-Live session request schema using a mocked API. A real microphone and GPT-Live project key are required to verify the end-to-end voice call. API access errors appear in the panel instead of silently selecting another model.
+Automated tests cover session parsing, private-content exclusion, workspace boundaries, key storage, same-origin checks, duplicate submissions, review prompts and their limits, and the GPT-Live session request schema using a mocked API. Whether a render plays depends on the browser's codecs: H.264 in MP4 or MOV plays everywhere, HEVC and 10-bit files depend on the computer, and ProRes never plays in Chrome. A real microphone and GPT-Live project key are required to verify the end-to-end voice call. API access errors appear in the panel instead of silently selecting another model.
 
 If voice stays at the microphone permission step, allow microphone access in the browser. After 20 seconds, an unresolved permission request shows a clear error and stops the connection attempt. If the in-app browser cannot show the permission prompt, open the same Content Studio URL in Chrome.
 
-On narrow windows, use Updates and Content preview to switch views. The conversation and preview scroll independently, and message and voice controls stay beneath the updates. Wider windows show both views side by side.
+On narrow windows, use Updates and the workspace's name (Screening room, Files, and so on) to switch views. The conversation and workspace scroll independently, and message and voice controls stay beneath the updates. Wider windows show both side by side, with Theater to give the workspace the whole window.
 
 ## Talking in the office
 

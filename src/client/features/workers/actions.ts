@@ -9,6 +9,7 @@ import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
 import type { AgentEffort, AgentProvider, WorkerInfo } from '../../../shared/protocol';
 import { isAsleep, isBusy } from '../../../shared/status';
+import { workspaceHint } from '../../../shared/workspace';
 import type { Ctx, Hint } from '../../core/context';
 import type { CoreState } from '../../core/ctx';
 import { seatBuilt } from '../../core/floors';
@@ -360,7 +361,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
         h('span.title', {}, `${sign ? `🪧 ${sign} · ` : ''}${w.name} · ${STATUS_LABEL[w.status]}`),
         doing ? aside(doing) : '',
         spent ? h('span.cost', { title: usageTitle(w.usage!, workerProvider) }, spent) : '',
-        key('E', 'Open terminal'),
+        key('E', shell ? 'Open terminal' : workspaceHint(w.specialist)),
         key('C', 'Changes'),
         isAsleep(w.status) ? key('R', shell ? 'Restart' : 'Resume') : key('P', shell ? 'Run command' : 'Prompt'),
         w.repos?.length ? reposKey(w) : w.pr ? key('O', `PR #${w.pr.number}`) : w.prOpening ? aside('⏳ Opening PR…') : prReady(w) ? key('O', 'Open PR') : '',
