@@ -88,6 +88,7 @@ function office() {
   const told: [string, unknown][] = [];
   const won: string[] = [];
   const court = new Court(() => now);
+  const hoop = { up: true };
   const deps: PigDeps = {
     where: (id) => where.get(id),
     findOwner: (floor, owner) => [...where.entries()].find(([id, w]) => w.floor === floor && id.startsWith(owner.slice(0, 1).toLowerCase()))?.[0],
@@ -99,6 +100,7 @@ function office() {
     toast: (_floor, text) => toasts.push(text),
     tell: (id, msg) => told.push([id, msg]),
     won: (w) => won.push(w.name),
+    hasHoop: () => hoop.up,
     later(ms, fn) {
       const t = { at: now + ms, fn, off: false };
       timers.push(t);
@@ -120,7 +122,7 @@ function office() {
     now = until;
   };
   const stand = (id: string, d: number, floor = 'f') => where.set(id, { floor, ...out(d), y: 0 });
-  return { games, court, where, sent, toasts, told, won, wait, stand, state: () => games.game('f') };
+  return { games, court, hoop, where, sent, toasts, told, won, wait, stand, state: () => games.game('f') };
 }
 
 const T: PigWho = { ...tyler, owner: 'Tyler' };
@@ -274,7 +276,12 @@ test('walking off the court, leaving the floor or dropping out forfeits after a 
   p.wait(AWAY_GRACE + 1500);
   assert.match(p.toasts.at(-1)!, /Tyler left the floor — Gavin wins/);
 
+  // A shot each first, so the win counts.
   const q = playing();
+  q.shoot('t1', 6, true);
+  q.wait(1000 + HAND_AFTER);
+  q.shoot('g1', 6, false);
+  q.wait(1000 + HAND_AFTER);
   q.where.delete('g1');
   q.wait(AWAY_GRACE + 1500);
   assert.match(q.toasts.at(-1)!, /Gavin dropped out — Tyler wins/);
@@ -294,11 +301,53 @@ test('dropping out and coming back on a new connection carries on the game as th
   assert.equal(o.shoot('t2', 7, true), null);
 });
 
-test('giving up is a forfeit, at once', () => {
+test('giving up is a forfeit, at once, but a win only goes on the table once each has had a shot', () => {
   const o = playing();
   o.games.quit('g1');
   assert.equal(o.state()!.winner, 0);
   assert.match(o.toasts.at(-1)!, /Gavin gave up — Tyler wins/);
+  assert.deepEqual(o.won, [], 'giving up straight away is no win to farm');
+  assert.ok(o.told.some(([id, m]) => id === 't1' && /No win on the table/.test((m as { text: string }).text)));
+  // Only Tyler has shot: still too soon.
+  const p = playing();
+  p.shoot('t1', 6, true);
+  p.wait(1000 + HAND_AFTER);
+  p.games.quit('g1');
+  assert.deepEqual(p.won, []);
+  // A shot each, and then giving up (or walking off) counts.
+  const q = playing();
+  q.shoot('t1', 6, true);
+  q.wait(1000 + HAND_AFTER);
+  q.shoot('g1', 6, false);
+  q.wait(1000 + HAND_AFTER);
+  q.games.quit('t1');
+  assert.deepEqual(q.won, ['Gavin']);
+});
+
+test('one person in two tabs (the same account, or name on the shared password) can’t play themselves', () => {
+  const o = office();
+  o.stand('t1', 4);
+  o.stand('t2', 5);
+  const again: PigWho = { ...T, id: 't2' };
+  assert.match(o.games.invite('f', T, again)!, /That's you, in another tab/);
+  assert.equal(o.told.length, 0, 'nobody was asked');
+  assert.match(o.games.invite('f', again, T)!, /another tab/);
+  assert.equal(o.state(), null);
+});
+
+test('the hoop coming down mid-game calls it off: no contest, no win, the ball anyone’s, and both players told', () => {
+  const o = playing();
+  o.shoot('t1', 6, true, 1.2);
+  o.hoop.up = false;
+  o.wait(1000);
+  assert.equal(o.state(), null, 'off the board');
+  assert.equal(o.sent.at(-1)!.pig, null);
+  assert.equal(o.court.state().for, undefined, 'the ball is no longer kept for anyone');
+  assert.deepEqual(o.won, []);
+  for (const id of ['t1', 'g1']) assert.ok(o.told.some(([to, m]) => to === id && /hoop came down/.test((m as { text: string }).text)), id);
+  // The shot that was in the air doesn't land on a game that's gone.
+  o.wait(5000);
+  assert.equal(o.state(), null);
 });
 
 test("the court: a ball held for someone is theirs alone to pick up, and handed to them wherever it was", () => {

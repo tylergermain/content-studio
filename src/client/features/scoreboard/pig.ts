@@ -65,7 +65,8 @@ function tagTexture(letters: number, up: boolean): THREE.CanvasTexture {
 export class PigMarks {
   readonly group = new THREE.Group();
   private ring = new THREE.Group();
-  private tags = new Map<string, { sprite: THREE.Sprite; key: string }>();
+  /** Each player's tag, by their id: `key` is what it shows (letters, and whether it's their shot), `seen` whether they were this frame. */
+  private tags = new Map<string, { sprite: THREE.Sprite; key: number; seen: boolean }>();
   private tmp = new THREE.Vector3();
 
   constructor() {
@@ -93,27 +94,34 @@ export class PigMarks {
       this.ring.position.set(spot.x, 0, spot.z);
       const pulse = 0.5 + 0.5 * Math.sin(t * 4);
       this.ring.scale.setScalar(1 + pulse * 0.05);
-      for (const m of this.ring.children as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[]) m.material.opacity = (m.userData.base ??= m.material.opacity) * (0.65 + 0.35 * pulse);
+      const parts = this.ring.children as THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>[];
+      for (let k = 0; k < parts.length; k++) parts[k].material.opacity = (parts[k].userData.base ??= parts[k].material.opacity) * (0.65 + 0.35 * pulse);
     }
-    const on = new Set<string>();
-    pig?.players.forEach((p, i) => {
-      const at = feetOf(p.id, this.tmp);
-      if (!at) return;
-      on.add(p.id);
-      const up = pig.winner === null && pig.turn === i;
-      const key = `${p.letters}|${up}`;
-      let tag = this.tags.get(p.id);
-      if (!tag || tag.key !== key) {
-        if (tag) this.drop(p.id);
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTexture(p.letters, up), depthWrite: false, transparent: true }));
-        sprite.scale.set(0.62, 0.2, 1);
-        sprite.renderOrder = 10;
-        this.group.add(sprite);
-        this.tags.set(p.id, (tag = { sprite, key }));
+    // No game on (most of the time): nothing to do, once the last tags are down.
+    if (!pig && !this.tags.size) return;
+    for (const tag of this.tags.values()) tag.seen = false;
+    if (pig) {
+      for (let i = 0; i < pig.players.length; i++) {
+        const p = pig.players[i];
+        const at = feetOf(p.id, this.tmp);
+        if (!at) continue;
+        const up = pig.winner === null && pig.turn === i;
+        const key = p.letters * 2 + (up ? 1 : 0);
+        let tag = this.tags.get(p.id);
+        if (!tag || tag.key !== key) {
+          if (tag) this.drop(p.id);
+          const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tagTexture(p.letters, up), depthWrite: false, transparent: true }));
+          sprite.scale.set(0.62, 0.2, 1);
+          sprite.renderOrder = 10;
+          this.group.add(sprite);
+          this.tags.set(p.id, (tag = { sprite, key, seen: true }));
+        }
+        tag.seen = true;
+        tag.sprite.position.set(at.x, at.y + TAG_Y + (up ? Math.sin(t * 5) * 0.03 : 0), at.z);
       }
-      tag.sprite.position.set(at.x, at.y + TAG_Y + (up ? Math.sin(t * 5) * 0.03 : 0), at.z);
-    });
-    for (const id of [...this.tags.keys()]) if (!on.has(id)) this.drop(id);
+    }
+    // A Map can lose entries while it's walked: those not yet reached are skipped.
+    for (const [id, tag] of this.tags) if (!tag.seen) this.drop(id);
   }
 
   private drop(id: string) {

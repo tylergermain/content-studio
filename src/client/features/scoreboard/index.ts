@@ -52,28 +52,60 @@ export function installScoreboard(ctx: Ctx, deps: ScoreboardDeps) {
   const atCourt = (p: { x: number; y: number; z: number }) => Math.abs(p.y) < 1.5 && rimDistance(p) <= COURT_REACH;
   const youAtCourt = () => !office.hoop.away && !ctx.upTop() && atCourt(ctx.player.pos);
 
-  /** The others at the court to play PIG with, nearest you first (someone who's asked you, first of all). */
+  /** Whether `id` (someone else) is at the court with you to play PIG; how near you, if so (-1: they've asked you). */
+  function partnerAt(id: string, p: { lite?: boolean; floor?: string; x: number; y: number; z: number }, now: number): number | null {
+    if (id === store.you || p.lite || p.floor !== store.floor || !atCourt(p)) return null;
+    if ((invites.get(id)?.until ?? 0) > now) return -1;
+    return Math.hypot(p.x - ctx.player.pos.x, p.z - ctx.player.pos.z);
+  }
+
+  /** The others at the court to play PIG with, nearest you first (someone who's asked you, first of all): for the window. */
   function partners(): Partner[] {
     if (!youAtCourt()) return [];
-    const me = ctx.player.pos;
+    const now = performance.now();
     const out: (Partner & { d: number })[] = [];
     for (const [id, p] of store.peers) {
-      if (id === store.you || p.lite || p.floor !== store.floor || !atCourt(p)) continue;
-      const asked = (invites.get(id)?.until ?? 0) > performance.now();
-      out.push({ id, name: p.name, asked, d: asked ? -1 : Math.hypot(p.x - me.x, p.z - me.z) });
+      const d = partnerAt(id, p, now);
+      if (d !== null) out.push({ id, name: p.name, asked: d < 0, d });
     }
     return out.sort((a, b) => a.d - b.d).map(({ d: _, ...p }) => p);
   }
 
   /** Whether you're in the game of PIG on the floor (and it's not over). */
   const playing = () => !!store.pig && store.pig.winner === null && store.pig.players.some((p) => p.id === store.you);
-  /** The one P asks (or says yes to), and the hint's key for it; null when there's nobody, or a game is on. */
+  /** The last pigKey, kept while it's still the same one (the hint asks every frame). */
+  let lastKey: { partner: Partner; hint: Hint } | null = null;
+  /**
+   * The one P asks (or says yes to), and the hint's key for it; null when there's nobody, or a game is
+   * on. The hint bar asks every frame, so it looks for the nearest in one pass, and makes the hint anew
+   * only when that's someone else (or they've asked you since).
+   */
   function pigKey(): { partner: Partner; hint: Hint } | null {
-    if (store.pig && store.pig.winner === null) return null;
-    const partner = partners()[0];
-    if (!partner) return null;
-    const name = clip(partner.name, 14);
-    return { partner, hint: { k: `pig|${partner.id}|${partner.asked}`, parts: [key('P', `Play PIG with ${name}`), partner.asked ? aside(`${name} asked you`) : ''] } };
+    if ((store.pig && store.pig.winner === null) || !youAtCourt()) return null;
+    const now = performance.now();
+    let best: string | undefined;
+    let nearest = Infinity;
+    for (const [id, p] of store.peers) {
+      const d = partnerAt(id, p, now);
+      if (d !== null && d < nearest) {
+        best = id;
+        nearest = d;
+      }
+    }
+    const peer = best === undefined ? undefined : store.peers.get(best);
+    if (!best || !peer) return null;
+    const asked = nearest < 0;
+    const was = lastKey?.partner;
+    if (was && was.id === best && was.asked === asked && was.name === peer.name) return lastKey;
+    const name = clip(peer.name, 14);
+    lastKey = { partner: { id: best, name: peer.name, asked }, hint: { k: `pig|${best}|${asked}`, parts: [key('P', `Play PIG with ${name}`), asked ? aside(`${name} asked you`) : ''] } };
+    return lastKey;
+  }
+
+  /** Takes down `from`'s invite (its toast too): answered, one way or the other. */
+  function dropInvite(from: string) {
+    invites.get(from)?.done();
+    if (invites.delete(from)) refresh();
   }
 
   function invite(id: string) {
@@ -91,24 +123,37 @@ export function installScoreboard(ctx: Ctx, deps: ScoreboardDeps) {
     if (!(there || (asked && youAtCourt()))) return false;
     const k = pigKey();
     if (!k) return false;
-    if (!e.repeat) invite(k.partner.id);
+    if (!e.repeat) {
+      invite(k.partner.id);
+      // Asking someone who asked you is your answer to them: their invite's done with either way.
+      if (k.partner.asked) dropInvite(k.partner.id);
+    }
     e.preventDefault();
     return true;
   });
 
+  /** The ball hint's few lines about your game, each made once (the hint bar asks every frame). */
+  const gameHints = new Map<string, Hint>();
+  const gameHint = (k: string, text: string): Hint => {
+    let hint = gameHints.get(k);
+    if (!hint) gameHints.set(k, (hint = { k, parts: [aside(text)] }));
+    return hint;
+  };
   // With the ball in your hands: asking someone to play, or how your game's going.
   deps.hoops.addBallHint(() => {
     const pig = store.pig;
     if (pig && playing()) {
       const mine = pig.players[pig.turn]?.id === store.you;
-      if (!mine) return { k: 'pig|wait', parts: [aside('🐷 not your shot')] };
-      if (!pig.spot || pig.turn === pig.leader) return { k: 'pig|lead', parts: [aside('🐷 your shot: from anywhere')] };
+      if (!mine) return gameHint('pig|wait', '🐷 not your shot');
+      if (!pig.spot || pig.turn === pig.leader) return gameHint('pig|lead', '🐷 your shot: from anywhere');
       const off = Math.hypot(ctx.player.pos.x - pig.spot.x, ctx.player.pos.z - pig.spot.z);
-      return { k: `pig|match|${off <= MATCH_R}`, parts: [aside(off <= MATCH_R ? '🐷 in the ring: sink it!' : '🐷 match it from the ring')] };
+      return off <= MATCH_R ? gameHint('pig|match|in', '🐷 in the ring: sink it!') : gameHint('pig|match|out', '🐷 match it from the ring');
     }
     return pigKey()?.hint ?? null;
   });
 
+  /** The board's hint, kept while it says the same (the hint bar asks every frame). */
+  let boardHint: Hint | null = null;
   ctx.interactions.define('scoreboard', {
     // It's read from across the court.
     reach: 9,
@@ -117,7 +162,9 @@ export function installScoreboard(ctx: Ctx, deps: ScoreboardDeps) {
       const best = store.hoopBoard.shots[0];
       const what = pig ? scoreLine(pig) : best ? `record ${metres(best.dist)}, ${clip(best.name, 14)}` : 'no makes yet';
       const k = pigKey();
-      return { k: `${what}|${k?.hint.k ?? ''}`, parts: [hintTitle('🏀 Longest shots'), aside(what), key('E', 'See all'), ...(k ? k.hint.parts : [])] };
+      const hk = `${what}|${k?.hint.k ?? ''}`;
+      if (boardHint?.k !== hk) boardHint = { k: hk, parts: [hintTitle('🏀 Longest shots'), aside(what), key('E', 'See all'), ...(k ? k.hint.parts : [])] };
+      return boardHint;
     },
     use: onE(() => openWindow()),
   });
@@ -140,7 +187,11 @@ export function installScoreboard(ctx: Ctx, deps: ScoreboardDeps) {
   ctx.messages.on('pig.invited', (m) => {
     invites.get(m.from)?.done();
     const ms = Math.max(5000, Math.min(30_000, m.until - Date.now()));
-    const done = inviteToast(m.name, ms, (yes) => ctx.net.send({ t: 'pig.answer', from: m.from, yes }));
+    const done = inviteToast(m.name, ms, (yes) => {
+      ctx.net.send({ t: 'pig.answer', from: m.from, yes });
+      // Answered: no more "they asked you", and P asks them afresh rather than saying yes.
+      dropInvite(m.from);
+    });
     invites.set(m.from, { name: m.name, until: performance.now() + ms, done });
     refresh();
   });

@@ -2,6 +2,7 @@ import { LongShots } from './longshots.js';
 import { PigGames } from './pig.js';
 import { ballChanged } from './ws/handlers/ball.js';
 import { ownerOf } from './ws/handlers/hoop.js';
+import { hasHoop } from './shot-judge.js';
 import type { Ctx } from './office/context.js';
 
 /**
@@ -42,6 +43,10 @@ export function hoopServices(ctx: Ctx, dataDir: string): { longShots: LongShots;
     won(winner) {
       longShots.win(winner);
       ctx.broadcast({ t: 'hoop.board', board: longShots.board() });
+    },
+    hasHoop(floor) {
+      const f = ctx.floors.get(floor);
+      return !!f && hasHoop(f.plan.layoutNow().furniture);
     },
     later(ms, fn) {
       const t = setTimeout(fn, ms);

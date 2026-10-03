@@ -4,7 +4,10 @@ import { FARTHEST, SHOTS_KEPT, WINS_KEPT, rankShot, tallyWin, type HoopBoard, ty
 
 const COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
-/** How often one person's longest make can change the table, at most (ms): no real make follows another this fast. */
+/**
+ * How often the building hears about one person's makes, at most (ms): a better one sooner than that
+ * goes on the table at once, and is told about when the time's up.
+ */
 export const RECORD_EVERY = 3000;
 
 /** Who made it, as the office knows them: their account (or their name, on the shared password), and how they show. */
@@ -25,17 +28,20 @@ export interface Recorded {
  * The longest shots sunk at the hoop, one a person, and the games of PIG each person has won: one
  * table for the whole building, saved in the office's .agent-office/hoop.json beside arcade.json, so
  * it's still there after a restart. What goes on it is the office's own word (see shot-judge.ts):
- * this only keeps it, and keeps anyone from changing it too often.
+ * this only keeps it, and keeps anyone's makes from being announced too often.
  */
 export class LongShots {
   private shots: Owned<LongShot>[] = [];
   private wins: Owned<PigTally>[] = [];
+  /** When each person's make was last announced, and the one waiting for its turn (see announce). */
   private last = new Map<string, number>();
+  private waiting = new Map<string, { tell: () => void }>();
   private file: string;
 
   constructor(
     dataDir: string,
     private now = () => Date.now(),
+    private later = (ms: number, fn: () => void) => void setTimeout(fn, ms).unref(),
   ) {
     this.file = path.join(dataDir, 'hoop.json');
     this.load();
@@ -46,28 +52,48 @@ export class LongShots {
     return { shots: this.shots.map(({ owner: _, ...s }) => s), wins: this.wins.map(({ owner: _, ...w }) => w) };
   }
 
-  /** `who` sank one from `dist` meters out. Counts if it's their longest yet and long enough for the table. */
+  /** `who` sank one from `dist` meters out. Goes on the table at once if it's their longest yet and long enough for it. */
   record(who: Shooter, dist: number): Recorded {
     if (!Number.isFinite(dist) || dist <= 0 || dist > FARTHEST) return { rank: 0, first: false };
     const shot: Owned<LongShot> = { owner: who.owner, name: who.name.slice(0, 24), color: COLOR_RE.test(who.color) ? who.color : '#09ca59', dist: Math.round(dist * 10) / 10, at: this.now() };
     const { table, rank } = rankShot(this.shots, shot);
-    if (!rank || this.tooSoon(who.owner)) return { rank: 0, first: false };
+    if (!rank) return { rank: 0, first: false };
     this.shots = table;
     this.save();
     return { rank, first: rank === 1 };
+  }
+
+  /** Where `owner`'s row is on the table now (1 is the top), and how far out it was; undefined when they're not on it. */
+  rowOf(owner: string): { rank: number; dist: number } | undefined {
+    const i = this.shots.findIndex((s) => s.owner === owner);
+    return i < 0 ? undefined : { rank: i + 1, dist: this.shots[i].dist };
+  }
+
+  /**
+   * Tells the building about a make of `owner`'s (`tell`), at most once every RECORD_EVERY a person:
+   * one sooner than that waits until the time's up, and a better one of theirs meanwhile goes instead.
+   */
+  announce(owner: string, tell: () => void) {
+    const waiting = this.waiting.get(owner);
+    if (waiting) return void (waiting.tell = tell);
+    const wait = (this.last.get(owner) ?? -Infinity) + RECORD_EVERY - this.now();
+    if (wait <= 0) {
+      this.last.set(owner, this.now());
+      return tell();
+    }
+    const next = { tell };
+    this.waiting.set(owner, next);
+    this.later(wait, () => {
+      this.waiting.delete(owner);
+      this.last.set(owner, this.now());
+      next.tell();
+    });
   }
 
   /** `who` won a game of PIG. */
   win(who: Shooter) {
     this.wins = tallyWin(this.wins, { owner: who.owner, name: who.name.slice(0, 24), color: COLOR_RE.test(who.color) ? who.color : '#09ca59' });
     this.save();
-  }
-
-  private tooSoon(owner: string): boolean {
-    const now = this.now();
-    if (now - (this.last.get(owner) ?? -Infinity) < RECORD_EVERY) return true;
-    this.last.set(owner, now);
-    return false;
   }
 
   private load() {

@@ -10,7 +10,8 @@ import type { ServerMsg } from '../src/shared/protocol.js';
 import { Court } from '../src/server/court.js';
 import { hoopServices } from '../src/server/hoop.js';
 import { ballHandlers } from '../src/server/ws/handlers/ball.js';
-import { hoopHandlers, hoopView } from '../src/server/ws/handlers/hoop.js';
+import { FLY_EVERY, hoopHandlers, hoopView, recordMake } from '../src/server/ws/handlers/hoop.js';
+import { flyShot, floorSolids } from '../src/server/shot-judge.js';
 import type { Ctx } from '../src/server/office/context.js';
 import type { Client } from '../src/server/office/client.js';
 import type { Floor } from '../src/server/floor.js';
@@ -25,7 +26,9 @@ const folder = (t: TestContext) => {
 };
 
 function office(t: TestContext, furniture = DEFAULT_FURNITURE) {
-  const floor = { id: 'f', court: new Court(), plan: { layoutNow: () => ({ furniture, room: roomOf(undefined) }), wing: 0 } } as unknown as Floor;
+  /** The floor's furniture now: the office builder can take the hoop down. */
+  const layout = { furniture };
+  const floor = { id: 'f', court: new Court(), plan: { layoutNow: () => ({ furniture: layout.furniture, room: roomOf(undefined) }), wing: 0 } } as unknown as Floor;
   const out: { to: string; msg: ServerMsg }[] = [];
   const clients = new Map<string, Client>();
   const ctx = {
@@ -40,13 +43,13 @@ function office(t: TestContext, furniture = DEFAULT_FURNITURE) {
   } as unknown as Ctx;
   Object.assign(ctx, hoopServices(ctx, folder(t)));
   t.after(() => ctx.pig.dispose());
-  /** Someone on the floor, standing `d` m straight out from the rim. */
-  const person = (id: string, name: string, d: number) => {
-    const c = { id, accountId: undefined, throttles: new Map<string, number>(), peer: { id, name, color: '#ef476f', floor: 'f', x: HOOP.rim.x + d, y: 0, z: HOOP.z } } as unknown as Client;
+  /** Someone on the floor, standing `d` m straight out from the rim (on the shared password, unless `accountId`). */
+  const person = (id: string, name: string, d: number, accountId?: string) => {
+    const c = { id, accountId, throttles: new Map<string, number>(), peer: { id, name, color: '#ef476f', floor: 'f', x: HOOP.rim.x + d, y: 0, z: HOOP.z } } as unknown as Client;
     clients.set(id, c);
     return c;
   };
-  return { ctx, floor, out, person };
+  return { ctx, floor, layout, out, person };
 }
 
 /** The throw someone standing `d` m out makes, letting go at `power` (from 0.3 m in front of them, at their eyes). */
@@ -82,10 +85,16 @@ test("a miss, a throw from somewhere they aren't standing, or a floor without th
   const bo = person('b1', 'Bo', 5);
   ballHandlers['ball.take'](ctx, bo, { t: 'ball.take' });
   ballHandlers['ball.throw'](ctx, bo, throwFrom(5, 1));
-  await settle(400);
-  // Claims a throw from 12 m out while standing at 5.
+  // Well after the last, so it's flown (not turned away by the rate limit): it's where Bo stands that rules it out.
+  await settle(FLY_EVERY + 300);
+  // Claims a throw from 12 m out while standing at 5: one that drops in from there.
+  const far = throwFrom(12);
+  assert.ok(flyShot(far, floorSolids({ furniture: DEFAULT_FURNITURE, room: roomOf(undefined) })).made, 'a make from 12 m');
+  const flownFrom = Date.now();
   ballHandlers['ball.take'](ctx, bo, { t: 'ball.take' });
-  ballHandlers['ball.throw'](ctx, bo, throwFrom(12));
+  ballHandlers['ball.throw'](ctx, bo, far);
+  assert.equal(ctx.floors.get('f')!.court.state().shot?.by, 'b1', 'the court took it');
+  assert.ok(bo.throttles.get('hoop.fly')! >= flownFrom, 'the office flew it');
   const bare = office(t, DEFAULT_FURNITURE.filter((p) => p.kind !== 'hoop'));
   const cy = bare.person('c1', 'Cy', 4);
   ballHandlers['ball.take'](bare.ctx, cy, { t: 'ball.take' });
@@ -121,5 +130,42 @@ test('two people play PIG through the messages: out of turn is refused, and the 
   assert.equal(floor.court.state().holder, 'g1');
   hoopHandlers['pig.quit'](ctx, gavin, { t: 'pig.quit' });
   assert.equal(ctx.pig.game('f')?.winner, 0);
-  assert.deepEqual(ctx.longShots.board().wins.map((w) => [w.name, w.wins]), [['Tyler', 1]]);
+  assert.deepEqual(ctx.longShots.board().wins, [], 'Gavin never got a shot: no win on the table');
+});
+
+test('PIG through the messages: nobody plays themselves in another tab, and taking the hoop down calls a game off', (t) => {
+  const { ctx, floor, layout, out, person } = office(t);
+  const tyler = person('t1', 'Tyler', 4);
+  const tylerAgain = person('t2', 'Tyler', 5);
+  hoopHandlers['pig.invite'](ctx, tyler, { t: 'pig.invite', to: 't2' });
+  assert.ok(out.some((o) => o.to === 't1' && o.msg.t === 'toast' && /another tab/.test(o.msg.text)));
+  assert.ok(!out.some((o) => o.msg.t === 'pig.invited'));
+  // The same account under two names is one person too.
+  const ada = person('a1', 'Ada', 4, 'acct-ada');
+  const adaToo = person('a2', 'Ada (laptop)', 5, 'acct-ada');
+  hoopHandlers['pig.invite'](ctx, ada, { t: 'pig.invite', to: adaToo.id });
+  assert.ok(!out.some((o) => o.msg.t === 'pig.invited'));
+  // Two people, mid-game, and the office builder takes the hoop down.
+  hoopHandlers['pig.invite'](ctx, tylerAgain, { t: 'pig.invite', to: 'a1' });
+  hoopHandlers['pig.answer'](ctx, ada, { t: 'pig.answer', from: 't2', yes: true });
+  assert.ok(ctx.pig.game('f'));
+  layout.furniture = DEFAULT_FURNITURE.filter((p) => p.kind !== 'hoop');
+  ctx.pig.sweep();
+  assert.equal(ctx.pig.game('f'), null);
+  assert.equal(floor.court.state().for, undefined);
+  assert.ok(out.some((o) => o.to === 'floor' && o.msg.t === 'pig' && o.msg.pig === null));
+  for (const id of ['t2', 'a1']) assert.ok(out.some((o) => o.to === id && o.msg.t === 'toast' && /hoop came down/.test(o.msg.text)), id);
+});
+
+test('a better make hard on the heels of the last goes on the table at once; the news of it waits its turn', (t) => {
+  const { ctx, out } = office(t);
+  const ada = { owner: 'name:Ada', name: 'Ada', color: '#ef476f' };
+  recordMake(ctx, 'a1', 'f', ada, 5);
+  recordMake(ctx, 'a1', 'f', ada, 6.2);
+  assert.deepEqual(
+    ctx.longShots.board().shots.map((s) => [s.name, s.dist]),
+    [['Ada', 6.2]],
+  );
+  const boards = out.filter((o) => o.msg.t === 'hoop.board').map((o) => (o.msg as Extract<ServerMsg, { t: 'hoop.board' }>).latest?.dist);
+  assert.deepEqual(boards, [5], 'the 6.2 is told about once the time is up');
 });

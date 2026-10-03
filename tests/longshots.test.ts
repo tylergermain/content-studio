@@ -181,21 +181,36 @@ test('the table on disk: kept, read back after a restart, and a broken or doctor
   assert.deepEqual(new LongShots(dir, () => now).board(), { shots: [], wins: [] });
 });
 
-test('the table changes at most so often for one person, and takes no make it can’t have been', (t) => {
+test('a better make goes on the table at once, and the building hears about one person’s at most so often: the best of a quick run, once the time’s up', (t) => {
   let now = 5_000_000;
-  const table = new LongShots(folder(t), () => now);
+  const timers: { at: number; fn: () => void }[] = [];
+  const table = new LongShots(folder(t), () => now, (ms, fn) => void timers.push({ at: now + ms, fn }));
+  const told: string[] = [];
+  const tell = (what: string) => () => void told.push(what);
   const ada = { owner: 'account:ada', name: 'Ada', color: '#ef476f' };
   assert.equal(table.record(ada, 3).rank, 1);
+  table.announce(ada.owner, tell('3'));
+  assert.deepEqual(told, ['3'], 'told at once');
   now += 500;
-  assert.equal(table.record(ada, 5).rank, 0, 'too soon after the last');
-  now += RECORD_EVERY;
-  assert.equal(table.record(ada, 5).rank, 1);
-  now += RECORD_EVERY;
-  // A make that doesn't better hers doesn't use up her turn.
-  assert.equal(table.record(ada, 2).rank, 0);
+  assert.equal(table.record(ada, 5).rank, 1, 'soon after her last, and on the table all the same');
+  assert.deepEqual(table.rowOf(ada.owner), { rank: 1, dist: 5 });
+  table.announce(ada.owner, tell('5'));
+  now += 500;
+  assert.equal(table.record(ada, 6).rank, 1);
+  table.announce(ada.owner, tell('6'));
+  assert.deepEqual(told, ['3'], 'not told yet');
+  assert.equal(timers.length, 1, 'one wait, however many makes');
+  assert.equal(timers[0].at, 5_000_000 + RECORD_EVERY);
+  now = timers[0].at;
+  timers.shift()!.fn();
+  assert.deepEqual(told, ['3', '6'], 'the best of them');
+  // Someone else isn't held up by her.
   assert.equal(table.record({ ...ada, owner: 'account:bo', name: 'Bo' }, 4).rank, 2);
-  for (const dist of [0, -3, NaN, Infinity, FARTHEST + 1]) {
-    now += RECORD_EVERY;
-    assert.equal(table.record({ ...ada, owner: `name:${dist}` }, dist).rank, 0, `${dist}`);
-  }
+  table.announce('account:bo', tell('bo'));
+  assert.deepEqual(told, ['3', '6', 'bo']);
+  // A make that doesn't better hers changes nothing.
+  assert.equal(table.record(ada, 2).rank, 0);
+  assert.deepEqual(table.rowOf(ada.owner), { rank: 1, dist: 6 });
+  assert.equal(table.rowOf('name:nobody'), undefined);
+  for (const dist of [0, -3, NaN, Infinity, FARTHEST + 1]) assert.equal(table.record({ ...ada, owner: `name:${dist}` }, dist).rank, 0, `${dist}`);
 });

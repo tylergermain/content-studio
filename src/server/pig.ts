@@ -35,6 +35,8 @@ export interface PigDeps {
   tell(id: string, msg: { invitedBy: PigWho; until: number } | { text: string }): void;
   /** `winner` won a game of PIG (for the table). */
   won(winner: Shooter): void;
+  /** Whether `floor` still has its hoop up (the office builder can take it down, mid-game too). */
+  hasHoop(floor: string): boolean;
   /** Runs `fn` in `ms`; what it hands back calls it off. */
   later(ms: number, fn: () => void): () => void;
   now(): number;
@@ -59,6 +61,8 @@ interface Game {
   owners: string[];
   /** When each player went away from the court (0: they're there). */
   away: number[];
+  /** How many shots each player has had (landed, and decided), for whether a forfeit's win counts. */
+  shots: number[];
   /** Timers to call off when the game ends. */
   timers: Set<() => void>;
 }
@@ -121,6 +125,8 @@ export class PigGames {
 
   /** Why `from` and `to` can't start a game on `floor` now, or undefined. */
   private busy(floor: string, from: PigWho, to: PigWho): string | undefined {
+    // The same account (or name, on the shared password) in two tabs is one person: no game, and no win to farm.
+    if (from.owner === to.owner) return "🐷 That's you, in another tab: PIG takes two people";
     const on = this.games.get(floor);
     if (on && on.state.winner === null) return `🐷 ${on.state.players.map((p) => p.name).join(' and ')} are playing PIG: one game at a time, there's one ball`;
     if (this.gameOf(to.id)) return `🐷 ${to.name} is in a game already`;
@@ -150,7 +156,7 @@ export class PigGames {
       this.invites.delete(id);
       for (const [k, v] of this.invites) if (v.from.id === id) this.invites.delete(k);
     }
-    const g: Game = { floor, state: newGame(a, b), owners: [a.owner, b.owner], away: [0, 0], timers: new Set() };
+    const g: Game = { floor, state: newGame(a, b), owners: [a.owner, b.owner], away: [0, 0], shots: [0, 0], timers: new Set() };
     this.games.set(floor, g);
     this.deps.ball(floor, a.id, a.id);
     this.deps.changed(floor, g.state);
@@ -178,6 +184,7 @@ export class PigGames {
   }
 
   private landed(g: Game, made: boolean, feet: { x: number; z: number }) {
+    g.shots[g.state.turn]++;
     g.state = shotResult(g.state, made, feet);
     this.deps.changed(g.floor, g.state);
     if (g.state.winner !== null) return this.finish(g);
@@ -211,15 +218,27 @@ export class PigGames {
     this.finish(g);
   }
 
-  /** It's over: the floor hears who won, the table gets the win, the ball's anyone's again, and the board shows it a while. */
+  /**
+   * It's over: the floor hears who won, the table gets the win, the ball's anyone's again, and the
+   * board shows it a while. A win by forfeit only counts once each player has had a shot: giving up
+   * (or walking off) straight away doesn't put a win on the table.
+   */
   private finish(g: Game) {
     for (const off of g.timers) off();
     g.timers.clear();
     const winner = g.state.players[g.state.winner!];
     this.deps.toast(g.floor, `🐷 ${g.state.news}`);
-    this.deps.won({ owner: g.owners[g.state.winner!], name: winner.name, color: winner.color });
+    if (g.state.end === 'pig' || g.shots.every((n) => n > 0)) this.deps.won({ owner: g.owners[g.state.winner!], name: winner.name, color: winner.color });
+    else for (const p of g.state.players) this.deps.tell(p.id, { text: '🐷 No win on the table: it takes a shot each before a game counts' });
     this.deps.ball(g.floor, undefined);
     this.after(g, SHOW_END, () => this.end(g.floor));
+  }
+
+  /** The floor's hoop came down mid-game: the game's off, no contest (no win for anyone), and the ball's anyone's again. */
+  private noContest(g: Game) {
+    const players = g.state.players;
+    this.end(g.floor);
+    for (const p of players) this.deps.tell(p.id, { text: '🐷 The hoop came down: the game of PIG is off, no contest' });
   }
 
   /** Takes the floor's game off the board. */
@@ -249,12 +268,19 @@ export class PigGames {
     });
   }
 
-  /** Looks at where each player is: back on a new connection, off the court, or gone long enough to forfeit. */
+  /**
+   * Looks at each game: whether its floor still has the hoop, and where each player is (back on a new
+   * connection, off the court, or gone long enough to forfeit).
+   */
   sweep() {
     const now = this.deps.now();
     for (const [k, v] of this.invites) if (v.until <= now) this.invites.delete(k);
     for (const g of [...this.games.values()]) {
       if (g.state.winner !== null) continue;
+      if (!this.deps.hasHoop(g.floor)) {
+        this.noContest(g);
+        continue;
+      }
       g.state.players.forEach((p, i) => {
         if (g.state.winner !== null) return;
         let w = this.deps.where(p.id);

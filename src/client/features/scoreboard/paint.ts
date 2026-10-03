@@ -15,6 +15,8 @@ const RED = '#FF4D5E';
 const WHITE = '#F3F5FA';
 const DIM = '#1B2230';
 const DIM_GREEN = '#2E7D52';
+/** Second-line figures (the feet, the game's news): softer than the lit green, still bright enough to read from the court. */
+const SOFT = '#8FDDB0';
 const FONT = '"Arial Narrow", "Roboto Condensed", "Helvetica Neue", Arial, sans-serif';
 
 /** What the board shows: the longest shots, with the make that last got on picked out a while; or the floor's game of PIG. */
@@ -49,10 +51,29 @@ function paintShots(g: CanvasRenderingContext2D, v: Extract<FaceView, { page: 's
     text(g, 'SINK ONE AND YOU’RE UP HERE', FACE_W / 2, 420, 34, DIM_GREEN, 'center');
     return;
   }
+  // The rows share the room below the title: a short table's are taller (up to three rows' worth), and
+  // what's in them bigger (up to BIGGEST), so a board with a make or two on it is still full, and reads
+  // from across the court. They sit in the middle of it.
   const top = 132;
-  const row = (FACE_H - top - 20) / SHOTS_SHOWN;
-  v.shots.slice(0, SHOTS_SHOWN).forEach((s, i) => {
-    const y = top + i * row;
+  const room = FACE_H - top - 20;
+  const shown = v.shots.slice(0, SHOTS_SHOWN);
+  const row = room / Math.max(3, shown.length);
+  const k = Math.min(BIGGEST, row / (room / SHOTS_SHOWN));
+  const first = top + (room - row * shown.length) / 2;
+  const h = 54 * k;
+  const nameSize = Math.min(80, 56 * k);
+  const mSize = 36 * k;
+  const feetSize = 38 * k;
+  // Right to left: the feet, the M, the meters; the name has what's left after the rank and its dot.
+  const feetLeft = FACE_W - 36 - measure(g, '888 FT', feetSize);
+  const mLeft = feetLeft - 20 - measure(g, 'M', mSize);
+  const distRight = mLeft - 8;
+  const rankRight = 52 + digitWidth(h);
+  const dotR = 9 * k;
+  const nameX = rankRight + 26 + dotR * 2;
+  const nameMax = distRight - digitsWidth('88.8', h) - 28 - nameX;
+  shown.forEach((s, i) => {
+    const y = first + i * row;
     const mid = y + row / 2;
     const newest = v.latest && v.latest.rank === i + 1 && v.latest.name === s.name;
     if (newest && v.blink) {
@@ -61,17 +82,30 @@ function paintShots(g: CanvasRenderingContext2D, v: Extract<FaceView, { page: 's
       g.fillStyle = GREEN;
       g.fillRect(20, y + 4, 8, row - 8);
     }
-    digits(g, String(i + 1), 96, mid, row * 0.7, AMBER);
+    digits(g, String(i + 1), rankRight, mid, h, AMBER);
     g.fillStyle = s.color;
     g.beginPath();
-    g.arc(140, mid, 9, 0, Math.PI * 2);
+    g.arc(rankRight + 18 + dotR, mid, dotR, 0, Math.PI * 2);
     g.fill();
-    text(g, fit(g, s.name.toUpperCase(), 56, 440), 164, mid + 20, 56, WHITE, 'left');
-    const right = FACE_W - 158;
-    digits(g, s.dist.toFixed(1), right, mid, row * 0.7, GREEN);
-    text(g, 'M', right + 10, mid + 16, 36, GREEN, 'left');
-    text(g, `${inFeet(s.dist)} FT`, FACE_W - 30, mid + 16, 26, DIM_GREEN, 'right');
+    text(g, fit(g, s.name.toUpperCase(), nameSize, nameMax), nameX, mid + nameSize * 0.36, nameSize, WHITE, 'left');
+    // The M and the feet sit on the digits' baseline.
+    const base = mid + h / 2;
+    digits(g, s.dist.toFixed(1), distRight, mid, h, GREEN);
+    text(g, 'M', mLeft, base, mSize, GREEN, 'left');
+    text(g, `${inFeet(s.dist)} FT`, FACE_W - 36, base, feetSize, SOFT, 'right');
   });
+}
+
+/** How much bigger than a full board's rows a short table's get, at most. */
+const BIGGEST = 1.5;
+
+/** How wide `s` is in the board's lettering at `size`. */
+function measure(g: CanvasRenderingContext2D, s: string, size: number): number {
+  g.save();
+  g.font = `700 ${size}px ${FONT}`;
+  const w = g.measureText(s).width;
+  g.restore();
+  return w;
 }
 
 // ---- A game of PIG ----------------------------------------------------------------------------------
@@ -82,7 +116,7 @@ function paintPig(g: CanvasRenderingContext2D, pig: PigState, blink: boolean) {
   rule(g, 158);
   const over = pig.winner !== null;
   pig.players.forEach((p, i) => {
-    const y = 248 + i * 136;
+    const y = 238 + i * 132;
     const up = !over && pig.turn === i;
     if (up && blink) text(g, '▶', 40, y + 24, 60, GREEN, 'left');
     text(g, fit(g, p.name.toUpperCase(), 72, 470), 100, y + 22, 72, over && pig.winner === i ? GREEN : WHITE, 'left');
@@ -110,8 +144,9 @@ function paintPig(g: CanvasRenderingContext2D, pig: PigState, blink: boolean) {
     line = `${at.name.toUpperCase()}: SHOOT FROM ANYWHERE`;
     color = AMBER;
   }
-  text(g, fit(g, line, 52, FACE_W - 70), FACE_W / 2, 562, 52, color, 'center');
-  text(g, fit(g, pig.news.toUpperCase(), 28, FACE_W - 70), FACE_W / 2, 610, 28, DIM_GREEN, 'center');
+  text(g, fit(g, line, 52, FACE_W - 70), FACE_W / 2, 514, 52, color, 'center');
+  // What just happened, big enough to read from the court.
+  text(g, fit(g, pig.news.toUpperCase(), 42, FACE_W - 70), FACE_W / 2, 590, 42, SOFT, 'center');
 }
 
 // ---- The pieces --------------------------------------------------------------------------------------
@@ -176,12 +211,22 @@ function ball(g: CanvasRenderingContext2D, x: number, y: number, r: number) {
 /** Which of a seven-segment digit's segments light up for each character. */
 const SEGMENTS: Record<string, string> = { '0': 'abcdef', '1': 'bc', '2': 'abged', '3': 'abgcd', '4': 'fgbc', '5': 'afgcd', '6': 'afgedc', '7': 'abc', '8': 'abcdefg', '9': 'abcdfg', '-': 'g' };
 
+/** How wide one seven-segment digit `h` tall is (see digits). */
+const digitWidth = (h: number) => h * 0.52;
+
+/** How wide `s` is in seven-segment digits `h` tall (see digits). */
+function digitsWidth(s: string, h: number): number {
+  let w = 0;
+  for (const ch of s) w += ch === '.' ? h * 0.12 * 1.6 + h * 0.16 * 0.6 : digitWidth(h) + h * 0.16;
+  return w;
+}
+
 /**
  * A number in seven-segment digits, lit `color`, its right edge at `right` and its middle at `mid`,
  * `h` tall: the unlit segments show faintly, as on a real board. A '.' is a dot after the digit before.
  */
 function digits(g: CanvasRenderingContext2D, s: string, right: number, mid: number, h: number, color: string) {
-  const w = h * 0.52;
+  const w = digitWidth(h);
   const gap = h * 0.16;
   const t = h * 0.12;
   let x = right;

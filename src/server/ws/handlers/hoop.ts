@@ -66,7 +66,7 @@ export function hoopMayThrow(ctx: Ctx, c: Client, floor: Floor, s: Throw): boole
 }
 
 /** How often one person's throws are flown (ms): no shot follows another quicker, as the ball has to be picked up and wound up. */
-const FLY_EVERY = 400;
+export const FLY_EVERY = 400;
 
 /**
  * The court took a throw of `c`'s: the office flies it (see shot-judge.ts). How it went is the game
@@ -88,14 +88,22 @@ export function hoopThrown(ctx: Ctx, c: Client, floor: Floor, s: Throw) {
   setTimeout(() => recordMake(ctx, c.id, floor.id, who, dist), flight.at * 1000).unref();
 }
 
-/** `who` sank one from `dist` m on floor `floorId`, just now: on the table if it's their longest yet. */
+/**
+ * `who` sank one from `dist` m on floor `floorId`, just now: on the table at once if it's their longest
+ * yet. The building hears about it then, or (hard on the heels of their last) once it may: where it
+ * stands on the table by then, if it's still on it.
+ */
 export function recordMake(ctx: Ctx, id: string, floorId: string, who: Shooter, dist: number) {
-  const r = ctx.longShots.record(who, dist);
-  if (!r.rank) return;
-  ctx.broadcast({ t: 'hoop.board', board: ctx.longShots.board(), latest: { name: who.name, dist, rank: r.rank, first: r.first } });
-  if (r.first) return ctx.toastFloor(ctx.floors.get(floorId), `🏀 ${who.name} sank one from ${dist.toFixed(1)} m — a new record!`);
-  const c = ctx.clients.get(id);
-  if (c) ctx.sendTo(c, { t: 'toast', text: `🏀 Your longest yet: ${dist.toFixed(1)} m, ${ordinal(r.rank)} on the board`, level: 'info' });
+  if (!ctx.longShots.record(who, dist).rank) return;
+  ctx.longShots.announce(who.owner, () => {
+    const row = ctx.longShots.rowOf(who.owner);
+    if (!row) return;
+    const first = row.rank === 1;
+    ctx.broadcast({ t: 'hoop.board', board: ctx.longShots.board(), latest: { name: who.name, dist: row.dist, rank: row.rank, first } });
+    if (first) return ctx.toastFloor(ctx.floors.get(floorId), `🏀 ${who.name} sank one from ${row.dist.toFixed(1)} m — a new record!`);
+    const c = ctx.clients.get(id);
+    if (c) ctx.sendTo(c, { t: 'toast', text: `🏀 Your longest yet: ${row.dist.toFixed(1)} m, ${ordinal(row.rank)} on the board`, level: 'info' });
+  });
 }
 
 export const hoopHooks: FeatureHooks = {
