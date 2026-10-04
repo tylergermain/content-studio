@@ -27,6 +27,8 @@ export function openUpgrade(net: Net) {
     if (u.current) body.append(h('label', {}, 'Running now'), version(u.current));
     const busy = u.phase === 'building' || u.phase === 'restarting';
     recheck.disabled = !!u.checking || busy;
+    // Admins upgrade; everyone else sees what's running and what's new.
+    go.classList.toggle('hidden', !store.me.admin);
     go.disabled = !u.latest || !!u.checking || busy;
 
     if (u.phase === 'building') {
@@ -52,7 +54,8 @@ export function openUpgrade(net: Net) {
           h(
             'p.note',
             {},
-            'Upgrading builds the new version while the office keeps running, then restarts it. Everyone reconnects on the new version automatically. ',
+            store.me.admin ? 'Upgrading builds the new version while the office keeps running, then restarts it. ' : 'An admin can upgrade the office: it builds the new version while the office keeps running, then restarts it. ',
+            'Everyone reconnects on the new version automatically. ',
             awake ? 'Workers keep working through the restart, and whatever they were in the middle of carries on.' : '',
           ),
         );
@@ -60,13 +63,9 @@ export function openUpgrade(net: Net) {
     }
   };
 
-  const unsub = store.on('upgrade', render);
-  const unsubWorkers = store.on('workers', render);
+  const unsub = [store.on('upgrade', render), store.on('workers', render), store.on('me', render)];
   const modal = openModal(el, {
-    onClose: () => {
-      unsub();
-      unsubWorkers();
-    },
+    onClose: () => unsub.forEach((off) => off()),
   });
   close.addEventListener('click', () => modal.close());
   render();

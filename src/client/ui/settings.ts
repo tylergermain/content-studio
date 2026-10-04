@@ -213,23 +213,29 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   };
   paintNotify();
 
-  // The office's Slack / Discord webhook, shared by everyone.
+  // The office's Slack / Discord webhook, shared by everyone. Admins set it; anyone can send a test.
   const hookStatus = h('p.setting-note');
   const hookInput = h('input', { type: 'text', placeholder: 'https://hooks.slack.com/services/…', 'aria-label': 'Slack or Discord webhook URL', spellcheck: 'false', autocomplete: 'off' }) as HTMLInputElement;
   const hookSave = h('button.btn.primary', { type: 'button' }, 'Save');
+  const hookRow = h('div.webhook', {}, hookInput, hookSave);
   const hookTest = h('button.btn', { type: 'button' }, 'Send a test');
   const hookRemove = h('button.btn.danger', { type: 'button' }, 'Remove');
   const hookActions = h('div.seg', { style: 'margin-top:8px' }, hookTest, hookRemove);
   const paintHook = () => {
     const { webhook, error, lastSentAt } = store.notify;
+    const admin = store.me.admin;
+    hookRow.classList.toggle('hidden', !admin);
     hookActions.classList.toggle('hidden', !webhook);
+    hookRemove.classList.toggle('hidden', !admin);
     hookSave.textContent = webhook ? 'Replace' : 'Save';
     hookStatus.classList.toggle('bad', !!error);
     hookStatus.textContent = !webhook
-      ? 'Paste an incoming webhook from Slack or Discord, and the office posts to that channel when a worker needs input or finishes and nobody has its terminal open. It’s for everyone in the office.'
-      : error
-        ? `⚠️ Posting to ${WEBHOOK_NAME[webhook.kind]} (${webhook.hint}) failed: ${error}`
-        : `📣 Posting to ${WEBHOOK_NAME[webhook.kind]} (${webhook.hint}), set by ${webhook.by} ${timeAgo(webhook.at)}${lastSentAt ? ` · last message ${timeAgo(lastSentAt)}` : ''}.`;
+      ? admin
+        ? 'Paste an incoming webhook from Slack or Discord, and the office posts to that channel when a worker needs input or finishes and nobody has its terminal open. It’s for everyone in the office.'
+        : 'Off. With an incoming webhook from Slack or Discord, the office posts to that channel when a worker needs input or finishes and nobody has its terminal open. An admin can set one up.'
+      : (error
+          ? `⚠️ Posting to ${WEBHOOK_NAME[webhook.kind]} (${webhook.hint}) failed: ${error}`
+          : `📣 Posting to ${WEBHOOK_NAME[webhook.kind]} (${webhook.hint}), set by ${webhook.by} ${timeAgo(webhook.at)}${lastSentAt ? ` · last message ${timeAgo(lastSentAt)}` : ''}.`) + (admin ? '' : ' Admins can change it.');
   };
   paintHook();
   const saveHook = () => {
@@ -435,7 +441,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     ],
     notify: [
       setting('Desktop notifications', 'you', notifyRow, notifyNote),
-      setting('Team notifications (Slack / Discord)', 'office', h('div.webhook', {}, hookInput, hookSave), hookActions, hookStatus),
+      setting('Team notifications (Slack / Discord)', 'office', hookRow, hookActions, hookStatus),
     ],
     building: [
       setting('Holiday theme', 'office', themeRow, themeNote),
@@ -494,7 +500,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
 
   const close = h('button.btn.close', { 'aria-label': 'Close' }, '✕');
   const el = h('div.modal.settings', { role: 'dialog', 'aria-label': 'Settings' }, h('header', {}, h('h2', {}, '⚙️ Settings'), close), h('div.settings-body', {}, nav, ...bodies.values()));
-  const offNotify = store.on('notify', paintHook);
+  const offNotify = [store.on('notify', paintHook), store.on('me', paintHook)];
   const offDog = store.on('dog', paintDog);
   const offTheme = store.on('theme', paintTheme);
   const offLeave = store.on('leaveOnMerge', paintLeave);
@@ -504,7 +510,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const modal = openModal(el, {
     doing: '⚙️ in settings',
     onClose: () => {
-      offNotify();
+      offNotify.forEach((off) => off());
       offDog();
       offTheme();
       offLeave();

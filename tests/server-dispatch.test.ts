@@ -575,6 +575,66 @@ test('only admins manage the building: a member rides the elevator and is refuse
   await boss.close();
 });
 
+test('only admins let people in, upgrade the office or point its notifications somewhere', async () => {
+  const boss = await Browser.open('?name=Hal');
+  await boss.take('welcome');
+  const member = await Browser.open('', { cookie: await joinAs(boss, 'Ida', 'member'), origin: base });
+  assert.equal((await member.take('welcome')).me.admin, false);
+  await boss.take('peer.join');
+  await boss.drain();
+  const refused = async (text: string) => assert.equal((await member.take('toast', (m) => m.level === 'warn')).text, text);
+  const NOTIFY = 'Only admins can change the team notifications';
+  const hook = 'http://127.0.0.1:9/hook';
+
+  // SSH keys that open a tunnel to the office's machine: nobody's added, nobody's taken off.
+  member.send({ t: 'team.invite', github: 'octocat' });
+  assert.deepEqual(await member.take('team.invited'), { t: 'team.invited', github: 'octocat', error: 'Only admins can invite teammates' });
+  member.send({ t: 'team.remove', name: 'octocat' });
+  await refused('Only admins can remove a teammate’s access');
+  // No new version built and swapped in.
+  member.send({ t: 'upgrade.start' });
+  await refused('Only admins can upgrade the office');
+  // Everyone's workers keep being posted where an admin said, or nowhere.
+  member.send({ t: 'notify.webhook', url: hook });
+  await refused(NOTIFY);
+  member.send({ t: 'notify.webhook', url: '' });
+  await refused(NOTIFY);
+  assert.deepEqual([...boss.pending('toast'), ...boss.pending('notify'), ...boss.pending('upgrade'), ...boss.pending('team')], []);
+
+  // What's still everyone's: who's invited, whether there's a new version, a test message, and the decorations.
+  member.send({ t: 'team.get' });
+  assert.match((await member.take('team')).state.unavailable ?? '', /deploy\/provision\.sh/);
+  member.send({ t: 'upgrade.check' });
+  member.send({ t: 'notify.test' });
+  await refused('No webhook is set');
+  member.send({ t: 'theme.set', pick: 'christmas' });
+  assert.equal((await boss.take('toast', (m) => m.text.startsWith('🎄'))).text, '🎄 Ida dressed the office up for Christmas');
+  member.send({ t: 'theme.set', pick: 'off' });
+  assert.equal((await boss.take('theme', (m) => m.state.pick === 'off')).state.pick, 'off');
+
+  // An admin isn't turned away: this office just can't invite or upgrade, and the webhook goes on and off.
+  const UNAVAILABLE = 'Invites work on offices set up with deploy/provision.sh or deploy/aws.sh';
+  boss.send({ t: 'team.invite', github: 'octocat' });
+  assert.equal((await boss.take('team.invited')).error, UNAVAILABLE);
+  boss.send({ t: 'team.remove', name: 'octocat' });
+  assert.equal((await boss.take('toast', (m) => m.level === 'warn')).text, UNAVAILABLE);
+  boss.send({ t: 'upgrade.start' });
+  assert.equal((await boss.take('toast', (m) => m.level === 'warn')).text, "This office can't upgrade itself (it wasn't installed by deploy/provision.sh or deploy/aws.sh)");
+  boss.send({ t: 'notify.webhook', url: hook });
+  assert.equal((await member.take('notify', (m) => !!m.state.webhook)).state.webhook?.by, 'Hal');
+  assert.equal((await member.take('toast', (m) => m.text.startsWith('📣'))).text, '📣 Hal set up team notifications');
+  boss.send({ t: 'notify.webhook', url: '' });
+  await member.take('notify', (m) => !m.state.webhook);
+  assert.equal((await member.take('toast', (m) => m.text.includes('turned off'))).text, 'Hal turned off team notifications');
+
+  boss.send({ t: 'accounts.get' });
+  const ida = (await boss.take('accounts', (m) => m.state.accounts.length === 1)).state.accounts[0];
+  boss.send({ t: 'accounts.revoke', accountId: ida.id });
+  await boss.take('accounts', (m) => m.state.accounts.length === 0);
+  await member.close();
+  await boss.close();
+});
+
 test('the hook server answers only workers, with their own token', async () => {
   const hook = (p: string, init: RequestInit = {}) => fetch(hooks + p, init);
   assert.equal((await hook('/hooks/claude?worker=nobody', { method: 'POST', body: '{}' })).status, 401);
