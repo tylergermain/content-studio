@@ -11,7 +11,7 @@ import { isTyping } from '../../player';
 import { store } from '../../state';
 import { doingNow, h, toast, type Modal } from '../../ui/dom';
 import type { Arcade } from '../arcade/ui';
-import { across, callKey, callSettled, deskCard, deskPeople, deskRole, deskSeat, hasBossDesk, mirrorWanted, recall, remember, type DeskRole, type ShareKind } from './desk';
+import { across, deskCard, deskPeople, deskRole, deskSeat, hasBossDesk, mirrorWanted, recall, remember, type DeskRole, type ShareKind } from './desk';
 import { deskScreens } from './screens';
 import { callStrip, openDeskMenu, openDeskViewer, type CallPerson } from './ui';
 
@@ -47,9 +47,6 @@ export function installBossDesk(ctx: Ctx, deps: BossDeskDeps): { seat(seatId: st
   /** Who was across from you a frame ago, and whether the boss's screen had reached you. */
   let faces = new Set<string>();
   let hadScreen = false;
-  /** Who's across the desk and on the call (see callKey), and when that last changed. */
-  let guests = '';
-  let guestsChanged = 0;
 
   const screens = deskScreens(ctx, () => at);
 
@@ -107,13 +104,13 @@ export function installBossDesk(ctx: Ctx, deps: BossDeskDeps): { seat(seatId: st
 
   /**
    * The game on your monitor goes out to whoever's sitting across from you as a share, for as long as
-   * they sit there and it's open (see mirrorWanted): that's what puts it on the monitor facing them.
+   * they sit there and it's open (see mirrorWanted): that's what puts it on the monitor facing them. It
+   * goes out the moment a guest sits down, which is the moment they're put on the call: Voice sees both
+   * through, though they change the one connection from its two ends at once.
    */
   function mirror() {
     const want = mirrorWanted({ role, playing: !!arcade.playing, guests: at.guests.length, sharing: voice.sharing || asking, kind });
     if (want && kind !== 'game') {
-      // Someone has just sat down and is being put on the call: the game goes out once that has connected.
-      if (!callSettled(guestsChanged, performance.now())) return;
       // A browser that can't send a canvas on: the game stays yours alone.
       if (typeof arcade.picture.captureStream !== 'function') return;
       void voice.startShare(arcade.picture.captureStream(15));
@@ -192,11 +189,6 @@ export function installBossDesk(ctx: Ctx, deps: BossDeskDeps): { seat(seatId: st
   ctx.ticks.add('me', () => {
     const there = !ctx.upTop() && hasBossDesk(ctx.office.room.get());
     at = there ? deskPeople(everyone()) : { boss: null, guests: [] };
-    const key = callKey(at.guests);
-    if (key !== guests) {
-      guests = key;
-      guestsChanged = performance.now();
-    }
     const now = there ? deskRole(player.seat?.key) : null;
     if (now !== role) {
       const was = role;
