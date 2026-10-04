@@ -10,6 +10,7 @@ import { builtFloors } from '../../core/floors';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder, waitingLabel } from '../../nextup';
 import { saveSettings, store } from '../../state';
+import { skillLibraryFloor } from '../../../shared/skill-library';
 import { openOrgChart } from '../../ui/org-chart/ui';
 import { openAccounts } from '../../ui/accounts';
 import { openBoard } from '../../ui/boards';

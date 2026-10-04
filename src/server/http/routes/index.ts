@@ -2,6 +2,7 @@ import { spotifyRoutes } from './spotify.js';
 // Every HTTP route the office answers, in the order they're tried: a new route goes where it has to
 // come in that order (see http/router.ts). The public ones are tried first, then the sign-in check,
 // then the rest; the last one answers every path left with the client bundle, or a 404.
+import { skillLibraryRoute } from './skill-library.js';
 import { orgChartRoute } from './org-chart.js';
 import { specialistRoute } from './specialists.js';
 import { workerChatRoutes } from './worker-chat.js';
@@ -38,6 +39,7 @@ export const routes: readonly Route[] = [
   workerChatRoutes.chat,
   sharesRoute,
   specialistRoute,
+  skillLibraryRoute,
   orgChartRoute,
   fileRoutes.image,
   fileRoutes.media,

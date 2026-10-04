@@ -1,4 +1,7 @@
 /** The bookshelf: the project's docs to read, with a book in your hands (and a swish as its pages turn). */
+import { skillLibraryFloor } from '../../../shared/skill-library';
+import { mountSkillLibrarySign } from '../../ui/skill-library/sign';
+import { openSkillLibrary } from '../../ui/skill-library/ui';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { saveSettings, store } from '../../state';
@@ -20,9 +23,11 @@ function githubUrl(remote?: string): string | undefined {
 
 export function installBookshelf(ctx: Ctx) {
   const { settings } = ctx;
+  mountSkillLibrarySign(ctx);
 
   function showBookshelf() {
     if (!store.floor) return toast('Take the elevator to a floor first');
+    if(skillLibraryFloor(store.floor))return openSkillLibrary();
     openBookshelf({
       floor: store.floor,
       project: store.project?.name,
@@ -39,6 +44,7 @@ export function installBookshelf(ctx: Ctx) {
   ctx.interactions.define('bookshelf', {
     reach: 4,
     hint: () => {
+      if(skillLibraryFloor(store.floor))return {k:'skill-library',parts:[hintTitle('📚 Skill library'),aside('Skills and version history'),key('E','Browse skills')]};
       const names = [...store.peers.values()].filter((p) => p.reading && p.id !== store.you && store.onMyFloor(p)).map((p) => p.name).join(', ');
       return { k: names, parts: [hintTitle('📚 Bookshelf'), aside(names ? `📖 ${clip(names, 40)} reading` : "the project's docs"), key('E', 'Read the docs')] };
     },

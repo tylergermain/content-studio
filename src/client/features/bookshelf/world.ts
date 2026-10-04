@@ -107,6 +107,7 @@ export function buildBookshelf(): BookshelfModel {
 
   // A sign along the crown.
   const sign = textPlane('📚 Docs', { size: 40, bg: '#fffaf3' });
+  sign.userData.bookshelfLabel='📚 Docs';
   sign.position.set(0, H + 0.3, 0.02);
   group.add(sign);
 
