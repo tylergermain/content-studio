@@ -2,7 +2,9 @@ import './workspace.css';
 import { h } from '../dom';
 import { unshareRequest } from '../worker-chat/api';
 import { artifactKey, type ChatArtifact, type ChatSnapshot, type SharedFolder } from '../../../shared/worker-chat';
-import { WORKSPACES, fileTab, type WorkspaceKind, type WorkspaceTab } from '../../../shared/workspace';
+import { WORKSPACES, WORKSPACE_TABS, fileTab, type WorkspaceKind, type WorkspaceTab } from '../../../shared/workspace';
+import { appOn } from '../../../shared/apps';
+import { store } from '../../state';
 import { designBoard } from './board';
 import { designCanvas } from './canvas';
 import { filesPanel } from './files';
@@ -33,13 +35,22 @@ const filesOn = (tab: WorkspaceTab, all: ChatArtifact[]) => (tab === 'files' ? a
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 const pauseAll = (el: HTMLElement) => { for (const m of el.querySelectorAll<HTMLMediaElement>('video,audio')) m.pause(); };
 
+/** Whether the floor has an app on (☰ › Apps, see shared/apps.ts). */
+const enabled = (tab: WorkspaceTab) => appOn(store.studio.setup, tab);
+
 /**
  * Mounts a workspace of `kind`: a bar with its name, its tabs and Theater, the open tab's panel, and for an admin the
- * folders shared with the floor. A tab shows when it has files or is the kind's first; until you pick one, the window
- * opens on the first tab holding a file the worker linked.
+ * folders shared with the floor. Its tabs are the floor's apps that are on (see shared/apps.ts): the kind's own in its
+ * order, then the others, Files last. A tab shows when it has files or is the kind's main one (its first that's on);
+ * until you pick one, the window opens on the first tab holding a file the worker linked.
  */
 export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Workspace {
   const spec = WORKSPACES[kind];
+  const order: WorkspaceTab[] = [...spec.tabs.filter((t) => t !== 'files'), ...WORKSPACE_TABS.filter((t) => t !== 'files' && !spec.tabs.includes(t)), 'files'];
+  /** The tab the window opens on: the kind's first, unless the floor has turned it off. Files is always on. */
+  const main = () => [spec.tabs[0], ...order].find(enabled)!;
+  /** The tabs showing for `all`: on, and the main one or holding something. */
+  const showing = (all: ChatArtifact[]) => order.filter((t) => enabled(t) && (t === main() || filesOn(t, all).length > 0));
   const tabBar = h('div.ws-tabs', { role: 'tablist', 'aria-label': `${spec.label} views` });
   const theater = h('button.btn.ws-theater', { type: 'button', 'aria-pressed': 'false', title: 'Hide the conversation to give this side the whole window (F)' }, 'Theater');
   const body = h('div.ws-body', {}, h('p.chat-empty.ws-loading', {}, `Opening ${host.workerName}’s ${spec.label === 'Files' ? 'files' : spec.label.toLowerCase()}…`));
@@ -50,7 +61,7 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
   const panels = new Map<WorkspaceTab, { panel: Panel; stamp: string }>();
   let data: ChatSnapshot | undefined, active: WorkspaceTab = spec.tabs[0], chosen = false, shareStamp = '';
 
-  for (const tab of spec.tabs) {
+  for (const tab of order) {
     const b = h('button.ws-tab', { type: 'button', role: 'tab', 'aria-selected': 'false', 'data-tab': tab }, TAB_LABELS[tab], h('span.ws-count'));
     b.addEventListener('click', () => { chosen = true; select(tab); });
     buttons.set(tab, b);
@@ -79,15 +90,15 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
     data = next;
     const all = everyFile(next);
     const linkedTabs = new Set((next.linked ?? []).map((f) => fileTab(f) ?? 'files'));
-    const shown = spec.tabs.filter((t, i) => i === 0 || filesOn(t, all).length > 0);
+    const shown = showing(all);
     for (const [t, b] of buttons) {
       const n = filesOn(t, all).length;
       b.hidden = !shown.includes(t);
       b.querySelector('.ws-count')!.textContent = n ? String(n) : '';
     }
     tabBar.hidden = shown.length < 2;
-    let tab = chosen ? active : spec.tabs.find((t) => linkedTabs.has(t)) ?? spec.tabs[0];
-    if (!shown.includes(tab)) tab = spec.tabs[0];
+    let tab = chosen ? active : shown.find((t) => linkedTabs.has(t)) ?? main();
+    if (!shown.includes(tab)) tab = main();
     select(tab);
     const nextShares = JSON.stringify(next.shares ?? []);
     if (nextShares !== shareStamp) { shareStamp = nextShares; paintShares(next.shares ?? []); }
@@ -130,11 +141,13 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
     element,
     paint,
     show(key) {
-      const file = data && everyFile(data).find((f) => artifactKey(f) === key);
+      if (!data) return;
+      const all = everyFile(data);
+      const file = all.find((f) => artifactKey(f) === key);
       if (!file) return;
       const own = fileTab(file);
       chosen = true;
-      select(own && spec.tabs.includes(own) ? own : 'files').show(file);
+      select(own && showing(all).includes(own) ? own : 'files').show(file);
       element.focus({ preventScroll: true });
     },
     stop() {

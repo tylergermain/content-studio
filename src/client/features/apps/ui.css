@@ -1,0 +1,9 @@
+/* The floor's apps (features/apps). */
+.modal.apps-window { width: min(560px, 100%); }
+.apps-note { margin: 0 0 12px; font-size: 13px; color: var(--muted); line-height: 1.45; }
+.modal.apps-window .apps-row { display: grid; grid-template-columns: auto auto 1fr; align-items: start; gap: 10px; padding: 10px 12px; margin-bottom: 8px; border: 1px solid var(--hairline); border-radius: var(--r-md); background: var(--surface); cursor: pointer; }
+.modal.apps-window .apps-row.locked { cursor: default; opacity: .75; }
+.modal.apps-window .apps-row input { margin-top: 3px; accent-color: var(--accent); }
+.apps-icon { font-size: 18px; line-height: 1.2; }
+.apps-text { display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.apps-text span { color: var(--muted); font-size: 12px; line-height: 1.4; }

@@ -23,6 +23,15 @@ export const studioHandlers = {
     ctx.watch.refresh();
     ctx.toastFloor(floor, `🪧 ${c.peer.name} set up this floor's boards and agents`);
   },
+  'studio.apps'(ctx, c, msg) {
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can turn a floor\'s apps on and off');
+    const floor = here(ctx, c);
+    if (!floor) return;
+    // The rest of the setup stays as it is.
+    floor.studio.configure({ ...floor.studio.state().setup, apps: { off: msg.off } });
+    ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() });
+    ctx.toastFloor(floor, `🧩 ${c.peer.name} changed this floor's apps`);
+  },
   'studio.post'(ctx, c, msg) {
     const floor = here(ctx, c);
     if (!floor) return;
