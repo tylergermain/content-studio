@@ -458,3 +458,4 @@ Putt Street now has arcade-style mouse pull-back shots, a percentage power meter
 The putting and third-person cameras keep clearance from solid props and walls while moving between views.
 Mini golf supports free mouse aiming before clicking, including third-person view with an unlocked cursor.
 Desktop avatars now share head-look direction, including helicopter passengers on different floors.
+Webcam faces use a tighter centered crop, showing the middle half of the camera's square image to reduce surrounding background.
