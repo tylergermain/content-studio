@@ -1,3 +1,4 @@
+import { installHeadLook } from '../head-look';
 /**
  * VR mode: the office in a VR headset (a Meta Quest's browser, over WebXR), walked about at your
  * real height, with your hands on the controllers and every window floating in front of you (see
@@ -34,6 +35,7 @@ export interface VrDeps {
 type Offering = XRSystem & { offerSession?(mode: XRSessionMode, init?: XRSessionInit): Promise<XRSession> };
 
 export function installVr(ctx: Ctx, parts: VrParts, deps: VrDeps): void {
+  installHeadLook(ctx, parts);
   // Someone else in a headset: their head turning and their hands, on a screen too.
   ctx.messages.on('peer.vr', (m) => void import('./remote').then((r) => r.peerPose(ctx, parts, m)));
 

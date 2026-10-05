@@ -1,3 +1,4 @@
+import { showHead } from '../head-look';
 import type * as THREE from 'three';
 import { lookFromSeed } from '../../../shared/avatar';
 import { SEAT_HIPS } from '../../../shared/garage';
@@ -66,12 +67,13 @@ export class CrewFigures {
 
   /** Each frame: everyone in their seat as it's drawn at `pose`, its street at `base` in the group's frame. */
   place(pose: HeliPose, base: number, dt: number, t: number) {
-    for (const f of this.figures.values()) {
+    for (const [id,f] of this.figures) {
       const s = HELI.seats[f.place] ?? HELI.seats[0];
       heliPoint(pose, s.x, s.y - SEAT_HIPS, s.z, this.at);
       f.person.root.position.set(this.at.x, base + this.at.h, this.at.z);
       f.person.root.rotation.y = pose.yaw;
       f.person.update(dt, t, false, false);
+      showHead(id,f.person,dt);
     }
     this.tag?.position.set(pose.x, base + pose.h + HELI.hub + TAG_UP, pose.z);
   }

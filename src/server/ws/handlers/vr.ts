@@ -2,6 +2,7 @@
 // kept by nobody (see protocol/vr.ts). Each pose is cleaned up first (shared/vr-pose.ts), and at most
 // twenty a second each get through; leaving VR (a null pose) always does.
 import type { VrClientMsg } from '../../../shared/protocol.js';
+import { cleanHead } from '../../../shared/head-look.js';
 import { cleanPose } from '../../../shared/vr-pose.js';
 import { throttle } from '../../office/client.js';
 import type { HandlerMap } from './types.js';
@@ -10,6 +11,10 @@ import type { HandlerMap } from './types.js';
 export const VR_POSE_EVERY_MS = 50;
 
 export const vrHandlers = {
+  'head.look'(ctx,c,msg) {
+    const look=cleanHead(msg.look);
+    if(look&&throttle(c,'head.look',100))ctx.broadcast({t:'peer.head',id:c.id,look},c.id,true);
+  },
   'vr.pose'(ctx, c, msg) {
     if (msg.pose === null) return ctx.toNeighbors(c, { t: 'peer.vr', id: c.id, pose: null });
     const pose = cleanPose(msg.pose);

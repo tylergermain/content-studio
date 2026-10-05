@@ -97,3 +97,5 @@ One helicopter; one pilot, who has to be a street admin; three passengers; getti
 ## In the code
 
 `features/heli/` on the page: `index.ts` (getting in and out, the keys, what everyone sees), `controller.ts` (the pilot's flight at a fixed step, and what the office is told), `follow.ts` (everyone else's smooth drawing of it), `ride.ts` and `camera.ts` (your seat and the two views), `land.ts` (the page's own landing checks and the downwash), `model.ts` (the toon model), `world.ts` (the `heliPark` street fixture, its colliders), `crew.ts`, `roof.ts`, `ui.ts` and `sound.ts`. The flight itself and what it flies in are `shared/heli.ts` and `shared/heli-world.ts`, which the office checks every pose against (`server/heli/`). The props lab shows the model: `/lab/props.html?show=heli&spin=1` (spin 0 to 1; above 0.6 the blades blur).
+
+Desktop head direction is shared separately from body rotation. In the cockpit, other passengers see you turn toward them while your body stays seated facing forward. Head updates also reach the passenger figures used across floors. VR continues to use its tracked head pose.
