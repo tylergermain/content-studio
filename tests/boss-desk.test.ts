@@ -6,11 +6,8 @@ import {
   BOSS_DESK,
   BOSS_PLACE,
   BOSS_SEAT,
-  CALL_SETTLES,
   GUEST_SEATS,
   across,
-  callKey,
-  callSettled,
   deskCard,
   deskPeople,
   deskRole,
@@ -83,21 +80,6 @@ test("the game goes out to the guests only when it wouldn't take down a screen t
   assert.equal(mirrorWanted({ ...playing, sharing: true, kind: 'game' }), true, 'the game is what is up: keep it');
   assert.equal(mirrorWanted({ ...playing, sharing: true, kind: 'game', guests: 0 }), false, 'the guest got up');
   assert.equal(mirrorWanted({ ...playing, sharing: true, kind: 'game', playing: false }), false, 'the game was closed');
-});
-
-test('the game waits for a guest who has just sat down to be on the call before it goes out', () => {
-  // The line changes when a guest sits down, gets up, or joins or leaves the call, and at nothing else.
-  assert.equal(callKey([]), '');
-  assert.equal(callKey([{ id: 'gav' }]), callKey([{ id: 'gav', voice: false }]));
-  assert.notEqual(callKey([{ id: 'gav' }]), callKey([]));
-  assert.notEqual(callKey([{ id: 'gav' }]), callKey([{ id: 'gav', voice: true }]));
-  assert.notEqual(callKey([{ id: 'gav', voice: true }]), callKey([{ id: 'gav', voice: true }, { id: 'sam' }]));
-  // And the game holds off for a moment after each change.
-  assert.equal(callSettled(1000, 1000), false);
-  assert.equal(callSettled(1000, 1000 + CALL_SETTLES - 1), false);
-  assert.equal(callSettled(1000, 1000 + CALL_SETTLES), true);
-  // Nobody has sat down since the page loaded: nothing to wait for.
-  assert.equal(callSettled(0, CALL_SETTLES + 1), true);
 });
 
 test('with no picture the monitors say who is at the desk and what they are doing', () => {

@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
-- **Together.** Voice, chat, screen sharing on the lounge TV, a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
+- **Together.** Voice, chat, screen sharing on the lounge TV, your webcam as your character's face (**I**, off until you turn it on; it goes browser to browser, or encrypted through a TURN server if you set one, and the office never decodes or records it), a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
 - **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
 There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach, and out front Main Street, with plots for other businesses, a mini golf course and a helicopter to fly over it all): see [docs/features.md](docs/features.md).
@@ -382,6 +382,7 @@ From a checkout without the command installed, the same is `npx tsx src/server/c
 | T / Enter | Chat |
 | V | Join voice; then hold V to talk |
 | M | Mute / unmute in voice |
+| I | Your webcam as your face (on or off) |
 | Ctrl + Space | Dictate into a terminal or a prompt box: hold it and talk (or hold the **🎤**) |
 | Tab | The ☰ menu: every window |
 | Esc | Close any window |

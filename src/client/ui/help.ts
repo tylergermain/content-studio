@@ -50,6 +50,7 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   [IS_MAC ? '⌘K' : 'Ctrl+K', 'Command palette: type a few letters to find a worker, issue, PR, service, board, teammate or action. Enter opens it, Shift+Enter walks you over to it first'],
   ['V', 'Join voice. In voice, hold V to talk (push to talk): you’re muted once you let go. Leave voice from the ☰ menu'],
   ['M', 'Mute or unmute your mic in voice. ⚙️ Settings can have you join muted, for push to talk'],
+  ['I', 'Your webcam as your face: the people near you on your floor see your webcam on your character’s face (you see yourself in the bottom-right corner, and 📷 On camera on the top bar). I again, the corner or the top bar turns it off and the camera stops. It’s off until you turn it on, every time; ⚙️ Settings → Sound & voice picks the camera. It goes browser to browser (relayed, still encrypted, if the office has a TURN server), you don’t have to be in voice, and the office never decodes or records it'],
   ['Ctrl+Space', 'Dictate: in a worker’s terminal or a prompt box, hold Ctrl+Space (or the 🎤) and talk, and what you said is typed in when you let go, for you to read over and send. A quick tap leaves it listening until you tap again. The browser does the listening (Chrome, Edge and Safari can), so there’s nothing to install'],
   ['Tab', 'The ☰ menu, top right: every window, and what shows on screen. Pin what you use most to the top bar'],
   ['Esc', 'Close any window and get back to looking around'],

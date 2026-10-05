@@ -23,6 +23,7 @@ import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, Dog
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
 import type { VrClientMsg, VrServerMsg } from './protocol/vr.js';
 import type { WatchServerMsg } from './protocol/watch.js';
+import type { WebcamClientMsg } from './protocol/webcam.js';
 import type { WhiskyClientMsg, WhiskyServerMsg } from './protocol/whisky.js';
 import type { WorkerClientMsg, WorkerServerMsg } from './protocol/workers.js';
 
@@ -46,6 +47,7 @@ export * from './protocol/toys.js';
 export * from './protocol/usage.js';
 export * from './protocol/vr.js';
 export * from './protocol/watch.js';
+export * from './protocol/webcam.js';
 export * from './protocol/whisky.js';
 export * from './protocol/workers.js';
 
@@ -78,7 +80,8 @@ export type ClientMsg =
   | HeliClientMsg
   | StudioClientMsg
   | HoopClientMsg
-  | WhiskyClientMsg;
+  | WhiskyClientMsg
+  | WebcamClientMsg;
 
 export type ServerMsg =
   | PresenceServerMsg
