@@ -333,6 +333,13 @@ export function shoreX(z: number): number {
   return -254 + 5 * Math.sin(z / 37) + 3 * Math.sin(z / 13 + 1);
 }
 
+/**
+ * The SCENIC LOOP billboard across the street from the garage, facing it: its middle. Its board is
+ * 8.4 m wide and its top 5.7 m up, so it stands in x 23.8..32.2, between Friday Park (x ..22) and
+ * Plot 7 (x 34..). The page draws it (world/scenic/road.ts) and Friday One flies round it.
+ */
+export const BILLBOARD = { x: 28, z: 37, width: 8.4, height: 5.7 } as const;
+
 /** The lighthouse, on its rocky point out into the sea, and the pier off the beach. */
 export const LIGHTHOUSE = { x: -274, z: 18 } as const;
 export const PIER = { z: 236, length: 44, width: 4 } as const;

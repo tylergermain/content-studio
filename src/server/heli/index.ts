@@ -5,7 +5,8 @@
 // ground, tells everyone else, and has the last word on setting down: never over anyone at street level
 // on any floor, nor any floor's car. Where it was last parked is kept in the office's data folder's
 // heli.json (store.ts); with none, it's on its pad in Friday Park. A pilot who goes mid-flight sends it
-// flying itself home (home.ts), passengers and all.
+// flying itself home (home.ts), passengers and all; a trip home that gets nowhere ends with it set down
+// where it is, if it may land there, or else back on its pad.
 import { BODY, FLIGHT, HELI, bodyHit, doorDistance, groundUnder, heliFootprint, parkedHeli, tailOf } from '../../shared/heli.js';
 import { heliSolids, heliTerrain, heliTerrainOver, onPad, whyNotLand } from '../../shared/heli-world.js';
 import { overlaps } from '../../shared/garage.js';
@@ -18,7 +19,7 @@ import type { Ctx } from '../office/context.js';
 import { isStreetAdmin } from '../street/admins.js';
 import { streetPeople, streetSpot } from '../street/people.js';
 import { streetOf } from '../street/registry.js';
-import { cleanPose, stepWhy } from './checks.js';
+import { STEP, cleanPose, stepWhy } from './checks.js';
 import { homeStep, startTrip, type HomeWorld, type Trip } from './home.js';
 import { HeliFile } from './store.js';
 
@@ -65,8 +66,9 @@ export class Helicopter implements Heli {
   private readonly clock: () => number;
   private readonly cards: () => readonly BusinessCard[];
   private readonly timers: boolean;
-  /** When the pose it has now was taken (ms). */
+  /** When the pose it has now was taken (ms), and how many seconds of flying the pilot's page had left in hand then (see fly). */
   private lastAt = 0;
+  private credit = 0;
   /** Its way home, while it's flying itself there. */
   private trip: Trip | null = null;
   private timer: ReturnType<typeof setInterval> | null = null;
@@ -109,7 +111,7 @@ export class Helicopter implements Heli {
   }
 
   /** What it flies in now: the building as tall as it is and the street as it is, the ground, and who's under where. */
-  private world(): HomeWorld {
+  protected world(): HomeWorld {
     const cards = this.cards();
     const real = this.ctx.floors.size;
     const roofFloors = Math.max(TOWER.storeys, real);
@@ -167,6 +169,7 @@ export class Helicopter implements Heli {
     if (seat === 'pilot') {
       s.stage = 'landed';
       this.lastAt = this.clock();
+      this.credit = 0;
     }
     this.changed();
   }
@@ -214,8 +217,13 @@ export class Helicopter implements Heli {
       return;
     }
     const world = this.world();
-    const why = stepWhy(s.pose, pose, now - this.lastAt, world);
+    // How far it could have flown since the pose before: the time since, on the office's clock, and
+    // whatever the page had left in hand then, at most STEP.gap. Poses the network bunched up or the
+    // throttle dropped leave some in hand, so the next one to come on time isn't too far for it.
+    const hand = Math.min(STEP.gap, this.credit + (now - this.lastAt) / 1000);
+    const why = stepWhy(s.pose, pose, hand, world);
     if (why) return this.snap(c, why);
+    this.credit = hand - Math.hypot(pose.x - s.pose.x, pose.h - s.pose.h, pose.z - s.pose.z) / FLIGHT.maxSpeed;
     if (s.landed) {
       // Off the ground.
       Object.assign(s, { pose, landed: false, stage: 'flying', pad: null });
@@ -280,8 +288,25 @@ export class Helicopter implements Heli {
   private goHome() {
     const s = this.heli;
     Object.assign(s, { stage: 'home', landed: false, pad: null });
-    this.trip = startTrip(s.pose, this.world());
+    this.trip = startTrip(s.pose, this.world(), this.clock());
     this.ticking();
+  }
+
+  /**
+   * Its trip home got nowhere (home.ts): down where it is, if it may land there with nothing in the way
+   * below it and nobody under it; else back on its pad. Either way it's parked, kept in heli.json, and
+   * its passengers get out (their pages put them by a door), as at the end of any trip home.
+   */
+  private giveUp(world: HomeWorld) {
+    const p = this.heli.pose;
+    const ground = groundUnder(p, world);
+    const down: HeliPose = { ...p, h: ground, pitch: 0, roll: 0 };
+    const here = !world.whyNotLand(p.x, p.z, p.yaw) && !world.occupied(p.x, p.z, p.yaw) && !bodyHit(down, world.solids, p.h - ground);
+    console.warn(`agent-office: Friday One got nowhere flying itself home from (${p.x.toFixed(1)}, ${p.h.toFixed(1)}, ${p.z.toFixed(1)}), so it's ${here ? 'set down there' : 'back on its pad'}`);
+    this.heli = here ? { pose: down, landed: true, stage: 'parked', pad: onPad(p.x, p.z) ? 'park' : null, crew: [] } : parkedHeli();
+    this.trip = null;
+    this.file.save({ pose: this.heli.pose, pad: this.heli.pad });
+    this.changed();
   }
 
   private ticking() {
@@ -292,14 +317,16 @@ export class Helicopter implements Heli {
 
   /**
    * One step of its own flying, `dt` s: home, with everyone told where it is (and asked to step off
-   * the pad, if they're on it), or, parked with nobody at the controls, its rotor spinning down. Stops
-   * ticking when there's nothing to do.
+   * the pad, if they're on it), or given up on when it's getting nowhere; or, parked with nobody at the
+   * controls, its rotor spinning down. Stops ticking when there's nothing to do.
    */
   step(dt: number): void {
     const s = this.heli;
     const now = this.clock();
     if (s.stage === 'home' && this.trip) {
-      const leg = homeStep(s.pose, this.trip, dt, now, this.world());
+      const world = this.world();
+      const leg = homeStep(s.pose, this.trip, dt, now, world);
+      if (leg === 'stuck') return this.giveUp(world);
       if (leg === 'waiting') this.ctx.toastAll(this.trip.to.pad ? WAITING.pad : WAITING.spot);
       if (leg !== 'landed') {
         this.ctx.broadcast({ t: 'heli.move', pose: s.pose, at: now }, undefined, true);

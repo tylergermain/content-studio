@@ -117,6 +117,7 @@ export interface PuttBoard {
   record: PuttRecord | null;
   /** The best on each hole, 0..8. */
   best: (PuttBest | null)[];
+  /** The holes in one, newest first (the last 50: ACES_KEPT in server/minigolf/records.ts). */
   aces: PuttAce[];
   /** The last PUTT_RULES.kept rounds, newest first. */
   rounds: PuttCard[];

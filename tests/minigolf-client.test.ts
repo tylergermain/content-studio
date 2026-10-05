@@ -17,7 +17,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 });
 
 const play = await import('../src/client/features/minigolf/play.js');
-const { meterAt, pathAt, headingAt, rollSeconds, stanceAt, ballOf, totalOf, toPar, parText, scoreName, highlights, clockText, distText, nth, feltAt, yawTo } = play;
+const { meterAt, pathAt, rollSeconds, stanceAt, ballOf, totalOf, toPar, parText, scoreName, highlights, clockText, distText, nth, feltAt, yawTo } = play;
 
 const at = () => ({ x: 0, y: 0, z: 0 });
 const PARS = HOLES.map((h) => h.par);
@@ -80,14 +80,6 @@ test('a ball handed on (out of a tunnel, a club length off) jumps there rather t
   const p = pathAt(path, 1.6 / 30, at());
   assert.deepEqual(p, { x: 0, y: -0.3, z: 0 });
   assert.deepEqual(pathAt(path, 2 / 30, at()), { x: 3, y: 0.04, z: 2 });
-});
-
-test('the camera follows the way the ball is going, and knows when it isn’t', () => {
-  const east = [0, 0, 0, 0.1, 0, 0, 0.2, 0, 0, 0.3, 0, 0];
-  assert.ok(Math.abs((headingAt(east, 3 / 30) ?? 0) - Math.PI / 2) < 1e-9);
-  const south = [0, 0, 0, 0, 0, 0.1, 0, 0, 0.2];
-  assert.ok(Math.abs(headingAt(south, 2 / 30) ?? 1) < 1e-9);
-  assert.equal(headingAt([1, 0, 1, 1, 0, 1, 1, 0, 1], 1 / 30), null, 'still');
 });
 
 test('you stand side on to the ball, STANCE from it, the hole on your left and facing the ball', () => {
@@ -235,4 +227,50 @@ test('the putter’s blade is down at the ball, STANCE in front of your feet, an
   // golf's tee (features/golf/tee.ts) has the ball 0.57 m out, on the ground.
   const driver = headAt('driver');
   assert.ok(Math.abs(driver.z - 0.57) < 0.03 && driver.y < 0.08, `the driver's head is at ${driver.toArray().map((v) => v.toFixed(3))}`);
+});
+
+// The boards and the name cards are painted on canvases, which is all they need of a page.
+const painted: string[] = [];
+const ctx2d = new Proxy({} as Record<string | symbol, unknown>, {
+  get: (_, k) => {
+    if (k === 'measureText') return (s: string) => ({ width: s.length * 10 });
+    if (k === 'fillText') return (s: string) => void painted.push(s);
+    if (k === 'createLinearGradient') return () => ({ addColorStop() {} });
+    return () => {};
+  },
+  set: () => true,
+});
+(globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 0, height: 0, getContext: () => ctx2d }) };
+
+test('the record board lists the newest holes in one, newest first, as the office keeps them', async () => {
+  const { paintRecords } = await import('../src/client/world/minigolf/boards.js');
+  // Thirty aces, newest first (records.ts), all today.
+  const aces = Array.from({ length: 30 }, (_, i) => ({ name: `Ace${i}`, hole: i % 9, at: 1_000_000 - i * 1000 }));
+  painted.length = 0;
+  paintRecords(ctx2d as unknown as CanvasRenderingContext2D, 1024, 768, { record: null, best: Array(9).fill(null), aces, rounds: [] }, 1_000_000);
+  const listed = painted.filter((s) => s.startsWith('Ace')).map((s) => s.split(' ')[0]);
+  assert.ok(listed.length > 3 && listed.length < aces.length, `${listed.length} of them listed`);
+  assert.deepEqual(listed, aces.slice(0, listed.length).map((a) => a.name));
+});
+
+test('a name card over a ball is kept while its player is in a round, and let go of once they are in none', async () => {
+  const THREE = await import('three');
+  const { PuttBalls } = await import('../src/client/features/minigolf/balls.js');
+  const balls = new PuttBalls();
+  const cards = () => balls.group.children.filter((o): o is InstanceType<typeof THREE.Sprite> => o instanceof THREE.Sprite);
+  const kept = () => (balls as unknown as { labels: Map<string, unknown> }).labels.size;
+  const disposed: string[] = [];
+  const watch = (who: string) => cards()[0].material.addEventListener('dispose', () => void disposed.push(who));
+  const a = player('p-a');
+  const b = player('p-b');
+  // A is up: their name's over their ball on the tee.
+  balls.update(0, [round([a, b])], new Map());
+  watch('a');
+  // B's turn: B's name goes up, and A's card is kept for their next turn.
+  balls.update(0, [round([a, b], { turn: 1 })], new Map());
+  watch('b');
+  assert.deepEqual([cards().length, kept(), disposed], [1, 2, []]);
+  // The round's gone: both let go of.
+  balls.update(0, [], new Map());
+  assert.deepEqual([cards().length, kept(), disposed.sort()], [0, 0, ['a', 'b']]);
 });

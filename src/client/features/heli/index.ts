@@ -203,6 +203,9 @@ export function installHeli(ctx: Ctx, deps: HeliDeps) {
 
   /** The office has you out (it flew itself home and landed, or you came back after a dropped connection): out at the door. */
   function dropped() {
+    // Riding along, down where the office has it now: it may have been put there rather than flown
+    // (a trip home that got nowhere), so not where it was last drawn.
+    if (store.heli.landed && !pilot.active) follow.reset(store.heli.pose);
     const at = wayOut();
     letGo(drawn().yaw);
     if (at) player.pos.set(at.x, at.y, at.z);

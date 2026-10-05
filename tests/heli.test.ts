@@ -1,7 +1,7 @@
 // Friday One's flight, what it flies in and where it may land (shared/heli.ts, heli-world.ts and
 // heli-terrain.ts), flown here as the pilot's page flies it: it never gets into the tower from any side
-// or height, nor swings its tail into a wall, nor goes through the farm, the lighthouse, the rocks by
-// the tunnel, the back offices, bar 2's overhang or a crane's jib; it sets down only slowly, on level
+// or height, nor swings its tail into a wall, nor goes through the farm, the lighthouse, the billboard,
+// the rocks by the tunnel, the back offices, bar 2's overhang or a crane's jib; it sets down only slowly, on level
 // ground, and never anywhere it mustn't; the ground it flies over is never under the mountains the
 // page draws; and its downwash only pushes people on the ground under it while it's flying.
 import test from 'node:test';
@@ -11,7 +11,7 @@ import { BODY, FLIGHT, HELI, LAND_HOLD, WASH, bodyHit, fly, groundUnder, homePos
 import { heliSolids, heliTerrain, heliTerrainOver, onPad, whyNotLand } from '../src/shared/heli-world.js';
 import { GOLF_HOLE, STREET_Y, roofDrop } from '../src/shared/layout.js';
 import { CRANE, GROUNDS, PARK, PLOTS, craneAt, inPlots, type Solid } from '../src/shared/mainstreet.js';
-import { FARM, FOOTHILLS, LAKE, LIGHTHOUSE, MOUNTAINS, SPURS, shoreX } from '../src/shared/scenic.js';
+import { BILLBOARD, FARM, FOOTHILLS, LAKE, LIGHTHOUSE, MOUNTAINS, SPURS, shoreX } from '../src/shared/scenic.js';
 import type { BusinessCard, HeliPose } from '../src/shared/protocol.js';
 import { neighbourBoxes } from '../src/client/world/outside.js';
 import { buildMountains } from '../src/client/world/scenic/mountains.js';
@@ -98,7 +98,7 @@ test("turning beside a wall can't swing the tail into it", () => {
   assert.ok(f.pose.z - HELI.tail >= 13.3 - 0.3, `the tail's end at ${(f.pose.z - HELI.tail).toFixed(2)}`);
 });
 
-test("it can't fly through a crane's jib, the farm, the lighthouse, the rocks by the tunnel, the back offices or bar 2's overhang", () => {
+test("it can't fly through a crane's jib, the farm, the lighthouse, the billboard, the rocks by the tunnel, the back offices or bar 2's overhang", () => {
   const site = [card('P3', 'site')];
   const w = world(site);
   const jib = craneAt('P3');
@@ -110,6 +110,7 @@ test("it can't fly through a crane's jib, the farm, the lighthouse, the rocks by
     ['the windmill', FARM.windmill.x, 8, FARM.windmill.z, 30, 2],
     ["the windmill's sails", FARM.windmill.x + 6, 16, FARM.windmill.z + 3.35, 30, 2],
     ['the lighthouse', LIGHTHOUSE.x, 15, LIGHTHOUSE.z, 30, 2],
+    ['the SCENIC LOOP billboard', BILLBOARD.x, 3, BILLBOARD.z, 30, 2],
     ...SPURS.map(([x, z, , hgt], i) => [`spur rock ${i}`, x, hgt * 0.5, z, 40, 2] as [string, number, number, number, number, number]),
     ['the back offices', 15.7, 10, -20, 30, 2],
   ];
