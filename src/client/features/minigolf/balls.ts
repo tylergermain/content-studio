@@ -111,14 +111,26 @@ export class PuttBalls {
         }
       }
     }
-    // Balls of people no longer in a round are picked up.
+    // Balls of people no longer in a round are picked up, and their name cards let go of.
+    let gone = false;
     for (const [id, b] of this.balls) {
       if (b.seen) continue;
       this.group.remove(b.mesh);
       this.balls.delete(id);
+      gone = true;
     }
     for (const id of this.played.keys()) if (!hasRound(rounds, id)) this.played.delete(id);
     this.label(labelId, labelName, labelBall);
+    if (gone) this.forget();
+  }
+
+  /** Lets go of the name card of anyone whose ball's been picked up (never the one up now, who has a ball). */
+  private forget() {
+    for (const [id, sprite] of this.labels) {
+      if (this.balls.has(id) || this.labelled?.sprite === sprite) continue;
+      disposeSprite(sprite);
+      this.labels.delete(id);
+    }
   }
 
   /** The playing-out of round `round`'s latest putt, started over when a new one comes. */
@@ -215,17 +227,6 @@ export class PuttBalls {
       this.group.add(sprite);
     }
     this.labelled.sprite.position.copy(ball.position).y += 0.32;
-  }
-
-  /** Everything put away (the floor's gone). */
-  clear() {
-    for (const b of this.balls.values()) this.group.remove(b.mesh);
-    this.balls.clear();
-    this.played.clear();
-    for (const s of this.labels.values()) disposeSprite(s);
-    this.labels.clear();
-    if (this.labelled) this.group.remove(this.labelled.sprite);
-    this.labelled = null;
   }
 }
 

@@ -7,7 +7,7 @@
 
 import type { Box } from '../../../shared/garage';
 import { ROAD } from '../../../shared/layout';
-import { CRANE, HOARDING, PARK, PLATE, PLOTS, boxToStreet, craneAt, frameOf, isClaimable, plateBox, shellTop, toStreet, type Claimable } from '../../../shared/mainstreet';
+import { CRANE, CRANE_YARD as SHARED_YARD, HOARDING, PARK, PLATE, PLOTS, boxToStreet, craneAt, frameOf, isClaimable, plateBox, shellTop, toStreet, type Claimable } from '../../../shared/mainstreet';
 import type { BusinessCard, BusinessStage } from '../../../shared/protocol';
 
 /** Something in the way out on the street: its footprint, and from `bottom` to `top` over the street. */
@@ -53,8 +53,8 @@ export const LOBBY = { x: 4.5, width: 3, height: 2.7, glass: [-0.5, 9.5], canopy
 const CONES = [-3.6, -1.2, 1.2, 3.6];
 const CONE_Z = GATE.front + 0.9;
 
-/** The fenced square round a crane's foot: this far either way from its mast. */
-export const CRANE_YARD = 2.2;
+/** The fenced square round a crane's foot: this far either way from its mast (CRANE_YARD in shared/mainstreet.ts). */
+export const CRANE_YARD = SHARED_YARD.half;
 
 /** The floodlight over Friday One's pad: how tall its pole is. Its lamp leans out toward the pad. */
 export const FLOOD = { height: 6.5, lean: 0.7 } as const;

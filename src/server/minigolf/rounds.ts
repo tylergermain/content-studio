@@ -290,8 +290,10 @@ export class PuttRounds {
     this.letThrough();
   }
 
+  /** A finished round goes, and with it when its players last putted (they're in no other round: see play). */
   private drop(game: Game) {
     this.clearTimers(game);
+    for (const p of game.round.players) this.struck.delete(p.id);
     this.games = this.games.filter((g) => g !== game);
     this.letThrough();
     this.changed();

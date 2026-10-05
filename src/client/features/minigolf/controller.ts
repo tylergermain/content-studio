@@ -4,6 +4,7 @@ import { BALL_R } from '../../../shared/minigolf/types';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import type { Person } from '../../world/character';
+import { aimClear, followClear } from './clear';
 import { distText, feltAt, meterAt, nth, stanceAt, wrapAngle, yawTo } from './play';
 
 // Putting (E at your ball on your turn): you stand side on to the ball with the putter, and the camera
@@ -23,7 +24,8 @@ const AIM_LINE = 1.2;
 const DOTS = 12;
 /**
  * Behind the ball along the line while aiming, and up, and a little to the side away from you so you
- * don't stand in your own way; then following it, back and up.
+ * don't stand in your own way; then following it, back and up, still that little to the side, so you
+ * aren't in the way as it sets off either.
  */
 const AIM_BACK = 2.6;
 const AIM_UP = 1.4;
@@ -56,6 +58,8 @@ export interface PutterHooks {
 const lookAt = new THREE.Matrix4();
 const want = new THREE.Vector3();
 const target = new THREE.Vector3();
+/** The camera where it is, its height over the street (see clear.ts). */
+const here = new THREE.Vector3();
 const turn = new THREE.Quaternion();
 const UP = new THREE.Vector3(0, 1, 0);
 const spot = { x: 0, z: 0, facing: 0 };
@@ -268,16 +272,23 @@ export class Putter {
     const street = this.hooks.street();
     const ball = this.stage === 'watch' ? this.hooks.ball() : null;
     if (ball) {
-      // Following it: behind it the way it's going, and up, looking at it.
-      const yaw = this.heading;
-      want.set(ball.x - Math.sin(yaw) * CHASE_BACK, street + ball.y + CHASE_UP, ball.z - Math.cos(yaw) * CHASE_BACK);
+      // Following it: behind it the way it's going, and up, looking at it, off to the side you aren't.
+      const sin = Math.sin(this.heading);
+      const cos = Math.cos(this.heading);
+      want.set(ball.x - sin * CHASE_BACK - cos * AIM_SIDE, ball.y + CHASE_UP, ball.z - cos * CHASE_BACK + sin * AIM_SIDE);
+      // By the windmill, never into its house or among its sails (see clear.ts).
+      here.set(this.camPos.x, this.camPos.y - street, this.camPos.z);
+      followClear(HOLES[this.hole], ball, here, want);
+      want.y += street;
       target.set(ball.x, street + ball.y, ball.z);
     } else {
       // Behind the ball along the line, and up: the ball low in the view, the line out ahead of it.
       const sin = Math.sin(this.aim);
       const cos = Math.cos(this.aim);
       // You stand to the line's left (see stanceAt): the camera's off to its right.
-      want.set(this.at.x - sin * AIM_BACK - cos * AIM_SIDE, street + this.at.y + AIM_UP, this.at.z - cos * AIM_BACK + sin * AIM_SIDE);
+      want.set(this.at.x - sin * AIM_BACK - cos * AIM_SIDE, this.at.y + AIM_UP, this.at.z - cos * AIM_BACK + sin * AIM_SIDE);
+      aimClear(HOLES[this.hole], this.at, this.aim, want);
+      want.y += street;
       target.set(this.at.x + sin * 1.6, street + this.at.y - BALL_R, this.at.z + cos * 1.6);
     }
     const k = 1 - Math.exp(-dt * (ball ? 4 : 7));

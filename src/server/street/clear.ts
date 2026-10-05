@@ -5,7 +5,7 @@
 // out on the street, on every floor.
 import { HELI, heliFootprint } from '../../shared/heli.js';
 import type { Box } from '../../shared/garage.js';
-import { businessBoxes, claimedBox, PLOTS, type Claimable, type Solid, type StreetPoint } from '../../shared/mainstreet.js';
+import { businessBoxes, claimedBox, CRANE_YARD, craneAt, PLOTS, type Claimable, type Solid, type StreetPoint } from '../../shared/mainstreet.js';
 import type { BusinessStage, HeliState } from '../../shared/protocol.js';
 import { heliOf } from '../heli/index.js';
 import type { Ctx } from '../office/context.js';
@@ -23,10 +23,19 @@ export interface InTheWay {
 /** What's in the way in the office now: Friday One as it is, and everyone at street level on every floor. */
 export const inTheWay = (ctx: Ctx): InTheWay => ({ heli: heliOf(ctx).state(), people: streetPeople(ctx).map((p) => p.at) });
 
-/** What would stand on `plot` as `stage` with `planned` storeys, as businessBoxes has it. */
+/**
+ * What would stand on `plot` as `stage` with `planned` storeys, as businessBoxes has it, and for a site
+ * the fenced yard its crane stands in, outside the hoarding at the plot's back corner.
+ */
 export function wallsOf(plot: Claimable, stage: BusinessStage, planned: number): Solid[] {
   const storeys = Array.from({ length: planned }, () => ({ name: '', accent: '#000000' }));
-  return businessBoxes([{ id: '', name: '', plot, accent: '#000000', skin: 'glass', stage, home: 'hosted', storeys }]);
+  const walls = businessBoxes([{ id: '', name: '', plot, accent: '#000000', skin: 'glass', stage, home: 'hosted', storeys }]);
+  if (stage === 'site') {
+    const { x, z } = craneAt(plot);
+    const y = CRANE_YARD.half;
+    walls.push({ minX: x - y, maxX: x + y, minZ: z - y, maxZ: z + y, bottom: 0, top: CRANE_YARD.fence });
+  }
+  return walls;
 }
 
 const overlaps = (a: Box, b: Box) => a.minX <= b.maxX && a.maxX >= b.minX && a.minZ <= b.maxZ && a.maxZ >= b.minZ;
@@ -43,19 +52,21 @@ function reaches(b: Box, bottom: number, top: number, s: Solid): boolean {
 
 /**
  * Why `walls` can't go up on `plot` now, if they can't. Friday One parked or landed with any of its
- * footprint (rotor disc and tail) on the plot's ground, or in the air with its body in what's going
- * up (a shell's top storeys, a crane's jib sweeping round), has to fly clear first; anyone standing on
- * the plot, or within a step of its walls, has to step off. Nothing in the way: undefined.
+ * footprint (rotor disc and tail) on the plot's ground (its claimed ground, and a site's crane yard
+ * out behind it), or in the air with its body in what's going up (a shell's top storeys, a crane's jib
+ * sweeping round), has to fly clear first; anyone standing on that ground, or within a step of its
+ * walls, has to step off. Nothing in the way: undefined.
  */
 export function whyNotClear(plot: Claimable, walls: readonly Solid[], o: InTheWay): string | undefined {
   const name = PLOTS[plot].name;
-  const ground = claimedBox(plot);
+  // The plot's claimed ground, and whatever of the walls stands on the street outside it (a crane's yard and mast).
+  const ground: Box[] = [claimedBox(plot), ...walls.filter((s) => s.bottom <= 0 && !s.round)];
   const { pose, landed } = o.heli;
   const foot = heliFootprint(pose);
-  if (landed && overlaps(foot, ground)) return `🚁 Friday One is parked on ${name}: it has to fly off first`;
+  if (landed && ground.some((g) => overlaps(foot, g))) return `🚁 Friday One is parked on ${name}: it has to fly off first`;
   if (!landed && walls.some((s) => reaches(foot, pose.h, pose.h + HELI.hub + 0.3, s))) return `🚁 Friday One is in the way over ${name}: wait till it's flown clear`;
   const m = STEP_OFF;
-  const on = (p: StreetPoint) => p.x >= ground.minX - m && p.x <= ground.maxX + m && p.z >= ground.minZ - m && p.z <= ground.maxZ + m;
+  const on = (p: StreetPoint) => ground.some((g) => p.x >= g.minX - m && p.x <= g.maxX + m && p.z >= g.minZ - m && p.z <= g.maxZ + m);
   if (o.people.some(on)) return `🏙 Someone's standing on ${name}: they have to step off first`;
   return undefined;
 }

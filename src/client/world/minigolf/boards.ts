@@ -161,7 +161,8 @@ export function paintRecords(g: CanvasRenderingContext2D, w: number, h: number, 
   text(g, 'Last rounds', w / 2 + 10, y0, 26, MUTED, 800);
   const lh = 34;
   const room = Math.max(1, Math.floor((h - y0 - 30) / lh));
-  const aces = board.aces.slice(-room).reverse();
+  // The newest first, as the office keeps them.
+  const aces = board.aces.slice(0, room);
   if (!aces.length) text(g, 'None yet: be the first.', 20, y0 + lh, 24, INK, 700);
   aces.forEach((a, i) => text(g, cut(`${a.name} · hole ${a.hole + 1} · ${dayOf(a.at, now)}`, 34), 20, y0 + lh * (i + 1), 24, INK, 700));
   const last = board.rounds.slice(0, room);

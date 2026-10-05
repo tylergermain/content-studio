@@ -18,6 +18,7 @@ Object.defineProperty(globalThis, 'localStorage', {
 
 const play = await import('../src/client/features/minigolf/play.js');
 const { meterAt, pathAt, headingAt, rollSeconds, stanceAt, ballOf, totalOf, toPar, parText, scoreName, highlights, clockText, distText, nth, feltAt, yawTo } = play;
+const { inMill, followClear, aimClear, MILL_OVER } = await import('../src/client/features/minigolf/clear.js');
 
 const at = () => ({ x: 0, y: 0, z: 0 });
 const PARS = HOLES.map((h) => h.par);
@@ -88,6 +89,91 @@ test('the camera follows the way the ball is going, and knows when it isn’t', 
   const south = [0, 0, 0, 0, 0, 0.1, 0, 0, 0.2];
   assert.ok(Math.abs(headingAt(south, 2 / 30) ?? 1) < 1e-9);
   assert.equal(headingAt([1, 0, 1, 1, 0, 1, 1, 0, 1], 1 / 30), null, 'still');
+});
+
+/**
+ * The putting camera following a putt on `hole` as controller.ts has it (3 m behind the ball the way
+ * it's going, 0.55 m to the side, 2 m up, easing there at 4 a second, 60 frames a second, clear.ts by
+ * the windmill), from behind the tee: where it is each frame, and the ball.
+ */
+function follow(hole: Hole, path: ArrayLike<number>, yaw: number) {
+  const ball = at();
+  pathAt(path, 0, ball);
+  const cam = { x: ball.x - Math.sin(yaw) * 3 - Math.cos(yaw) * 0.55, y: ball.y + 2, z: ball.z - Math.cos(yaw) * 3 + Math.sin(yaw) * 0.55 };
+  const want = at();
+  let heading = yaw;
+  const frames: { cam: { x: number; y: number; z: number }; ball: { x: number; y: number; z: number } }[] = [];
+  for (let t = 0; t <= rollSeconds(path) + 1; t += 1 / 60) {
+    pathAt(path, t, ball);
+    heading = headingAt(path, t) ?? heading;
+    want.x = ball.x - Math.sin(heading) * 3 - Math.cos(heading) * 0.55;
+    want.y = ball.y + 2;
+    want.z = ball.z - Math.cos(heading) * 3 + Math.sin(heading) * 0.55;
+    followClear(hole, ball, cam, want);
+    const k = 1 - Math.exp(-4 / 60);
+    cam.x += (want.x - cam.x) * k;
+    cam.y += (want.y - cam.y) * k;
+    cam.z += (want.z - cam.z) * k;
+    frames.push({ cam: { ...cam }, ball: { ...ball } });
+  }
+  return frames;
+}
+
+/** Whether a camera at `c` is inside the windmill's house or the disc its sails sweep across its front. */
+function inMillItself(hole: Hole, c: { x: number; y: number; z: number }): boolean {
+  const m = hole.mill!;
+  const half = m.base / 2;
+  const house = Math.abs(c.x - m.x) < half && Math.abs(c.z - m.z) < half && c.y < m.height + 0.1;
+  // The sails turn on the front toward the tee (-z), 0.08 m out from the house, 2.22 m round a hub 2.32 m up.
+  const sails = Math.abs(c.z - (m.z - half - 0.08)) < 0.15 && Math.hypot(c.x - m.x, c.y - 2.32) < 2.3;
+  return house || sails;
+}
+
+test('following a putt through the windmill, the camera goes up over its house and sails, never into them', () => {
+  const hole = HOLES[1];
+  const m = hole.mill!;
+  const r = roll(hole, { from: teeBall(hole), yaw: -0.0506, power: 0.726, startAt: 1_000_000 });
+  assert.ok(r.holed, 'the putt goes through the windmill and drops');
+  const frames = follow(hole, r.path, -0.0506);
+  for (const f of frames) assert.ok(!inMillItself(hole, f.cam), `the camera's in the windmill at ${JSON.stringify(f.cam)}`);
+  // It did go up over the mill once the ball was through, and back down after it.
+  assert.ok(frames.some((f) => f.cam.y > m.height + MILL_OVER - 0.5 && Math.abs(f.cam.z - m.z) < m.base), 'it goes over the mill');
+  // Nowhere near a windmill, it's left where it would be.
+  const want = { x: HOLES[0].cup.x, y: 2, z: HOLES[0].cup.z };
+  followClear(HOLES[0], HOLES[0].cup, { x: 0, y: 0, z: 0 }, want);
+  assert.deepEqual(want, { x: HOLES[0].cup.x, y: 2, z: HOLES[0].cup.z });
+});
+
+test('a putt a sail knocks back is watched from the tee’s side of the windmill, not from inside it or behind it', () => {
+  const hole = HOLES[1];
+  const m = hole.mill!;
+  // A firm straight putt, struck while the mouth is shut: the sail sends it back toward the tee.
+  let r: ReturnType<typeof roll> | null = null;
+  for (let startAt = 1_000_000; startAt < 1_004_000 && !r; startAt += 25) {
+    const tried = roll(hole, { from: teeBall(hole), yaw: 0, power: 0.7, startAt });
+    if (!tried.holed && !tried.out && tried.rest.z < m.z - m.base / 2) r = tried;
+  }
+  assert.ok(r, 'some putt is knocked back');
+  for (const f of follow(hole, r.path, 0)) {
+    assert.ok(!inMillItself(hole, f.cam), `the camera's in the windmill at ${JSON.stringify(f.cam)}`);
+    assert.ok(f.cam.z < m.z, 'the camera stays on the tee’s side of the mill');
+  }
+});
+
+test('aiming from just behind the windmill, the camera looks down on the ball rather than from in the house', () => {
+  const hole = HOLES[1];
+  const m = hole.mill!;
+  const ball = { x: m.x, y: 0.09, z: m.z + m.base / 2 + 0.4 };
+  const aim = yawTo(ball, hole.cup);
+  const want = { x: ball.x - Math.sin(aim) * 2.6, y: ball.y + 1.4, z: ball.z - Math.cos(aim) * 2.6 };
+  assert.ok(inMill(hole, want.x, want.z, want.y), 'behind the ball along the line is in the house');
+  aimClear(hole, ball, aim, want);
+  assert.ok(!inMillItself(hole, want), 'out of the house');
+  assert.ok(Math.hypot(want.x - ball.x, want.z - ball.z) < 0.5 && want.y > ball.y + 3, 'over the ball, looking down on it');
+  // Out on the felt, the camera stands where it would.
+  const open = { x: hole.tee.x, y: 1.4, z: hole.tee.z - 2.6 };
+  aimClear(hole, { x: hole.tee.x, y: 0.09, z: hole.tee.z }, 0, open);
+  assert.deepEqual(open, { x: hole.tee.x, y: 1.4, z: hole.tee.z - 2.6 });
 });
 
 test('you stand side on to the ball, STANCE from it, the hole on your left and facing the ball', () => {
@@ -235,4 +321,50 @@ test('the putter’s blade is down at the ball, STANCE in front of your feet, an
   // golf's tee (features/golf/tee.ts) has the ball 0.57 m out, on the ground.
   const driver = headAt('driver');
   assert.ok(Math.abs(driver.z - 0.57) < 0.03 && driver.y < 0.08, `the driver's head is at ${driver.toArray().map((v) => v.toFixed(3))}`);
+});
+
+// The boards and the name cards are painted on canvases, which is all they need of a page.
+const painted: string[] = [];
+const ctx2d = new Proxy({} as Record<string | symbol, unknown>, {
+  get: (_, k) => {
+    if (k === 'measureText') return (s: string) => ({ width: s.length * 10 });
+    if (k === 'fillText') return (s: string) => void painted.push(s);
+    if (k === 'createLinearGradient') return () => ({ addColorStop() {} });
+    return () => {};
+  },
+  set: () => true,
+});
+(globalThis as { document?: unknown }).document ??= { createElement: () => ({ width: 0, height: 0, getContext: () => ctx2d }) };
+
+test('the record board lists the newest holes in one, newest first, as the office keeps them', async () => {
+  const { paintRecords } = await import('../src/client/world/minigolf/boards.js');
+  // Thirty aces, newest first (records.ts), all today.
+  const aces = Array.from({ length: 30 }, (_, i) => ({ name: `Ace${i}`, hole: i % 9, at: 1_000_000 - i * 1000 }));
+  painted.length = 0;
+  paintRecords(ctx2d as unknown as CanvasRenderingContext2D, 1024, 768, { record: null, best: Array(9).fill(null), aces, rounds: [] }, 1_000_000);
+  const listed = painted.filter((s) => s.startsWith('Ace')).map((s) => s.split(' ')[0]);
+  assert.ok(listed.length > 3 && listed.length < aces.length, `${listed.length} of them listed`);
+  assert.deepEqual(listed, aces.slice(0, listed.length).map((a) => a.name));
+});
+
+test('a name card over a ball is kept while its player is in a round, and let go of once they are in none', async () => {
+  const THREE = await import('three');
+  const { PuttBalls } = await import('../src/client/features/minigolf/balls.js');
+  const balls = new PuttBalls();
+  const cards = () => balls.group.children.filter((o): o is InstanceType<typeof THREE.Sprite> => o instanceof THREE.Sprite);
+  const kept = () => (balls as unknown as { labels: Map<string, unknown> }).labels.size;
+  const disposed: string[] = [];
+  const watch = (who: string) => cards()[0].material.addEventListener('dispose', () => void disposed.push(who));
+  const a = player('p-a');
+  const b = player('p-b');
+  // A is up: their name's over their ball on the tee.
+  balls.update(0, [round([a, b])], new Map());
+  watch('a');
+  // B's turn: B's name goes up, and A's card is kept for their next turn.
+  balls.update(0, [round([a, b], { turn: 1 })], new Map());
+  watch('b');
+  assert.deepEqual([cards().length, kept(), disposed], [1, 2, []]);
+  // The round's gone: both let go of.
+  balls.update(0, [], new Map());
+  assert.deepEqual([cards().length, kept(), disposed.sort()], [0, 0, ['a', 'b']]);
 });

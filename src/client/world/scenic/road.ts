@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CREEK, LOOP, LOOP_HALF, LOOP_LENGTH, LOOP_PAVED, PLACES, STREET_END, STREET_Z, type Place } from '../../../shared/scenic';
+import { BILLBOARD, CREEK, LOOP, LOOP_HALF, LOOP_LENGTH, LOOP_PAVED, PLACES, STREET_END, STREET_Z, type Place } from '../../../shared/scenic';
 import { roadTexture } from '../outside';
 import { tilingCanvasTexture } from '../texture';
 import { mesh, textPlane, toon } from '../toon';
@@ -91,11 +91,8 @@ export function buildRoad(kit: ScenicKit): Road {
   return { asphalt, roadU, creekLine, bridge };
 }
 
-/**
- * The SCENIC LOOP billboard across the street from the garage, facing it: its middle. Its board is
- * 8.4 m wide, so it stands in x 23.8..32.2, between Friday Park (x ..22) and Plot 7 (x 34..).
- */
-export const BILLBOARD = { x: 28, z: 37, width: 8.4 } as const;
+/** Where the SCENIC LOOP billboard stands (shared/scenic.ts, so Friday One flies round it too). */
+export { BILLBOARD };
 
 /** A wooden sign on two posts, `text` on its face, facing `rotY` (its face toward +z turned by that). */
 function signpost(into: THREE.Group, labels: THREE.Group, x: number, z: number, rotY: number, text: string, width = 5) {

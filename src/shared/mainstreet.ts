@@ -84,6 +84,13 @@ export const HOARDING = { height: 2.4, out: 1 } as const;
  */
 export const CRANE = { mast: 34, jibY: 32.6, jib: 26, counter: 8, period: 90, set: 6 } as const;
 
+/**
+ * The fenced square a site's crane stands in, outside its hoarding: this far either way from the mast,
+ * and as high as its fence. Nobody's let in it (world/mainstreet walls it off), so a claim looks there
+ * too before it goes up (server/street/clear.ts).
+ */
+export const CRANE_YARD = { half: 2.2, fence: 1.2 } as const;
+
 /** Where plot `plot`'s crane's mast stands, in the street frame. */
 export function craneAt(plot: Claimable): { x: number; z: number } {
   const p = PLOTS[plot];

@@ -9,7 +9,7 @@ Putt Street is a nine-hole mini golf course, par 26, on plot P6 across Main Stre
 A white picket fence, 0.9 m high, runs round the plot. Its gate is on the street side, under a **⛳ PUTT STREET · MINI GOLF** sign. Inside the gate:
 
 - **The kiosk** is to the east of the gate. **PUTT STREET** is on its roof, facing the street. On the course side it has a hatch under a striped awning, and the putter rack with the live scorecard board over it. The board shows every round being played: who's in each group, their strokes hole by hole, the hole each group is on, and whose turn it is.
-- **The record board** is to the west of the gate, facing the street. It shows the course record, the best score on each hole, the holes in one, and the last few rounds.
+- **The record board** is to the west of the gate, facing the street. It shows the course record, the best score on each hole, the newest holes in one, and the last few rounds.
 
 Each hole has its own 10 m cell of lawn, on a 3 × 3 grid with gravel paths between. A lantern stands at each of two path crossings, and lights the course at night. The order snakes back from the kiosk, and each tee is on the side you walk up from the hole before. A sign beside each tee gives the hole's number, name and par.
 
@@ -33,7 +33,7 @@ The holes are data: they're defined in `src/shared/minigolf/course.ts`, and the 
 - **The scorecard.** While you're in a round, a compact scorecard is at the top left of the screen. It shows every player's strokes on holes 1 to 9, the total against par, a par row, and the hole being played. Above the card it says whose turn it is and how long that turn has left. It doesn't take the mouse or the keyboard.
 - **Your turn.** A toast says **⛳ Your turn on hole 4**. Walk to your ball (it's in your colour, with your name over it) and press **E** within about 2.5 m. You step up to the ball with a putter, side on to it, and the camera stands back along the line behind the ball.
 - **Aiming.** The mouse aims (or **A** and **D**). A dotted line shows the first 1.2 m of the line. It doesn't show where the ball will go.
-- **Putting.** Hold **Space**. The meter at the top of the screen runs from empty to full and back down, and keeps going for as long as you hold Space. Let go when it's where you want it. The putter swings, and the camera follows the ball until it stops. If it's still your turn, you're over the ball again where it stopped.
+- **Putting.** Hold **Space**. The meter at the top of the screen runs from empty to full and back down, and keeps going for as long as you hold Space. Let go when it's where you want it. The putter swings, and the camera follows the ball until it stops, a little to the side so you're not in its way. By the windmill it never goes into the house or among the sails: while the ball's on its side of the mill it waits there, and once the ball's through the tunnel it goes up over the roof after it. If it's still your turn, you're over the ball again where it stopped (just behind the windmill, the camera looks down on it from over it).
 - **Stepping away.** **E** or **Esc** steps away from the ball. Walk back and press **E** to step up again. You also step away when you sit down, take the elevator or go up to the roof.
 - **Leaving.** **E** at the rack twice (the first press asks) hands your putter back and takes you out of the round. Closing the page does the same.
 
@@ -88,7 +88,7 @@ The office keeps Putt Street's records in `minigolf.json`, in its data folder:
 
 - the course record, for a full nine holes (on a tie, the earlier round keeps it);
 - the best score on each hole;
-- every hole in one;
+- the last 50 holes in one (the record board lists as many of the newest as fit, newest first);
 - the last 20 rounds.
 
 A new course record or a hole in one is toasted to the whole building, and sets off confetti over the record board or the cup. A `minigolf.json` that won't read is logged and set aside as `minigolf.json.corrupt-<time>`, and the office starts the records again from empty. It's never quietly written over. Writes are atomic.
@@ -116,7 +116,7 @@ Every sound comes from where the ball is, and everyone on every floor hears it b
 | `src/shared/minigolf/` | The holes, the physics and the rules, all pure: the office runs the physics, and the page reads the holes and the windmill's clock. |
 | `src/shared/protocol/minigolf.ts` | The messages: `putt.play`, `putt.start`, `putt.stroke` and `putt.quit`, then `putt`, `putt.rolled` and `putt.board`. |
 | `src/server/minigolf/` and `ws/handlers/minigolf.ts` | The rounds, the referee and `minigolf.json`. |
-| `src/client/features/minigolf/` | The page: the `puttCourse` street fixture and `buildPuttStreet` (`world.ts`), playing the balls back (`balls.ts`), putting (`controller.ts`), the scorecard and the Round-over window (`ui.ts`), and the sounds (`sound.ts`). |
+| `src/client/features/minigolf/` | The page: the `puttCourse` street fixture and `buildPuttStreet` (`world.ts`), playing the balls back (`balls.ts`), putting (`controller.ts`, with where its camera goes by the windmill in `clear.ts`), the scorecard and the Round-over window (`ui.ts`), and the sounds (`sound.ts`). |
 | `src/client/world/minigolf/` | The course's pieces: the felt, walls and bumpers, the windmill, the loop, the hill and its tunnels, the arch, the grounds, the kiosk and the boards. |
 
 To look at the course in the lab, open `/lab/minigolf.html` on the Vite dev server:

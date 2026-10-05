@@ -6,9 +6,9 @@
 // bar 2 overhanging its west end, the balconies, the back offices on their posts, the marquee, the
 // stairs down its west side, and up on the roof the bar's clutter, the elevator's housing and mast, the
 // stage's rig and the parasols); the two neighbours behind it; the farm's barn, silo and windmill
-// with its sails; the lighthouse; the windsock by the heliport; Putt Street's kiosk, fence, gate,
-// record board, windmill and arch; and whatever stands on the claimed plots, a crane's whole jib sweep
-// included. Trees and lamps it flies through.
+// with its sails; the lighthouse; the windsock by the heliport; the SCENIC LOOP billboard; Putt
+// Street's kiosk, fence, gate, record board, windmill and arch; and whatever stands on the claimed
+// plots, a crane's whole jib sweep included. Trees and lamps it flies through.
 //
 // It never sets down on the lot in front of the garage (the parachutes come down there, and the cars
 // come and go through the garage's mouth), the tower or the lot down its east side, golf's green round
@@ -22,7 +22,7 @@ import { BALCONY, ELEVATOR, ELEVATOR_FRONT, EXIT_STAIRS, FLOOR, GOLF_HOLE, ROOF_
 import { businessBoxes, CLAIMABLE, claimedBox, GROUNDS, isClaimable, PARK, PLATE, PLOTS, PUTT, roundSolid, type Solid } from './mainstreet.js';
 import { HOLES } from './minigolf/course.js';
 import type { BusinessCard } from './protocol/street.js';
-import { FARM, LAKE, LIGHTHOUSE, SPURS, shoreX } from './scenic.js';
+import { BILLBOARD, FARM, LAKE, LIGHTHOUSE, SPURS, shoreX } from './scenic.js';
 import { TOWER } from './tower.js';
 import { BODY, HELI, tailOf } from './heli.js';
 import { discHitsBox, discHitsCircle, turnedHitsBox, turnedHitsCircle } from './heli-shapes.js';
@@ -143,6 +143,8 @@ const FIXED: readonly Solid[] = [
   // (anywhere within 0.45 of a rock's radius it stands at least 0.3 of its height).
   ...SPURS.map(([x, z, r, h]) => roundSolid(x, z, r * 0.45, FOOT, h * 0.28)),
   roundSolid(PARK.windsock.x, PARK.windsock.z, 1.2, FOOT, PARK.windsock.pole + 0.8),
+  // The SCENIC LOOP billboard between Friday Park and Plot 7, its board and posts.
+  box(BILLBOARD.x - BILLBOARD.width / 2 - 0.2, BILLBOARD.x + BILLBOARD.width / 2 + 0.2, BILLBOARD.z - 0.4, BILLBOARD.z + 0.4, FOOT, BILLBOARD.height + 0.3),
   ...puttSolids(),
 ];
 

@@ -174,3 +174,19 @@ test('aboard Friday One is flying it or riding in it, from whichever floor, and 
     store.heli = was;
   }
 });
+
+test('down on the street in a round on Putt Street is playing Putt Street, until the round is over', () => {
+  const was = store.puttRounds;
+  try {
+    const player = { id: 'p', name: 'P', color: '#fff', strokes: Array(9).fill(null), ball: null, taken: 0 };
+    const round = { id: 'putt-1', stage: 'playing' as const, hole: 0, turn: 0, players: [player], starter: 'p', since: 0, until: 0 };
+    store.puttRounds = [round];
+    assert.equal(whereabouts(peer(-46, 38, 'agent-office', -3.6)), '⛳ playing Putt Street');
+    // Indoors they're wherever they are, round or no round.
+    assert.equal(whereabouts(peer(14, 10, 'agent-office')), '🤝 in the meeting room');
+    store.puttRounds = [{ ...round, stage: 'over' as const }];
+    assert.equal(whereabouts(peer(-46, 38, 'agent-office', -3.6)), '🚶 outside');
+  } finally {
+    store.puttRounds = was;
+  }
+});

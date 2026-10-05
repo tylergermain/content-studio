@@ -1,23 +1,24 @@
 // The office's Friday One (server/heli/), with a made-up office of two floors, people on them and the
 // cars in their garages: only street admins fly it and three ride along, from beside a door while it's
-// down; every pose the pilot's page sends is checked (how fast, what's solid, how far out); it won't
-// set down over anyone at street level on any floor, or any floor's car; it flies itself home when its
-// pilot goes mid-flight, out from under bar 2's overhang first, and waits for anyone on its pad; and
-// heli.json keeps where it was parked, a file that won't read being set aside.
+// down; every pose the pilot's page sends is checked (how fast, what's solid, how far out), poses the
+// network bunches up included; it won't set down over anyone at street level on any floor, or any
+// floor's car; it flies itself home when its pilot goes mid-flight, out from under bar 2's overhang or a
+// crane's jib first (just off the ground too), and waits for anyone on its pad; a trip home that gets
+// nowhere gives up; and heli.json keeps where it was parked, a file that won't read being set aside.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { WebSocket } from 'ws';
-import { BODY, HELI, bodyHit, heliToStreet } from '../src/shared/heli.js';
+import { BODY, FLIGHT, HELI, bodyHit, groundUnder, heliToStreet } from '../src/shared/heli.js';
 import { heliSolids } from '../src/shared/heli-world.js';
 import { streetBelow } from '../src/shared/layout.js';
-import { PARK, type StreetPoint } from '../src/shared/mainstreet.js';
+import { PARK, craneAt, type Solid, type StreetPoint } from '../src/shared/mainstreet.js';
 import type { BusinessCard, CarState, HeliPose, ServerMsg } from '../src/shared/protocol.js';
 import { ROOF } from '../src/shared/rooftop.js';
 import { Helicopter, heliIfAny, heliOf } from '../src/server/heli/index.js';
-import { cleanPose, stepWhy } from '../src/server/heli/checks.js';
+import { STEP, cleanPose, stepWhy } from '../src/server/heli/checks.js';
 import { HOME, homeStep, startTrip, type HomeWorld } from '../src/server/heli/home.js';
 import { heliTerrain, heliTerrainOver, whyNotLand } from '../src/shared/heli-world.js';
 import { newClient, type Client } from '../src/server/office/client.js';
@@ -198,6 +199,41 @@ test('every pose the pilot sends is checked: who sends it, how fast, what it goe
   assert.ok(o.toastsTo(pilot).at(-1)?.startsWith('🚁 Only street admins fly Friday One'));
 });
 
+test("poses the network bunches up don't snap an honest pilot back; a jump, or flying faster than it can for long, still does", () => {
+  const o = office();
+  const { heli, pilot } = airborne(o);
+  assert.ok(flyTo(o, heli, pilot, { h: 60 }));
+  // West at the page's top speed, a pose every 66 ms, as the page sends them.
+  const from = heli.state().pose;
+  const along = (k: number): HeliPose => ({ ...from, x: from.x - FLIGHT.forward * 0.066 * k });
+  const send = (p: HeliPose, ms: number) => {
+    o.clock.now += ms;
+    heli.fly(pilot, p, false);
+  };
+  let k = 0;
+  while (k < 10) send(along(++k), 66);
+  // The network holds three up for 200 ms and lets them through together (the throttle takes the first
+  // and drops the other two); the next comes on time, three poses on from the one taken.
+  send(along(++k), 200);
+  send(along(++k), 1);
+  send(along(++k), 1);
+  send(along(++k), 64);
+  assert.deepEqual(o.snaps(pilot), []);
+  assert.equal(heli.state().pose.x, along(k).x);
+  while (k < 20) send(along(++k), 66);
+  assert.deepEqual(o.snaps(pilot), [], 'and on it flies');
+  // A jump further than STEP.gap of flying is never let through.
+  const last = heli.state().pose;
+  send({ ...last, x: last.x - FLIGHT.maxSpeed * STEP.gap - STEP.slack - 1 }, 66);
+  assert.equal(o.snaps(pilot).at(-1)?.why, 'Too fast');
+  assert.deepEqual(heli.state().pose, last);
+  // Faster than it can fly (by 60%), pose after pose: let through only while there was flying in hand.
+  let n = 0;
+  while (o.snaps(pilot).length === 1 && n < 200) send({ ...last, x: last.x - FLIGHT.maxSpeed * 1.6 * 0.066 * ++n }, 66);
+  assert.equal(o.snaps(pilot).at(-1)?.why, 'Too fast');
+  assert.ok(n <= STEP.gap / (0.066 * 0.6) + 2, `snapped back after ${n} poses`);
+});
+
 test("it won't set down over anyone at street level on any floor, nor any floor's car", () => {
   const o = office();
   const { heli, pilot } = airborne(o);
@@ -308,7 +344,7 @@ test("the trip home climbs out of the mountains' way, and never through anything
   ]) {
     const pose: HeliPose = { ...start, yaw: 0, pitch: 0, roll: 0, spin: 1 };
     pose.h = Math.max(pose.h, heliTerrainOver(pose.x - 8, pose.x + 8, pose.z - 8, pose.z + 8) + 1);
-    const trip = startTrip(pose, w);
+    const trip = startTrip(pose, w, 0);
     let leg = 'flying';
     for (let i = 0; i < 4000 && leg !== 'landed'; i++) {
       leg = homeStep(pose, trip, 0.1, i * 100, w);
@@ -316,6 +352,138 @@ test("the trip home climbs out of the mountains' way, and never through anything
       assert.ok(pose.h + BODY.bottom >= heliTerrain(pose.x, pose.z) - 1e-6, 'under the ground');
     }
     assert.equal(leg, 'landed', `home from (${start.x}, ${start.z})`);
+  }
+});
+
+test("its pilot gone just after lifting off under bar 2's overhang, it edges out, flies home and can be boarded again", () => {
+  const o = office();
+  const { heli, pilot } = airborne(o);
+  // Over to the grass by the tower's west wall, under bar 2 (53 to 81 m up), and down on it.
+  for (const to of [{ x: 13, h: 8, z: 68 }, { x: 30, z: 27 }, { x: -23 }, { z: 0 }]) assert.ok(flyTo(o, heli, pilot, to));
+  assert.ok(flyTo(o, heli, pilot, { h: 0 }, true));
+  assert.deepEqual({ landed: heli.state().landed, x: heli.state().pose.x, z: heli.state().pose.z }, { landed: true, x: -23, z: 0 });
+  // Up 0.3 m, and the pilot's tab goes.
+  o.clock.now += 300;
+  heli.fly(pilot, { ...heli.state().pose, h: 0.3 }, false);
+  assert.equal(heli.state().stage, 'flying');
+  o.clients.delete(pilot.id);
+  heli.gone(pilot);
+  const solids = heliSolids(15, [], 2);
+  for (let i = 0; i < 1500 && heli.state().stage === 'home'; i++) {
+    o.clock.now += 100;
+    heli.step(0.1);
+    const p = heli.state().pose;
+    assert.equal(bodyHit(p, solids), null, `in something at (${p.x.toFixed(1)}, ${p.h.toFixed(1)}, ${p.z.toFixed(1)})`);
+  }
+  const s = heli.state();
+  assert.deepEqual({ stage: s.stage, landed: s.landed, pad: s.pad, x: s.pose.x, z: s.pose.z }, { stage: 'parked', landed: true, pad: 'park', x: PARK.pad.x, z: PARK.pad.z });
+  // Its rotor run down, it says nothing more; and anyone gets in by a door.
+  const moves = () => o.all.filter((a) => a.msg.t === 'heli.move').length;
+  for (let i = 0; i < FLIGHT.spoolDown * 10 + 1; i++) heli.step(0.1);
+  const said = moves();
+  for (let i = 0; i < 50; i++) heli.step(0.1);
+  assert.equal(moves(), said);
+  const ada = o.join('ada', byDoor(s.pose));
+  o.clock.now += 300;
+  heli.board(ada, 'passenger');
+  assert.deepEqual(heli.state().crew.map((m) => m.id), ['ada']);
+});
+
+test("from anywhere under a building site's crane's jib, at any height under it, the trip home gets out from under and never into anything", () => {
+  const cards = (['P2', 'P3', 'P7'] as const).map((plot) => ({ id: `b-${plot}`, name: 'Acme', plot, accent: '#ff8800', skin: 'glass', stage: 'site', home: 'hosted', storeys: [] }) as unknown as BusinessCard);
+  const solids = heliSolids(15, cards, 3);
+  const w: HomeWorld = { solids, terrain: heliTerrain, terrainOver: heliTerrainOver, whyNotLand: (x, z, yaw) => whyNotLand(x, z, yaw, cards), occupied: () => false, towerTop: 131.8 };
+  let tried = 0;
+  for (const plot of ['P2', 'P3', 'P7'] as const) {
+    const mast = craneAt(plot);
+    for (let dx = -30; dx <= 30; dx += 6) {
+      for (let dz = -30; dz <= 30; dz += 6) {
+        for (const h of [5, 15, 25]) {
+          const pose: HeliPose = { x: mast.x + dx, h, z: mast.z + dz, yaw: (dx - dz) / 9, pitch: 0, roll: 0, spin: 1 };
+          // Only from where it fits, with the jib over it.
+          if (bodyHit(pose, solids) || !bodyHit(pose, solids, 100) || groundUnder(pose, w) > h) continue;
+          tried++;
+          const from = `from (${pose.x}, ${h}, ${pose.z})`;
+          const trip = startTrip(pose, w, 0);
+          let leg = 'flying';
+          for (let i = 0; i < 3000 && leg !== 'landed'; i++) {
+            leg = homeStep(pose, trip, 0.1, i * 100, w);
+            if (bodyHit(pose, solids)) assert.fail(`${from} into something at (${pose.x.toFixed(1)}, ${pose.h.toFixed(1)}, ${pose.z.toFixed(1)})`);
+          }
+          assert.equal(leg, 'landed', `home ${from}`);
+        }
+      }
+    }
+  }
+  assert.ok(tried > 300, `${tried} starts under a jib`);
+});
+
+test('a trip home that gets nowhere gives up after HOME.stuck s: down where it is if it may land there, else back on its pad', () => {
+  // Walled in all round and under a lid, as nothing on the street could ever wall it in.
+  const at = { x: 120, z: -60, yaw: Math.PI };
+  const box = (minX: number, maxX: number, minZ: number, maxZ: number, bottom: number, top: number): Solid => ({ minX, maxX, minZ, maxZ, bottom, top });
+  const CAGE = [
+    box(at.x - 10, at.x + 10, at.z - 10, at.z + 10, 12.5, 14),
+    box(at.x - 11, at.x - 10, at.z - 11, at.z + 11, -1, 14),
+    box(at.x + 10, at.x + 11, at.z - 11, at.z + 11, -1, 14),
+    box(at.x - 11, at.x + 11, at.z - 11, at.z - 10, -1, 14),
+    box(at.x - 11, at.x + 11, at.z + 10, at.z + 11, -1, 14),
+  ];
+  let cage: Solid[] = [];
+  class Caged extends Helicopter {
+    protected override world(): HomeWorld {
+      const w = super.world();
+      return { ...w, solids: [...w.solids, ...cage] };
+    }
+  }
+  assert.equal(whyNotLand(at.x, at.z, at.yaw, []), null, 'somewhere it may land');
+  for (const someone of [false, true]) {
+    const o = office();
+    cage = [];
+    const heli = new Caged(o.ctx, { timers: false, now: () => o.clock.now, cards: () => [] });
+    const pad = heli.state().pose;
+    const pilot = o.join('tyler', byDoor(pad), { admin: true });
+    const ada = o.join('ada', byDoor(pad));
+    heli.board(pilot, 'pilot');
+    heli.board(ada, 'passenger');
+    o.clock.now += 66;
+    heli.fly(pilot, { ...pad, h: 1, spin: 1 }, false);
+    assert.ok(flyTo(o, heli, pilot, { h: 30 }));
+    assert.ok(flyTo(o, heli, pilot, { x: at.x, z: at.z }));
+    assert.ok(flyTo(o, heli, pilot, { h: 8 }));
+    // The cage goes up round it, and (the second time) someone's standing under it, on the floor upstairs.
+    cage = CAGE;
+    if (someone) o.join('bo', { x: at.x + 1, z: at.z }, { floor: 'upstairs' });
+    o.clients.delete(pilot.id);
+    heli.gone(pilot);
+    const warned: string[] = [];
+    const warn = console.warn;
+    console.warn = (...a: unknown[]) => void warned.push(a.join(' '));
+    let steps = 0;
+    try {
+      for (; steps < 600 && heli.state().stage === 'home'; steps++) {
+        o.clock.now += 100;
+        heli.step(0.1);
+        const p = heli.state().pose;
+        if (heli.state().stage === 'home') assert.deepEqual([p.x, p.h, p.z], [at.x, 8, at.z], 'nowhere to go, it stays put');
+      }
+    } finally {
+      console.warn = warn;
+    }
+    assert.equal(steps, HOME.stuck * 10, `gave up after ${steps / 10} s`);
+    const s = heli.state();
+    const where = someone ? { x: PARK.pad.x, h: PARK.pad.deck, z: PARK.pad.z, pad: 'park' } : { x: at.x, h: 0, z: at.z, pad: null };
+    assert.deepEqual({ stage: s.stage, landed: s.landed, crew: s.crew, x: s.pose.x, h: s.pose.h, z: s.pose.z, pad: s.pad }, { stage: 'parked', landed: true, crew: [], ...where }, 'its passenger is put out');
+    assert.deepEqual(o.all.at(-1)?.msg, { t: 'heli', heli: s }, 'everyone is told');
+    const saved = JSON.parse(readFileSync(path.join(o.dir, 'heli.json'), 'utf8'));
+    assert.deepEqual([saved.pose.x, saved.pose.z, saved.pad], [where.x, where.z, where.pad]);
+    assert.equal(warned.length, 1);
+    assert.match(warned[0], someone ? /back on its pad/ : /set down there/);
+    // And it's there to get into.
+    o.walk(ada, byDoor(s.pose));
+    o.clock.now += 300;
+    heli.board(ada, 'passenger');
+    assert.deepEqual(heli.state().crew.map((m) => m.id), ['ada']);
   }
 });
 
@@ -360,22 +528,24 @@ test('heli.json keeps where it was parked; a file that will not read is set asid
   }
 });
 
-test('the pure checks: a pose cleaned up, and a step timed on the office clock', () => {
+test('the pure checks: a pose cleaned up, and a step against the flying it had in hand', () => {
   assert.deepEqual(cleanPose({ x: 1, h: 2, z: 3, yaw: 7, pitch: 4, roll: -4, spin: 3 }), { x: 1, h: 2, z: 3, yaw: Math.atan2(Math.sin(7), Math.cos(7)), pitch: 0.6, roll: -0.6, spin: 1 });
   assert.equal(cleanPose(null), 'Lost track of it');
   assert.equal(cleanPose({ x: 1, h: -1, z: 3, yaw: 0, pitch: 0, roll: 0, spin: 1 }), 'Mind the ground!');
   const w = { solids: heliSolids(15, [], 3), terrain: heliTerrain, whyNotLand: () => null };
   const at = (x: number, h: number, z: number): HeliPose => ({ x, h, z, yaw: 0, pitch: 0, roll: 0, spin: 1 });
-  assert.equal(stepWhy(at(0, 50, 40), at(2, 50, 40), 66, w), null);
-  assert.equal(stepWhy(at(0, 50, 40), at(6, 50, 40), 66, w), 'Too fast');
-  // Bunched up: timed over 50 ms at least, and a little leeway.
-  assert.equal(stepWhy(at(0, 50, 40), at(3.5, 50, 40), 1, w), null);
+  assert.equal(stepWhy(at(0, 50, 40), at(2, 50, 40), 0.066, w), null);
+  assert.equal(stepWhy(at(0, 50, 40), at(6, 50, 40), 0.066, w), 'Too fast');
+  // Nothing in hand: the leeway, and no more.
+  assert.equal(stepWhy(at(0, 50, 40), at(STEP.slack - 0.1, 50, 40), 0, w), null);
+  assert.equal(stepWhy(at(0, 50, 40), at(STEP.slack + 0.1, 50, 40), 0, w), 'Too fast');
   // Quiet for a minute: held to a second and a half of flying.
-  assert.equal(stepWhy(at(0, 50, 40), at(0, 50, 150), 60_000, w), 'Too fast');
-  assert.equal(stepWhy(at(0, 50, 40), at(0, 50, 18), 1000, w), 'Mind the building!');
+  assert.equal(stepWhy(at(0, 50, 40), at(0, 50, 40 + FLIGHT.maxSpeed * STEP.gap), 60, w), null);
+  assert.equal(stepWhy(at(0, 50, 40), at(0, 50, 150), 60, w), 'Too fast');
+  assert.equal(stepWhy(at(0, 50, 40), at(0, 50, 18), 1, w), 'Mind the building!');
   // Already in something (it went up round it): out it may go.
-  assert.equal(stepWhy(at(0, 50, 10), at(0, 50, 12), 66, w), null);
-  assert.equal(stepWhy(at(5, 60, 470), at(5, 20, 470), 1500, w), 'Mind the ground!');
+  assert.equal(stepWhy(at(0, 50, 10), at(0, 50, 12), 0.066, w), null);
+  assert.equal(stepWhy(at(5, 60, 470), at(5, 20, 470), 1.5, w), 'Mind the ground!');
 });
 
 test('the handler and the hooks: heliOf for the office, and a pilot whose socket goes sends it home', () => {

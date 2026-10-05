@@ -33,7 +33,7 @@ Passengers have the same views, the mouse, the wheel and **E**, and no controls.
 
 With no keys held it slows to a hover, holds its height and levels out; it leans into its speed and banks into its turns. Its engine starts with the first **Space** after you get in and keeps the rotor turning until you get out. It goes no higher than 200 m over the street, and 450 m from the tower is the edge of town, where it's drawn gently back in.
 
-It bumps off anything solid: Friday Tower (its glass bars, the balconies, the back offices on their posts, the marquee, the stairs down its west side, and up on the roof the railing, the bar, the stage, the parasols, the elevator's housing and the mast), the two neighbours behind it, the farm's barn, silo and windmill, the lighthouse, the windsock, Putt Street's kiosk (and the sign on its roof), fence, gate, record board, windmill and arch, whatever stands on a claimed plot (a building site's crane with the whole sweep of its jib), and the mountains, the hills and the tunnel's spur. Trees and street lamps it flies through. A hard bump thunks, shakes the view and says *Mind the building!*. Its tail counts as well as its rotor, and turning beside a wall won't swing the tail into it.
+It bumps off anything solid: Friday Tower (its glass bars, the balconies, the back offices on their posts, the marquee, the stairs down its west side, and up on the roof the railing, the bar, the stage, the parasols, the elevator's housing and the mast), the two neighbours behind it, the farm's barn, silo and windmill, the lighthouse, the windsock, the SCENIC LOOP billboard, Putt Street's kiosk (and the sign on its roof), fence, gate, record board, windmill and arch, whatever stands on a claimed plot (a building site's crane with the whole sweep of its jib), and the mountains, the hills and the tunnel's spur. Trees and street lamps it flies through. A hard bump thunks, shakes the view and says *Mind the building!*. Its tail counts as well as its rotor, and turning beside a wall won't swing the tail into it.
 
 **The views.** The chase view starts 12 m behind it and 4 m up, swings round after it as it turns (and back round behind once you've orbited it with the mouse and flown on), stays at least 1.5 m over the ground and comes in short of anything solid between it and the helicopter. The cockpit view is from your own seat, through the canopy, over the instrument panel; your own head isn't in the way. C switches between them, and the one you used last is the one you get next time. How far the camera sees doesn't change: the haze still closes in past 300 m.
 
@@ -63,7 +63,7 @@ Flying low (10 m or less over the ground there) with its rotor turning fast, it 
 
 ## Seeing and hearing it
 
-Everyone on every floor sees it at their own floor's street level, and up on the roof bar it's drawn too, the street a long way down. The pilot's page flies it and tells the office where it is about fifteen times a second; everyone else's page draws it smoothly between those words, carries it on the way it was going for up to 0.3 s when one's late, and only jumps when it's more than 20 m out (after a reload, say). Its rotor spins up and down at its own pace, on the ground too, and blurs into a disc above about 60%.
+Everyone on every floor sees it at their own floor's street level, and up on the roof bar it's drawn too, the street a long way down. The pilot's page flies it and tells the office where it is about fifteen times a second. The office takes each word only if Friday One could have flown there since the last one it took (at 45 m/s, with up to 1.5 s of flying in hand), and otherwise sends the pilot's page back to where it was last good (*Too fast*). Words the network holds up and lets through in a bunch still count the time they were held up, so a hiccup on the line doesn't snap an honest pilot back. Everyone else's page draws it smoothly between those words, carries it on the way it was going for up to 0.3 s when one's late, and only jumps when it's more than 20 m out (after a reload, say). Its rotor spins up and down at its own pace, on the ground too, and blurs into a disc above about 60%.
 
 Who's aboard sits in their seat: the people on your floor as themselves, anyone from another floor (or the roof) as a figure with their name over them. While the pilot isn't on your floor, a tag over the rotor says who's flying it (*🚁 Tyler · Friday One*).
 
@@ -77,12 +77,14 @@ Parked or landed, it's solid: you walk round it, not through it.
 
 A pilot who closes the page, loses the connection, or goes to another floor mid-flight leaves it to fly itself home:
 
-1. out from under anything overhead first (the bar of glass that juts out over the tower's west end from about 53 to 81 m up), sliding away from the tower until the way up is clear;
+1. out from under anything overhead first (the bar of glass that juts out over the tower's west end from about 53 to 81 m up, or a building site's crane, whose jib slews round 31 to 35 m up): up to a meter off the ground if it's lower and there's room, then sliding, at the height it's at, to the nearest spot with nothing over it;
 2. straight up to 140 m (clear of the mast) or higher;
 3. across at 18 m/s to over its pad;
 4. down at 3 m/s, slowly for the last 6 m, and its rotor spins down.
 
 Passengers ride along and are let out by its doors at the pad. If anyone's standing on the pad, it waits at 6 m and asks everyone to step off; after 20 s it sets down instead on the first clear spot it finds 12 to 20 m round the pad.
+
+If its way home ever gets nowhere (it hasn't moved a meter in 20 s, and isn't waiting for anyone), it gives up: it's set down where it is, if it may land there and nobody's under it, or else put straight back on its pad. Its passengers are let out by its doors, anyone can get in again, and the office's log says where it gave up.
 
 A pilot who gets out on the ground leaves it parked there, its rotor running down over 6 s. A pilot who's no longer a street admin is moved to a passenger's seat (and it flies itself home, if it's in the air).
 

@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { parkedHeli } from '../src/shared/heli.js';
 import { streetBelow } from '../src/shared/layout.js';
-import { claimedBox, shellTop } from '../src/shared/mainstreet.js';
+import { claimedBox, CRANE_YARD, craneAt, shellTop } from '../src/shared/mainstreet.js';
 import { BUSINESS_ID, type BusinessCard, type HeliPose, type HeliState, type PlotLook, type ServerMsg, type StreetFile } from '../src/shared/protocol.js';
 import { STEP_OFF, wallsOf, whyNotClear } from '../src/server/street/clear.js';
 import { LOOK_ERRORS, businessId, cleanBusinessName, defFrom, lookFrom } from '../src/server/street/look.js';
@@ -428,4 +428,19 @@ test("walls wait for Friday One's whole footprint, its tail too, and for its bod
   assert.match(whyNotClear('P3', site, nobody(heliAt(56, 1, 0, false)))!, /in the way over Plot 3/);
   assert.equal(whyNotClear('P3', site, nobody(heliAt(56, 40, 0, false))), undefined);
   assert.equal(whyNotClear('P3', wallsOf('P3', 'shell', 1), nobody(heliAt(56, 20, 0, false))), undefined, 'over a one-storey shell');
+});
+
+test("a site's crane yard, out behind its hoarding, is ground nobody may be standing on when it goes up", () => {
+  const at = craneAt('P3');
+  const ground = claimedBox('P3');
+  // The yard's fenced square is outside the claimed ground (the crane stands at the plot's back corner).
+  assert.ok(at.z + CRANE_YARD.half < ground.minZ || at.x - CRANE_YARD.half > ground.maxX, 'the yard is past the hoarding');
+  const someone = (x: number, z: number) => ({ heli: parkedHeli(), people: [{ x, h: 0, z }] });
+  // Standing where the crane's fence will go round them: a site waits, a shell (which has no crane) doesn't.
+  assert.match(whyNotClear('P3', wallsOf('P3', 'site', 4), someone(at.x + 1.5, at.z))!, /standing on Plot 3/);
+  assert.equal(whyNotClear('P3', wallsOf('P3', 'shell', 4), someone(at.x + 1.5, at.z)), undefined);
+  // A step past the fence is clear.
+  assert.equal(whyNotClear('P3', wallsOf('P3', 'site', 4), someone(at.x, at.z - CRANE_YARD.half - STEP_OFF - 0.1)), undefined);
+  // Friday One parked over the yard holds a site up too.
+  assert.match(whyNotClear('P3', wallsOf('P3', 'site', 4), { heli: heliAt(at.x, 0, at.z - 4.5, true), people: [] })!, /parked on Plot 3/);
 });

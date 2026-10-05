@@ -361,6 +361,7 @@ test('nine holes and the round is over: the record (a tie keeps the first), the 
   assert.equal(c.rounds.rounds().length, 1);
   c.clock.advance(1);
   assert.equal(c.rounds.rounds().length, 0);
+  assert.equal((c.rounds as unknown as { struck: Map<string, number> }).struck.size, 0, 'nor is when he last putted kept');
   // Gavin ties it later: the record, and each hole's best, stay Tyler's.
   c.rounds.play(gavin);
   c.rounds.start(gavin.id, c.round().id);

@@ -6,9 +6,10 @@ import { GROUNDS } from '../../shared/mainstreet.js';
 import type { HeliPose } from '../../shared/protocol.js';
 
 /**
- * The speed check's leeway: poses bunched up by the network arrive a moment apart, and the throttle
- * drops the ones between (`slack` m), and how long a gap it times a step over at most (`gap` s), so a
- * pilot who goes quiet can't jump far when they speak again.
+ * The speed check's leeway: `slack` m over what it could have flown, for the network's noise; and the
+ * most flying a pose is let have in hand (`gap` s: the time since the pose before, and any left over
+ * from it), so poses the network held up and let through in a bunch, or that the throttle dropped,
+ * don't make the next one seem too far, yet a pilot who goes quiet can't jump far when they speak again.
  */
 export const STEP = { slack: 1.5, gap: 1.5 } as const;
 
@@ -28,12 +29,13 @@ export function cleanPose(raw: unknown): HeliPose | string {
 }
 
 /**
- * Why the step from `last` to `next`, `ms` later on the office's clock, won't do: faster than
- * FLIGHT.maxSpeed (timed over 50 ms at least), into something solid (unless it was already in it,
- * when something went up round it, and it's on its way out), or down through the ground. Null if it'll do.
+ * Why the step from `last` to `next`, with `seconds` of flying in hand (at most STEP.gap), won't do:
+ * further than FLIGHT.maxSpeed could take it in that, into something solid (unless it was already in
+ * it, when something went up round it, and it's on its way out), or down through the ground. Null if
+ * it'll do.
  */
-export function stepWhy(last: HeliPose, next: HeliPose, ms: number, world: FlyWorld): string | null {
-  const t = clamp(ms / 1000, 0.05, STEP.gap);
+export function stepWhy(last: HeliPose, next: HeliPose, seconds: number, world: FlyWorld): string | null {
+  const t = clamp(seconds, 0, STEP.gap);
   if (Math.hypot(next.x - last.x, next.h - last.h, next.z - last.z) > FLIGHT.maxSpeed * t + STEP.slack) return 'Too fast';
   if (bodyHit(next, world.solids) && !bodyHit(last, world.solids)) return 'Mind the building!';
   if (next.h < world.terrain(next.x, next.z) - 1) return 'Mind the ground!';

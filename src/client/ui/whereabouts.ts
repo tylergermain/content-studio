@@ -50,8 +50,8 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, r
   if (p.floor === ROOF) return onTheRoof(p);
   // Through the north wall in the back office: nobody gets there unless the floor's built out.
   if (p.y > -1 && inWing(p.x, p.z, WING.rows)) return '🏗️ in the back office';
-  // Down on the street, or out the back door on the stairs down to it.
-  if (p.y < -1 || p.x < FLOOR.minX || p.x > FLOOR.maxX || p.z < FLOOR.minZ) return '🚶 outside';
+  // Down on the street, or out the back door on the stairs down to it: there, putting if they're in a round.
+  if (p.y < -1 || p.x < FLOOR.minX || p.x > FLOOR.maxX || p.z < FLOOR.minZ) return putting(p.id) ? '⛳ playing Putt Street' : '🚶 outside';
   if (p.z > FLOOR.maxZ) return p.x >= BALCONY.minX && p.x <= BALCONY.maxX ? '🌇 on the balcony' : '🚶 outside';
   // Up off the office floor: on its deck, if it's over one (and not just on the ladder, or up the pole).
   if (p.y > DECK_Y - 0.5) {
@@ -66,6 +66,15 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, r
   const meeting = meetingPlace(room);
   const [minX, maxX, minZ, maxZ] = meeting.area;
   return p.x > minX && p.x <= maxX && p.z > minZ && p.z <= maxZ ? meeting.where : undefined;
+}
+
+/** Whether `id` is in a round on Putt Street that isn't over yet (see Store.puttRounds). */
+function putting(id: string): boolean {
+  for (const r of store.puttRounds) {
+    if (r.stage === 'over') continue;
+    for (const p of r.players) if (p.id === id) return true;
+  }
+  return false;
 }
 
 /** Somewhere on the rooftop bar worth saying they are, standing up. */
