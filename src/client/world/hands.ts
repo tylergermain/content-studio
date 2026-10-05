@@ -7,6 +7,7 @@ import { HeldCard } from '../features/carrying/card';
 import { REACH_TIME, SMOKE_CYCLE, cigarette, coffeeMug, dragCurve, drinkGlass, emoteEnvelope, putDownGlass, reachCurve } from './character';
 import { mesh, toon, toonUnique } from './toon';
 import { ballMesh } from '../features/basketball/world';
+import { heavePose } from './hands-heave';
 
 export interface HandsInput {
   yaw: number;
@@ -70,6 +71,10 @@ export class Hands {
   /** How far into winding up a shot (0–1), and seconds into the follow-through after one (or -1). */
   private wind = 0;
   private shootT = -1;
+  /** Winding up a heave (see hands-heave.ts), whether the shot just thrown was one, and how far into its pose the hands are (0 → 1). */
+  private heave = false;
+  private heaved = false;
+  private heaveK = 0;
   /** Seconds into a sip (negative while it waits for the reach to finish), or null. */
   private sipT: number | null = null;
   /** Where what's in your left hand is held instead (its foot, in the camera's frame), and how far it's gone there: a glass in a toast (see aimHeld). */
@@ -151,15 +156,17 @@ export class Hands {
     this.holdMug(this.wantsMug);
   }
 
-  /** Winding up a shot, 0 (not yet) to 1 (as hard as you throw): the ball comes down and in, ready to go. */
-  windUp(k: number) {
+  /** Winding up a shot, 0 (not yet) to 1 (as hard as you throw): the ball comes down and in, ready to go; for a heave, back by your ear in your right hand. */
+  windUp(k: number, heave = false) {
     this.wind = k;
+    this.heave = heave;
   }
 
-  /** The shot: both hands up and out after the ball. */
-  shoot() {
+  /** The shot: both hands up and out after the ball; a heave, the right arm over and through. */
+  shoot(heave = false) {
     this.shootT = 0;
     this.wind = 0;
+    this.heaved = heave;
   }
 
   /** Puts a lit cigarette in your right hand, or takes it away. */
@@ -379,6 +386,11 @@ export class Hands {
       throwK = reachCurve(this.shootT / 0.45);
       if (this.shootT >= 0.45) this.shootT = -1;
     }
+    // A heave has the ball up in the right hand, and its throw is that arm's alone.
+    const heaving = (this.heave && this.wantsBall) || (this.heaved && this.shootT >= 0);
+    this.heaveK += ((heaving ? 1 : 0) - this.heaveK) * Math.min(1, dt * 10);
+    const heaveOut = this.heaved ? throwK : 0;
+    if (this.heaved) throwK = 0;
 
     for (const [arm, side] of [
       [this.right, 1],
@@ -432,6 +444,7 @@ export class Hands {
     // The ball rides between them, coming up from below as you pick it up.
     this.ball.visible = this.wantsBall && held > 0.02;
     this.ball.position.set(this.sway.x + step * 0.008, this.sway.y + breathe + bounce + this.air * 0.05 - 0.28 - 0.06 * this.wind - 0.3 * (1 - held), -0.54 + 0.05 * this.wind);
+    heavePose(this.right.group, this.left.group, this.ball, this.heaveK, this.heave ? this.wind : 0, heaveOut);
     // The card rides along with the hands, coming up from below as you take it; so does the book.
     this.holder.position.set(this.sway.x + step * 0.008, this.sway.y + breathe + bounce + this.air * 0.05 - 0.115 - 0.3 * (1 - carry), -0.5);
     if (this.book) {

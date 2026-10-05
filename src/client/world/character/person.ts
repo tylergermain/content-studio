@@ -15,6 +15,7 @@ import { cigarette, coffeeMug, drinkGlass, putDownGlass, undress } from './props
 import { styleHair } from './person-hair';
 import { clubSwing, strike, swingStep, type Golf } from './person-golf';
 import { propPosition, throwStep, type Oche } from './person-throw';
+import { heaveTurn, shotStep } from './person-shot';
 import { poseEmote, type Emoting } from './person-emote';
 
 export type Pose = 'stand' | 'walk' | 'sit' | 'type';
@@ -72,9 +73,10 @@ export class Person {
   /** A book off the bookshelf, open in both hands while they read (see read). */
   private book: OpenBook | null = null;
   private bookHolder = new THREE.Group();
-  /** The basketball in both hands (the ball itself is the floor's, see features/basketball/world.ts), and seconds into a shot, or -1. */
+  /** The basketball in both hands (the ball itself is the floor's, see features/basketball/world.ts), and seconds into a shot (a heave: one-armed), or -1. */
   private ball = false;
   private shootT = -1;
+  private heave = false;
   pose: Pose = 'stand';
   private cig: THREE.Group;
   private ember: THREE.MeshToonMaterial;
@@ -377,9 +379,10 @@ export class Person {
     this.holdMug(this.wantsMug);
   }
 
-  /** Shoots: both arms up over the head and after the ball. */
-  shoot() {
+  /** Shoots: both arms up over the head and after the ball, or a heave from way out, thrown one-armed (see person-shot.ts). */
+  shoot(heave = false) {
     this.shootT = 0;
+    this.heave = heave;
   }
 
   /** Waves, gives a thumbs up, claps…: the gesture, with its emoji popping up over their head. */
@@ -602,18 +605,7 @@ export class Person {
       this.armL.rotation.set(-1.25, 0, 0.3);
       this.armR.rotation.set(-1.25, 0, -0.3);
     }
-    if (this.shootT >= 0) {
-      this.shootT += dt;
-      const k = reachCurve(this.shootT / 0.5);
-      for (const [arm, side] of [
-        [this.armL, 1],
-        [this.armR, -1],
-      ] as const) {
-        arm.rotation.x = THREE.MathUtils.lerp(arm.rotation.x, -2.75, k);
-        arm.rotation.z = THREE.MathUtils.lerp(arm.rotation.z, side * 0.12, k);
-      }
-      if (this.shootT >= 0.5) this.shootT = -1;
-    }
+    if (this.shootT >= 0) this.shootT = shotStep(this.rig, this.shootT + dt, this.heave);
     let reach = 0;
     if (this.reachT >= 0) {
       this.reachT += dt;
@@ -658,6 +650,7 @@ export class Person {
     this.head.rotation.x = -this.mouthOpen * 0.08 + (this.book ? 0.32 : 0);
     this.head.rotation.y = this.head.rotation.z = 0;
     this.body.rotation.y = this.body.rotation.z = 0;
+    if (this.shootT >= 0 && this.heave) heaveTurn(this.rig, this.shootT);
     if (this.emoting) this.emoteStep(dt, moving || airborne ? 0 : 1 - sit);
     if (this.golf && !sit && !airborne) this.golfStep(dt);
     if (this.oche && !sit) this.ocheStep(dt);

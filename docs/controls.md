@@ -31,6 +31,8 @@ Back to the [README](../README.md).
 | Esc | Close any window (a terminal too) and get back to looking around |
 | Ctrl + [ | Send Esc to a terminal instead, to close a menu like Claude's `/skills` or interrupt Claude. **⎋ Esc** in the terminal's header does the same |
 
+With the basketball, hold **E** (or the mouse button, in first person) and let go in the meter's green. Further than 16 m from the hoop the green gets smaller the further out you are, only its middle is sure to go in and nothing let go of outside it does (and there's no green from up in the loft or under it, or with something in the way), and from 22 m out the meter turns orange, says **HEAVE** and runs half as fast again: you throw it one-handed, overhead. See [Features](features.md).
+
 A game on the boss's monitor or the arcade cabinet takes the arrows, W A S D, Space, Enter and its own letters (Blockfall: X, Z, C, P and Shift) while it's open. On the cabinet's list, ↑ ↓ (or W S) choose, Enter or Space plays, and 1–4 pick a game outright. Esc closes it, and V and M stay the call's.
 
 You can also click a nearby desk to interact with it, or click a worker in the Workers panel (**🤖 Workers**, top right) to open its terminal.
