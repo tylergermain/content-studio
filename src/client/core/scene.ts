@@ -9,6 +9,7 @@ import { Holiday } from '../world/holiday';
 import { buildOffice } from '../world/office';
 import type { Office } from '../world/types';
 import { HAZE_MAX, Sky } from '../world/sky';
+import type { Step } from '../ui/loading';
 import type { Ctx } from './context';
 import { noOutline } from './outline';
 
@@ -88,6 +89,41 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   noOutline(office.group);
   noOutline(holiday.group);
   return { canvas, renderer, effect, scene, camera, hemi, ambient, sun, office, sky, holiday };
+}
+
+/** Whether the loading screen waits for the floor's shaders (see warmShadersOnLoad). */
+let warming = false;
+/** The longest it waits for them: a browser that never says they're done doesn't keep you out. */
+const WARM_MAX_MS = 6000;
+
+/**
+ * Has the loading screen wait for the floor's shaders (warmingSteps). A headset's browser asks for it
+ * as the page loads (features/vr/index.ts, before main.ts gives the loading screen its steps); a
+ * laptop never does, and comes in exactly as it always has, each shader compiled as it first comes
+ * into view.
+ */
+export function warmShadersOnLoad() {
+  warming = true;
+}
+
+/** The loading screen's wait for warmShaders once `arrived` (the floor is here), where the page asked for it; none elsewhere. */
+export function warmingSteps(ctx: Pick<Ctx, 'renderer' | 'scene' | 'camera' | 'hands'>, arrived: Promise<unknown>): Step[] {
+  return warming ? [{ say: 'Warming up the lights', done: arrived.then(() => warmShaders(ctx)) }] : [];
+}
+
+/**
+ * Every shader the floor you're on is drawn with, and your hands', compiled side by side where the
+ * browser can (KHR_parallel_shader_compile): behind the loading screen, rather than each as it first
+ * comes into view, which on a headset's CPU is a stall every few steps. The shaders are the ones the
+ * office would have compiled anyway, so it looks the same once it's in.
+ */
+export function warmShaders(ctx: Pick<Ctx, 'renderer' | 'scene' | 'camera' | 'hands'>): Promise<void> {
+  const { renderer, hands } = ctx;
+  const compiled = Promise.all([renderer.compileAsync(ctx.scene, ctx.camera), renderer.compileAsync(hands.scene, hands.camera)]).then(
+    () => {},
+    () => {},
+  );
+  return Promise.race([compiled, new Promise<void>((resolve) => setTimeout(resolve, WARM_MAX_MS))]);
 }
 
 /** The sky follows the office's weather and time of day, and its thunder is heard. */

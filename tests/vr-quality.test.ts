@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as THREE from 'three';
-import { KNOB_STEPS, VR_PROFILES, nextValue, profileFor, profileName } from '../src/client/features/vr/quality-profile.js';
-import { HotTextures, qualityBefore, skyHalos, startQuality } from '../src/client/features/vr/quality.js';
+import { FLAT_PROFILES, KNOB_STEPS, VR_PROFILES, flatProfileFor, nextValue, profileFor, profileName } from '../src/client/features/vr/quality-profile.js';
+import { HotTextures, applyQuality, qualityBefore, skyHalos, startQuality } from '../src/client/features/vr/quality.js';
 import { median, quantile, summarize, type VrFrameStat } from '../src/client/features/vr/perf.js';
 import { VR_DEFAULTS } from '../src/client/features/vr/prefs.js';
-import type { VrQuality, VrSession } from '../src/client/features/vr/types.js';
+import type { SceneQuality, VrQuality, VrSession } from '../src/client/features/vr/types.js';
 import { uniforms as sky } from '../src/client/world/sky.js';
 import type { Ctx } from '../src/client/core/context.js';
 import type { Parts } from '../src/client/core/parts.js';
@@ -31,23 +31,37 @@ test('each headset gets its profile from the user agent: the Quest 2 (or any Que
   assert.equal(VR_PROFILES.quest2.outline, false, 'a profile handed out is a copy, to change knob by knob');
 });
 
-test('the Quest 2 starts lean: no outline, 0.8 resolution, full foveation, 72 Hz, shadows four times a second, no halos, video capped', () => {
+test('the Quest 2 starts lean: no outline, 0.8 resolution, full foveation, 72 Hz, shadows four times a second, no halos, video capped, the still office batched, pictures halved', () => {
   const q = VR_PROFILES.quest2;
   assert.deepEqual(
-    { outline: q.outline, scale: q.framebufferScale, fov: q.foveation, hz: q.frameRate, shadows: q.shadows, map: q.shadowMapSize, every: q.shadowEveryMs, halos: q.halos, lamps: q.maxLamps, hot: q.hotTextureEveryMs, reach: q.sceneryReach, panel: q.panelScale },
-    { outline: false, scale: 0.8, fov: 1, hz: 72, shadows: 'throttled', map: 1024, every: 250, halos: false, lamps: 24, hot: 100, reach: 0.6, panel: 1.5 },
+    { outline: q.outline, scale: q.framebufferScale, fov: q.foveation, hz: q.frameRate, shadows: q.shadows, map: q.shadowMapSize, every: q.shadowEveryMs, halos: q.halos, lamps: q.maxLamps, hot: q.hotTextureEveryMs, reach: q.sceneryReach, panel: q.panelScale, batching: q.batching, cap: q.textureCap },
+    { outline: false, scale: 0.8, fov: 1, hz: 72, shadows: 'throttled', map: 1024, every: 250, halos: false, lamps: 24, hot: 100, reach: 0.6, panel: 1.5, batching: true, cap: 512 },
   );
-  for (const p of Object.values(VR_PROFILES)) {
-    assert.ok(p.framebufferScale >= 0.5 && p.framebufferScale <= 1 && p.foveation >= 0 && p.foveation <= 1, p.name);
+  for (const p of [...Object.values(VR_PROFILES), ...Object.values(FLAT_PROFILES)] as Partial<VrQuality>[]) {
+    if (p.framebufferScale !== undefined) assert.ok(p.framebufferScale >= 0.5 && p.framebufferScale <= 1 && p.foveation! >= 0 && p.foveation! <= 1, p.name);
     // Each knob's value is one the overlay can step back to.
     for (const [k, steps] of Object.entries(KNOB_STEPS) as [keyof VrQuality, readonly unknown[]][]) {
-      if (k === 'frameRate' && p.frameRate === null) continue;
+      if (!(k in p) || (k === 'frameRate' && p.frameRate === null)) continue;
       assert.ok(steps.includes(p[k]), `${p.name}.${k} = ${p[k]} is one of ${steps}`);
     }
   }
   assert.equal(nextValue([0.6, 0.8, 1], 0.8), 1);
   assert.equal(nextValue([0.6, 0.8, 1], 1), 0.6, 'round to the first');
   assert.equal(nextValue(['on', 'throttled', 'off'], 'sideways'), 'on', 'from something else, the first');
+});
+
+test('a Quest\'s own page outside VR has a profile of its own; a laptop (or anything else) has none and is drawn as it always was', () => {
+  const q2 = flatProfileFor(ua('Quest 2'));
+  assert.deepEqual(
+    { name: q2?.name, outline: q2?.outline, ratio: q2?.pixelRatio, shadows: q2?.shadows, map: q2?.shadowMapSize, batching: q2?.batching },
+    { name: 'quest2', outline: false, ratio: 1, shadows: 'throttled', map: 1024, batching: true },
+  );
+  assert.equal(flatProfileFor(ua('Quest 3'))?.name, 'quest3');
+  assert.equal(flatProfileFor(ua('Quest Pro'))?.name, 'quest3');
+  assert.equal(flatProfileFor('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0 Safari/537.36'), null);
+  assert.equal(flatProfileFor('Mozilla/5.0 (X11; Linux x86_64) PicoBrowser/4.0 Chrome/105.0 VR Safari/537.36'), null);
+  q2!.outline = true;
+  assert.equal(FLAT_PROFILES.quest2.outline, false, 'a copy, to change knob by knob');
 });
 
 test('before a session: the resolution (yours, if you chose one) and the foveation', () => {
@@ -218,6 +232,47 @@ test('in VR the Quest 2 profile throttles the sun\'s shadows, hides the halos, c
   assert.equal(r.sun.shadow.mapSize.x, 2048);
   assert.equal(r.renderer.shadowMap.needsUpdate, true, 'drawn afresh at the old size');
   assert.deepEqual(Object.getOwnPropertyDescriptor(THREE.Texture.prototype, 'needsUpdate'), before, 'Texture is as it was');
+  sky.skyLampCount.value = 0;
+});
+
+test('profiles stack: the flat page\'s under a VR session\'s, each knob back to the flat page\'s as VR ends; the outline pass drawn only where the top one has it', () => {
+  const r = rig();
+  let outlines = 0;
+  const effect = { renderOutline: () => void outlines++ };
+  const draw = effect.renderOutline;
+  const parts = { stage: { ...r.parts.stage, effect } } as unknown as Pick<Parts, 'stage'>;
+  const ticks: ((f: { now: number }) => void)[] = [];
+  const flat: SceneQuality = { outline: false, shadows: 'throttled', shadowMapSize: 1024, shadowEveryMs: 250, halos: true, maxLamps: 24, hotTextureEveryMs: 0, sceneryReach: 1, batching: false, textureCap: 0 };
+  const texture = Object.getOwnPropertyDescriptor(THREE.Texture.prototype, 'needsUpdate');
+  let flatEnded: (() => void) | undefined;
+  applyQuality(r.ctx, parts, { tick: (_p, fn) => void ticks.push(fn), onEnd: (fn) => void (flatEnded = fn) }, flat);
+  assert.equal(r.sun.shadow.mapSize.x, 1024, 'the flat page\'s shadow map');
+  assert.equal(r.renderer.shadowMap.autoUpdate, false);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(THREE.Texture.prototype, 'needsUpdate'), texture, 'no video cap in this profile');
+  effect.renderOutline.call(effect);
+  assert.equal(outlines, 0, 'no outline pass on the flat page');
+  // In VR on the Quest 3, say, the outline's on and the shadows go to 2048.
+  r.s.quality.outline = true;
+  r.s.quality.shadowMapSize = 2048;
+  const knobs = startQuality(r.ctx, parts, r.s);
+  assert.equal(r.sun.shadow.mapSize.x, 2048);
+  effect.renderOutline.call(effect);
+  assert.equal(outlines, 1, 'the outline pass while VR\'s profile has it');
+  knobs.set('outline', false);
+  effect.renderOutline.call(effect);
+  assert.equal(outlines, 1);
+  r.end();
+  assert.equal(r.sun.shadow.mapSize.x, 1024, 'out of VR: the flat page\'s again, not the laptop\'s');
+  assert.equal(r.renderer.shadowMap.autoUpdate, false);
+  // The flat page's own tick keeps running its knobs.
+  r.renderer.shadowMap.needsUpdate = false;
+  ticks.forEach((fn) => fn({ now: 5000 }));
+  assert.equal(r.renderer.shadowMap.needsUpdate, true);
+  assert.deepEqual(Object.getOwnPropertyDescriptor(THREE.Texture.prototype, 'needsUpdate'), texture, 'VR\'s video cap came off with it');
+  flatEnded?.();
+  assert.equal(effect.renderOutline, draw, 'with no profile on, the outline effect is its own again');
+  assert.equal(r.sun.shadow.mapSize.x, 2048);
+  assert.equal(r.renderer.shadowMap.autoUpdate, true);
   sky.skyLampCount.value = 0;
 });
 

@@ -94,11 +94,16 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   /** What aims instead of the crosshair, if anything: a VR controller's ray (see features/vr/interact.ts). */
   let aim: Aim | null = null;
 
+  /** The furthest anything can be used from (the longest reach of any kind), once they're all defined. */
+  let longest = 0;
+
   /**
    * What the ray through `ndc` lands on first (or the one `aim` gives, measuring reach from its eye),
-   * whether it is within reach (plus `slack` meters), and where it hit.
+   * whether it is within reach (plus `slack` meters), and where it hit. `near` alone (what's aimed at
+   * each frame) looks no further along the ray than anything could be in reach from the eye: whatever's
+   * beyond is out of reach anyway, and the ray needn't be tested against the whole floor for it.
    */
-  function aimedAt(ndc: THREE.Vector2, slack = 0): { it: Interactable; near: boolean; hit: THREE.Intersection } | null {
+  function aimedAt(ndc: THREE.Vector2, slack = 0, near = false): { it: Interactable; near: boolean; hit: THREE.Intersection } | null {
     if (aim) {
       const ray = aim.ray();
       if (!ray) return null;
@@ -109,6 +114,8 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
       raycaster.setFromCamera(ndc, camera);
       eye.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
     }
+    longest ||= Math.max(0, ...ctx.interactions.kinds().map((k) => ctx.interactions.reach(k)));
+    raycaster.far = near ? longest + slack + raycaster.ray.origin.distanceTo(eye) + 0.01 : Infinity;
     const roof = parts.rooftop.roof();
     for (const hit of raycaster.intersectObjects(core.upTop && roof ? roof.pickables : [office.group, ...ctx.usables.pickables()], true)) {
       let it: Interactable | undefined;
@@ -144,14 +151,14 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
     aimedNote = null;
     if (modalOpen() || parts.telescope.active || ctx.activities.busy()) target = null;
     else if (firstPerson) {
-      const aim = aimedAt(CROSSHAIR);
+      const aim = aimedAt(CROSSHAIR, 0, true);
       target = aim?.near ? aim.it : (seating.mySeat() ?? hoops.ballAtFeet());
       if (aim?.near) aimedNote = noteUnder(aim);
     } else {
       target = seating.mySeat() ?? pickTarget();
       // By the issues board, the mouse points at the note you'd take.
       if (target?.kind === 'issues' && pointer) {
-        const aim = aimedAt(pointer, 2.5);
+        const aim = aimedAt(pointer, 2.5, true);
         if (aim?.near) aimedNote = noteUnder(aim);
       }
     }

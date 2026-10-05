@@ -1,13 +1,19 @@
 /**
- * VR's quality profile at work (see quality-profile.ts for the numbers): what's set before a session
- * starts (the resolution and the foveation), and while it runs, through handles the office already
- * has, each knob live so the perf overlay can flip it for an A/B in the headset. All of it is put back
- * as the session ends: the desktop goes on exactly as it was.
+ * A headset's quality profile at work (see quality-profile.ts for the numbers), in VR and on the
+ * headset browser's own page outside it (flat.ts): what's set before a VR session starts (the
+ * resolution and the foveation), and while a profile is on, through handles the office already has,
+ * each knob live so the perf overlay can flip it for an A/B in the headset.
  *
- * - outline: read by the session's own drawing each frame (session.ts), from `s.quality`.
- * - framebufferScale: only when a session starts (three refuses it during one), so a change is kept
+ * Profiles stack: on a Quest the flat page's is on from the start, a VR session's goes over it while
+ * you're in VR, and as one comes off the one under it is back. With none on, everything is as it was:
+ * a laptop never has one, and the desktop goes on exactly as it always has.
+ *
+ * - outline: the toon outline's own pass skipped while the top profile has it off (the frame is drawn
+ *   the same way otherwise, so your hands still go over it); a VR session also draws without the
+ *   effect at all then (session.ts).
+ * - framebufferScale (VR): only when a session starts (three refuses it during one), so a change is kept
  *   in the VR prefs for next time.
- * - foveation and frameRate: straight to the XR layer and session.
+ * - foveation and frameRate (VR): straight to the XR layer and session.
  * - shadows: the sun's map size, and drawn only every `shadowEveryMs` ('throttled'), or not at all
  *   ('off', which recompiles every material once).
  * - halos: the sky's night halos (additive points it shows again every frame) hidden after it.
@@ -16,14 +22,21 @@
  * - hotTextureEveryMs: a texture uploaded more than five times a second (a video, the TV, a screen's
  *   canvas, the arcade) is held to one upload per that many ms. A texture with `userData.vrHot === false`
  *   is left alone.
- * - panelScale: read by the panels when they paint (panels/).
+ * - batching: the office's still meshes drawn a region at a time (world/batch), through the batcher
+ *   the profile was put on with.
+ * - textureCap: the pictures on the walls at most this many pixels across (world/frames.ts).
+ * - panelScale (VR): read by the panels when they paint (panels/).
  */
 import * as THREE from 'three';
+import type { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
 import type { Ctx } from '../../core/context';
 import type { Parts } from '../../core/parts';
+import type { Frame, TickPhase } from '../../core/registry';
+import type { Batcher } from '../../world/batch/batcher';
+import { capPictures } from '../../world/frames';
 import { uniforms as skyUniforms } from '../../world/sky';
 import { saveVrPrefs } from './prefs';
-import type { VrKnobs, VrPrefs, VrQuality, VrSession } from './types';
+import type { SceneQuality, VrKnobs, VrPrefs, VrQuality, VrSession } from './types';
 
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
 
@@ -35,6 +48,159 @@ export function qualityBefore(renderer: THREE.WebGLRenderer, q: VrQuality, prefs
   renderer.xr.setFoveation(q.foveation);
 }
 
+/** Where a profile is on: what runs it each frame, and what says when it comes off. */
+export interface QualityHost {
+  tick(phase: TickPhase, fn: (f: Frame) => void): void;
+  onEnd(fn: () => void): void;
+}
+
+/** A profile that's on, and its knobs, changed one at a time. */
+export interface OnQuality<Q extends SceneQuality> {
+  readonly quality: Q;
+  set<K extends keyof SceneQuality>(k: K, v: Q[K]): void;
+}
+
+/** What a profile is put on with: the office's batcher, which its `batching` turns on and off. */
+export interface QualityDeps {
+  batcher?: Batcher | null;
+}
+
+interface Entry {
+  q: SceneQuality;
+  batcher: Batcher | null;
+}
+
+/** The profiles on in an office, the top one applied (see the stacking above). */
+class Profiles {
+  private readonly entries: Entry[] = [];
+  /** The renderer's shadows as they were before any profile was on. */
+  private was = { autoUpdate: true, enabled: true, size: 2048 };
+  private readonly hot = new HotTextures();
+  private halos: THREE.Points[] = [];
+  private shadowAt = -Infinity;
+  /** The outline effect's own outline pass, while a profile stands in front of it. */
+  private outline: OutlineEffect['renderOutline'] | null = null;
+
+  constructor(
+    private readonly ctx: Ctx,
+    private readonly parts: Pick<Parts, 'stage'>,
+  ) {}
+
+  private top(): Entry | undefined {
+    return this.entries.at(-1);
+  }
+
+  push<Q extends SceneQuality>(q: Q, host: QualityHost, deps: QualityDeps): OnQuality<Q> {
+    const { renderer } = this.ctx;
+    const { effect } = this.parts.stage;
+    if (!this.entries.length) {
+      this.was = { autoUpdate: renderer.shadowMap.autoUpdate, enabled: renderer.shadowMap.enabled, size: this.parts.stage.sun.shadow.mapSize.x };
+      // The outline's pass, drawn only while the top profile has it.
+      if (effect) {
+        const draw = (this.outline = effect.renderOutline);
+        effect.renderOutline = (scene, camera) => {
+          if (this.top()?.q.outline !== false) draw.call(effect, scene, camera);
+        };
+      }
+    }
+    const entry: Entry = { q, batcher: deps.batcher ?? null };
+    this.entries.push(entry);
+    this.halos = skyHalos(this.parts.stage.scene);
+    this.applyAll();
+    host.tick('env', ({ now }) => {
+      // After the sky (which shows its halos and sets its lamps every frame) and the scenic loop's own cull.
+      if (this.top() === entry) this.frame(now);
+    });
+    host.onEnd(() => this.pop(entry));
+    return {
+      quality: q,
+      set: (k, v) => {
+        if (q[k] === v) return;
+        q[k] = v;
+        if (this.top() === entry) this.apply(k);
+      },
+    };
+  }
+
+  private pop(entry: Entry) {
+    const i = this.entries.indexOf(entry);
+    if (i < 0) return;
+    this.entries.splice(i, 1);
+    if (this.entries.length) return this.applyAll();
+    // None on: the office as it was. (The halos, the lamps and the scenery: the sky and the frame loop set them again next frame.)
+    const { renderer } = this.ctx;
+    const { sun, scene } = this.parts.stage;
+    this.hot.unpatch();
+    setShadowsOn(renderer, scene, this.was.enabled);
+    renderer.shadowMap.autoUpdate = this.was.autoUpdate;
+    resizeShadow(sun, this.was.size);
+    renderer.shadowMap.needsUpdate = true;
+    entry.batcher?.enable(false);
+    capPictures(0);
+    if (this.outline && this.parts.stage.effect) this.parts.stage.effect.renderOutline = this.outline;
+    this.outline = null;
+  }
+
+  private applyAll() {
+    for (const k of ['shadows', 'hotTextureEveryMs', 'batching', 'textureCap'] as const) this.apply(k);
+  }
+
+  /** What changing knob `k` of the top profile does there and then (the rest are read every frame). */
+  private apply(k: keyof SceneQuality) {
+    const e = this.top();
+    if (!e) return;
+    const q = e.q;
+    switch (k) {
+      case 'shadows':
+      case 'shadowMapSize':
+      case 'shadowEveryMs': {
+        const { renderer } = this.ctx;
+        const { sun, scene } = this.parts.stage;
+        setShadowsOn(renderer, scene, q.shadows !== 'off');
+        renderer.shadowMap.autoUpdate = q.shadows === 'on';
+        resizeShadow(sun, q.shadowMapSize);
+        renderer.shadowMap.needsUpdate = true;
+        this.shadowAt = -Infinity;
+        break;
+      }
+      case 'hotTextureEveryMs':
+        this.hot.every = q.hotTextureEveryMs;
+        if (this.hot.every > 0) this.hot.patch();
+        else this.hot.unpatch();
+        break;
+      case 'batching':
+        e.batcher?.enable(q.batching);
+        break;
+      case 'textureCap':
+        capPictures(q.textureCap);
+        break;
+    }
+  }
+
+  private frame(now: number) {
+    const q = this.top()!.q;
+    const { renderer, camera, office } = this.ctx;
+    const { scene } = this.parts.stage;
+    if (!q.halos) for (const h of this.halos) h.visible = false;
+    if (skyUniforms.skyLampCount.value > q.maxLamps) skyUniforms.skyLampCount.value = Math.max(0, q.maxLamps);
+    if (!this.ctx.upTop() && q.sceneryReach < 1) office.scenic.cull(camera.position, office.night.street, (scene.fog as THREE.Fog).far * q.sceneryReach);
+    if (q.shadows === 'throttled' && now - this.shadowAt >= q.shadowEveryMs) {
+      renderer.shadowMap.needsUpdate = true;
+      this.shadowAt = now;
+    }
+    this.hot.flush(now);
+  }
+}
+
+const profiles = new WeakMap<Ctx, Profiles>();
+
+/** Puts profile `q` on, over whatever was, until `host` ends; the knobs change it live. */
+export function applyQuality<Q extends SceneQuality>(ctx: Ctx, parts: Pick<Parts, 'stage'>, host: QualityHost, q: Q, deps: QualityDeps = {}): OnQuality<Q> {
+  let p = profiles.get(ctx);
+  if (!p) profiles.set(ctx, (p = new Profiles(ctx, parts)));
+  return p.push(q, host, deps);
+}
+
 /** Each session's knobs, for the perf overlay (which starts before quality does: see knobsOf). */
 const running = new WeakMap<VrSession, VrKnobs>();
 
@@ -44,23 +210,9 @@ export function knobsOf(s: VrSession): VrKnobs | undefined {
 }
 
 /** The quality profile in play for the session (`s.quality`, changed in place by `set`), until it ends. */
-export function startQuality(ctx: Ctx, parts: Pick<Parts, 'stage'>, s: VrSession): VrKnobs {
-  const { renderer, camera, office } = ctx;
-  const { sun, scene } = parts.stage;
+export function startQuality(ctx: Ctx, parts: Pick<Parts, 'stage'>, s: VrSession, deps: QualityDeps = {}): VrKnobs {
+  const { renderer } = ctx;
   const q = s.quality;
-  const was = { autoUpdate: renderer.shadowMap.autoUpdate, enabled: renderer.shadowMap.enabled, size: sun.shadow.mapSize.x };
-  const halos = skyHalos(scene);
-  const hot = new HotTextures();
-  let shadowAt = -Infinity;
-
-  function shadows() {
-    const map = renderer.shadowMap;
-    setShadowsOn(renderer, scene, q.shadows !== 'off');
-    map.autoUpdate = q.shadows === 'on';
-    resizeShadow(sun, q.shadowMapSize);
-    map.needsUpdate = true;
-    shadowAt = -Infinity;
-  }
   function frameRate() {
     const rate = q.frameRate;
     const supported = s.xr.supportedFrameRates;
@@ -68,59 +220,34 @@ export function startQuality(ctx: Ctx, parts: Pick<Parts, 'stage'>, s: VrSession
     if (supported && !Array.from(supported).includes(rate)) return;
     s.xr.updateTargetFrameRate(rate).catch(() => {});
   }
-
-  shadows();
+  const on = applyQuality(ctx, parts, s, q, deps);
   frameRate();
-  hot.every = q.hotTextureEveryMs;
-  if (hot.every > 0) hot.patch();
-
-  s.tick('env', ({ now }) => {
-    // After the sky (which shows its halos and sets its lamps every frame) and the scenic loop's own cull.
-    if (!q.halos) for (const h of halos) h.visible = false;
-    if (skyUniforms.skyLampCount.value > q.maxLamps) skyUniforms.skyLampCount.value = Math.max(0, q.maxLamps);
-    if (!ctx.upTop() && q.sceneryReach < 1) office.scenic.cull(camera.position, office.night.street, (scene.fog as THREE.Fog).far * q.sceneryReach);
-    if (q.shadows === 'throttled' && now - shadowAt >= q.shadowEveryMs) {
-      renderer.shadowMap.needsUpdate = true;
-      shadowAt = now;
-    }
-    hot.flush(now);
-  });
-
-  s.onEnd(() => {
-    running.delete(s);
-    hot.unpatch();
-    setShadowsOn(renderer, scene, was.enabled);
-    renderer.shadowMap.autoUpdate = was.autoUpdate;
-    resizeShadow(sun, was.size);
-    renderer.shadowMap.needsUpdate = true;
-    // The halos, the lamps and the scenery: the sky and the frame loop set them again next frame.
-  });
+  s.onEnd(() => running.delete(s));
 
   const knobs: VrKnobs = {
     quality: q,
     set(k, v) {
       if (q[k] === v) return;
-      q[k] = v;
       switch (k) {
+        case 'name':
+          return;
         case 'framebufferScale':
+          q.framebufferScale = v as number;
           saveVrPrefs({ scale: q.framebufferScale });
-          break;
+          return;
         case 'foveation':
+          q.foveation = v as number;
           renderer.xr.setFoveation(clamp(q.foveation, 0, 1));
-          break;
+          return;
         case 'frameRate':
+          q.frameRate = v as number | null;
           frameRate();
-          break;
-        case 'shadows':
-        case 'shadowMapSize':
-        case 'shadowEveryMs':
-          shadows();
-          break;
-        case 'hotTextureEveryMs':
-          hot.every = q.hotTextureEveryMs;
-          if (hot.every > 0) hot.patch();
-          else hot.unpatch();
-          break;
+          return;
+        case 'panelScale':
+          q.panelScale = v as number;
+          return;
+        default:
+          on.set(k as keyof SceneQuality, v as never);
       }
     },
   };

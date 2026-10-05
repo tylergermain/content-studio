@@ -330,7 +330,11 @@ export function mergeByColor(root: THREE.Object3D): THREE.Group {
     const n = geo.attributes.position.count;
     const c = mat.color;
     const col = new Float32Array(n * 3);
-    for (let i = 0; i < n; i++) col.set([c.r, c.g, c.b], i * 3);
+    for (let i = 0; i < n * 3; i += 3) {
+      col[i] = c.r;
+      col[i + 1] = c.g;
+      col[i + 2] = c.b;
+    }
     geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
     (m.castShadow ? geos.cast : geos.still).push(geo);
   });
