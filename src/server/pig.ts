@@ -1,5 +1,5 @@
 import { COURT_REACH, feetOf, forfeit, newGame, shotRefused, shotResult, shotTaken, type PigState } from '../shared/pig.js';
-import { rimDistance } from '../shared/longshots.js';
+import { FARTHEST, rimDistance } from '../shared/longshots.js';
 import type { Flight } from './shot-judge.js';
 import type { Shooter } from './longshots.js';
 
@@ -42,8 +42,12 @@ export interface PigDeps {
   now(): number;
 }
 
-/** Further off than this (m) a player is away from the court. */
-export const AWAY_REACH = 16;
+/**
+ * Further off than this (m) a player is away from the court: nowhere on the floor's own level, as
+ * there's a long shot at the hoop (a heave, way out) from nearly anywhere on it (see
+ * shared/hoop-range.ts). Up in the loft is away all the same (see atCourt).
+ */
+export const AWAY_REACH = FARTHEST;
 /** How long a player can be away (off the court, off the floor, or out of the office) before they forfeit (ms). */
 export const AWAY_GRACE = 20_000;
 /** How long an invite stands (ms). */

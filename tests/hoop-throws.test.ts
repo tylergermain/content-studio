@@ -4,6 +4,8 @@ import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { HOOP, SWEET, idealSpeed, lookAtRim, shotSpeed, throwPitch, underCeiling } from '../src/shared/hoop.js';
+import { farAim, farShot, farSpeed } from '../src/shared/hoop-range.js';
+import { rimDistance } from '../src/shared/longshots.js';
 import { DEFAULT_FURNITURE } from '../src/shared/furniture.js';
 import { roomOf } from '../src/shared/floorplan.js';
 import type { ServerMsg } from '../src/shared/protocol.js';
@@ -58,6 +60,16 @@ function throwFrom(d: number, power = SWEET.at) {
   const pitch = underCeiling(from, throwPitch(lookAtRim(from)));
   const v = shotSpeed(idealSpeed(from, pitch)!, power);
   return { t: 'ball.throw' as const, ...from, vx: -v * Math.cos(pitch), vy: v * Math.sin(pitch), vz: 0 };
+}
+
+/** The throw someone standing `d` m out (past the old range: a heave, from far enough) makes, as the page throws it. */
+function farFrom(d: number, power = SWEET.at) {
+  const from = { x: HOOP.rim.x + d - 0.3, y: 1.4, z: HOOP.z };
+  const aim = farAim(from, throwPitch(lookAtRim(from)), rimDistance(from))!;
+  const shot = farShot(from, aim);
+  const v = farSpeed(shot, power);
+  const c = Math.cos(shot.pitch);
+  return { t: 'ball.throw' as const, ...from, vx: Math.sin(aim.heading) * c * v, vy: Math.sin(shot.pitch) * v, vz: Math.cos(aim.heading) * c * v };
 }
 
 const settle = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -168,4 +180,31 @@ test('a better make hard on the heels of the last goes on the table at once; the
   );
   const boards = out.filter((o) => o.msg.t === 'hoop.board').map((o) => (o.msg as Extract<ServerMsg, { t: 'hoop.board' }>).latest?.dist);
   assert.deepEqual(boards, [5], 'the 6.2 is told about once the time is up');
+});
+
+test('a heave from way out goes on the longest shots at its real distance, and sets the spot in a game of PIG', async (t) => {
+  const { ctx, floor, person } = office(t);
+  // Just short of the corner loft (a page offers no long shot from under it, or from up in it).
+  const ada = person('a1', 'Ada', 25.5);
+  ballHandlers['ball.take'](ctx, ada, { t: 'ball.take' });
+  ballHandlers['ball.throw'](ctx, ada, farFrom(25.5));
+  assert.equal(floor.court.state().shot?.by, 'a1', 'the court took it, faster than anyone throws two-handed');
+  await settle(2300);
+  assert.deepEqual(
+    ctx.longShots.board().shots.map((s) => [s.name, s.dist]),
+    [['Ada', 25.2]],
+  );
+
+  // PIG: both at the court to start, then Tyler heaves one in from 25 m out.
+  const tyler = person('t1', 'Tyler', 4);
+  const gavin = person('g1', 'Gavin', 5);
+  hoopHandlers['pig.invite'](ctx, tyler, { t: 'pig.invite', to: 'g1' });
+  hoopHandlers['pig.answer'](ctx, gavin, { t: 'pig.answer', from: 't1', yes: true });
+  tyler.peer.x = HOOP.rim.x + 25;
+  ballHandlers['ball.throw'](ctx, tyler, farFrom(25));
+  assert.equal(ctx.pig.game('f')?.inAir, true);
+  await settle(2300);
+  const g = ctx.pig.game('f')!;
+  assert.equal(g.turn, 1, "Gavin's to match");
+  assert.ok(g.spot && Math.abs(g.spot.dist - 25) < 0.2, `the spot is where Tyler stood (${g.spot?.dist})`);
 });
