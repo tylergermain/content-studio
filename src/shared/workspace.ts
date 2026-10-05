@@ -1,5 +1,6 @@
 import type { ReviewKind, ReviewNote } from './worker-chat.js';
 import { previewType } from './worker-chat.js';
+import { isDesignFile } from './design-canvas.js';
 
 // A specialist's workspace: the interface its chat window opens with beside the conversation. A kind
 // only says which tabs come first and what the window is called; the tabs themselves are panels in
@@ -11,7 +12,7 @@ import { previewType } from './worker-chat.js';
 
 export const WORKSPACE_KINDS = ['files', 'screening', 'board', 'reader'] as const;
 export type WorkspaceKind = typeof WORKSPACE_KINDS[number];
-export type WorkspaceTab = 'watch' | 'board' | 'read' | 'files';
+export type WorkspaceTab = 'canvas' | 'watch' | 'board' | 'read' | 'files';
 
 /**
  * Each kind's name, the words E shows at the worker's desk, a line for the admin choosing it, and its
@@ -20,9 +21,9 @@ export type WorkspaceTab = 'watch' | 'board' | 'read' | 'files';
  */
 export const WORKSPACES: Readonly<Record<WorkspaceKind, { label: string; hint: string; about: string; tabs: readonly WorkspaceTab[] }>> = Object.freeze({
   files: { label: 'Files', hint: 'Open chat', about: 'The conversation, with the files the worker links or makes beside it.', tabs: ['files'] },
-  screening: { label: 'Screening room', hint: 'Open the screening room', about: 'Watch each cut, leave notes at timestamps, send them back as a revision request, and approve the final version.', tabs: ['watch', 'read', 'board', 'files'] },
-  board: { label: 'Design board', hint: 'Open the design board', about: 'Compare images side by side and at YouTube size, pick one, or ask for variations.', tabs: ['board', 'read', 'watch', 'files'] },
-  reader: { label: 'Reports', hint: 'Read the reports', about: 'Read reports with their sources listed beside them, ask about them, and approve them.', tabs: ['read', 'board', 'watch', 'files'] },
+  screening: { label: 'Screening room', hint: 'Open the screening room', about: 'Watch each cut, leave notes at timestamps, send them back as a revision request, and approve the final version.', tabs: ['watch', 'read', 'board', 'canvas', 'files'] },
+  board: { label: 'Design board', hint: 'Open the design board', about: 'Watch designs take shape live and pin notes to them, compare images side by side and at YouTube size, pick one, or ask for variations.', tabs: ['canvas', 'board', 'read', 'watch', 'files'] },
+  reader: { label: 'Reports', hint: 'Read the reports', about: 'Read reports with their sources listed beside them, ask about them, and approve them.', tabs: ['read', 'board', 'watch', 'canvas', 'files'] },
 });
 
 /** The starter roles' kinds. Any other role is 'files' until an admin picks one in Manage specialists. */
@@ -44,8 +45,13 @@ export function workspaceHint(specialist?: string): string {
   return WORKSPACES[workspaceOf(specialist)].hint;
 }
 
+/** The tab a file belongs on: a design on the canvas (see shared/design-canvas.ts), anything else by its preview type. */
+export function fileTab(file: { path: string; type: string }): Exclude<WorkspaceTab, 'files'> | undefined {
+  return isDesignFile(file.path) ? 'canvas' : tabOf(file.type);
+}
+
 /** The tab a file's preview type belongs on. Anything else is only under Files. */
-export function tabOf(type: string): Exclude<WorkspaceTab, 'files'> | undefined {
+export function tabOf(type: string): Exclude<WorkspaceTab, 'files' | 'canvas'> | undefined {
   if (/^(video|audio)\//.test(type)) return 'watch';
   if (type.startsWith('image/')) return 'board';
   if (type.startsWith('text/') || type === 'application/pdf') return 'read';
@@ -127,11 +133,13 @@ export function reviewText(kind: ReviewKind, files: string[], notes?: ReviewNote
   if (kind === 'notes') {
     const version = one ? versionLabel(one) : undefined;
     parts.push(one ? `Revision notes on ${titled(one)}:\n${code(one)}` : `Revision notes on these files:\n${listed}`);
-    const sorted = [...(notes ?? [])].sort((a, b) => a.at - b.at).map((n) => `- ${clock(n.at)} ${oneLine(n.text)}`);
+    const sorted = [...(notes ?? [])].sort((a, b) => a.at - b.at).map((n) => (n.where ? `- On ${oneLine(n.where)}: ${oneLine(n.text)}` : `- ${clock(n.at)} ${oneLine(n.text)}`));
     if (sorted.length) parts.push(sorted.join('\n'));
     if (extra) parts.push(extra);
     const next = nextVersion(version);
-    parts.push(one
+    // A design is open live on the canvas: the changes go into it, where the reviewer watches them land.
+    if (one && isDesignFile(one)) parts.push(`Make these changes in that design file itself: it is open on the canvas, so I see each change as you save it. Keep each artboard's name, and link the file ${LINKED} when you are done.`);
+    else parts.push(one
       ? `Make these changes in a new version saved as a new file with ${next} in its name, and leave ${version ?? 'this file'} as it is. When it is ready, link it ${LINKED}.`
       : `Make these changes in new versions saved as new files next to the originals, and leave the originals as they are. When they are ready, link each new file ${LINKED}.`);
   } else if (kind === 'approve') {

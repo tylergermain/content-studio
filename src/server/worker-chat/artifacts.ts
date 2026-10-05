@@ -4,15 +4,16 @@ import { previewType, type ChatArtifact } from '../../shared/worker-chat.js';
 
 /** The preview types live in shared/worker-chat.ts, so the browser reads links with the same table. */
 export const artifactType = previewType;
-export function publicArtifact(file: string): boolean {
-  return !!artifactType(file) && !path.isAbsolute(file) && file.split(/[\\/]/).every(p => p && p !== '..' && !p.startsWith('.') && !/^(node_modules|vendor|credentials?|secrets?|auth|tokens?)$/i.test(p)) && !/(?:credentials|secret|api[-_]?key|auth[-_]?state|^mcp\.local\.json$)/i.test(path.basename(file));
+/** Whether a file may be served to a chat: one of the types `typeOf` knows (the previews', unless a caller has its own, as the design canvas does), nowhere hidden or private. */
+export function publicArtifact(file: string, typeOf: (file: string) => string | undefined = artifactType): boolean {
+  return !!typeOf(file) && !path.isAbsolute(file) && file.split(/[\\/]/).every(p => p && p !== '..' && !p.startsWith('.') && !/^(node_modules|vendor|credentials?|secrets?|auth|tokens?)$/i.test(p)) && !/(?:credentials|secret|api[-_]?key|auth[-_]?state|^mcp\.local\.json$)/i.test(path.basename(file));
 }
-export async function artifactPath(root: string, file: string): Promise<string | undefined> {
-  if (!publicArtifact(file)) return;
+export async function artifactPath(root: string, file: string, typeOf: (file: string) => string | undefined = artifactType): Promise<string | undefined> {
+  if (!publicArtifact(file, typeOf)) return;
   try {
     const base = await realpath(root); const target = await realpath(path.join(base, file));
     const rel = path.relative(base, target);
-    if (rel.startsWith('..') || path.isAbsolute(rel) || !publicArtifact(rel)) return;
+    if (rel.startsWith('..') || path.isAbsolute(rel) || !publicArtifact(rel, typeOf)) return;
     const info = await stat(target); return info.isFile() ? target : undefined;
   } catch { return; }
 }

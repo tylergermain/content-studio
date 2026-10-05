@@ -2,8 +2,8 @@ import type { WorkspaceKind } from './workspace.js';
 
 /** What a review asks of the worker: changes at timestamps, approval (a pick, for images), new variations, or an answer. */
 export type ReviewKind = 'notes' | 'approve' | 'variations' | 'question';
-/** A note at a time in a video, in seconds. */
-export interface ReviewNote { at: number; text: string }
+/** A note at a time in a video, in seconds; or, on a design, pinned to one of its elements (`where` says which, and `at` is 0). */
+export interface ReviewNote { at: number; text: string; where?: string }
 /** A review sent from a workspace, kept on the chat message that carried it so the files can show it (Approved, Notes sent). */
 export interface ChatReview { kind: ReviewKind; files: { root?: string; path: string }[]; notes?: ReviewNote[] }
 /** The body of POST /api/worker-chat/review. The server writes the prompt itself, with `reviewText` (shared/workspace.ts). */

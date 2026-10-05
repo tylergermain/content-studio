@@ -5,7 +5,7 @@ import { localImages } from '../worker-chat/links';
 import { normalizeTarget } from '../../../shared/chat-links';
 import { resolveDocLink } from '../../../shared/docs';
 import { artifactKey, previewType, type ChatArtifact, type ChatSnapshot, type LinkedFile } from '../../../shared/worker-chat';
-import { tabOf, versionLabel } from '../../../shared/workspace';
+import { fileTab, versionLabel } from '../../../shared/workspace';
 import { badges, fileItem, fileSize, fileTime, fileTitle, latestLinked, originOf, sections } from './files';
 import { bareUrls, groupSources, sourceKey, sourcesText, type Source, type SourceLink } from './sources';
 import type { Panel, WorkspaceHost } from './types';
@@ -308,7 +308,7 @@ export function reportReader(host: WorkspaceHost): Panel {
       }
       a.setAttribute('href', host.url(to.file));
       a.classList.add('reader-file');
-      if (tabOf(to.file.type) !== 'read') continue;
+      if (fileTab(to.file) !== 'read') continue;
       a.title = `Open ${to.file.name} here`;
       a.addEventListener('click', (e) => {
         if (!plainClick(e)) return;

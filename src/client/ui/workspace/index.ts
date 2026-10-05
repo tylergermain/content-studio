@@ -2,8 +2,9 @@ import './workspace.css';
 import { h } from '../dom';
 import { unshareRequest } from '../worker-chat/api';
 import { artifactKey, type ChatArtifact, type ChatSnapshot, type SharedFolder } from '../../../shared/worker-chat';
-import { WORKSPACES, tabOf, type WorkspaceKind, type WorkspaceTab } from '../../../shared/workspace';
+import { WORKSPACES, fileTab, type WorkspaceKind, type WorkspaceTab } from '../../../shared/workspace';
 import { designBoard } from './board';
+import { designCanvas } from './canvas';
 import { filesPanel } from './files';
 import { reportReader } from './reader';
 import { screeningRoom } from './screening';
@@ -14,20 +15,21 @@ import type { Panel, Workspace, WorkspaceHost } from './types';
 // here and a case in `tabOf`, and the Record fails the typecheck until the entry exists.
 
 export const PANELS: Record<WorkspaceTab, (host: WorkspaceHost) => Panel> = {
+  canvas: designCanvas,
   watch: screeningRoom,
   board: designBoard,
   read: reportReader,
   files: filesPanel,
 };
 
-const TAB_LABELS: Record<WorkspaceTab, string> = { watch: 'Watch', board: 'Board', read: 'Read', files: 'Files' };
+const TAB_LABELS: Record<WorkspaceTab, string> = { canvas: 'Canvas', watch: 'Watch', board: 'Board', read: 'Read', files: 'Files' };
 
 /** Every file once: what the worker linked (and remembered links), then the files beside them, then the floor's scan. */
 function everyFile(data: ChatSnapshot): ChatArtifact[] {
   const seen = new Set<string>();
   return [...(data.linked ?? []), ...(data.nearby ?? []), ...data.artifacts].filter((f) => !seen.has(artifactKey(f)) && !!seen.add(artifactKey(f)));
 }
-const filesOn = (tab: WorkspaceTab, all: ChatArtifact[]) => (tab === 'files' ? all : all.filter((f) => tabOf(f.type) === tab));
+const filesOn = (tab: WorkspaceTab, all: ChatArtifact[]) => (tab === 'files' ? all : all.filter((f) => fileTab(f) === tab));
 const typing = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
 const pauseAll = (el: HTMLElement) => { for (const m of el.querySelectorAll<HTMLMediaElement>('video,audio')) m.pause(); };
 
@@ -76,7 +78,7 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
   function paint(next: ChatSnapshot) {
     data = next;
     const all = everyFile(next);
-    const linkedTabs = new Set((next.linked ?? []).map((f) => tabOf(f.type) ?? 'files'));
+    const linkedTabs = new Set((next.linked ?? []).map((f) => fileTab(f) ?? 'files'));
     const shown = spec.tabs.filter((t, i) => i === 0 || filesOn(t, all).length > 0);
     for (const [t, b] of buttons) {
       const n = filesOn(t, all).length;
@@ -130,7 +132,7 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
     show(key) {
       const file = data && everyFile(data).find((f) => artifactKey(f) === key);
       if (!file) return;
-      const own = tabOf(file.type);
+      const own = fileTab(file);
       chosen = true;
       select(own && spec.tabs.includes(own) ? own : 'files').show(file);
       element.focus({ preventScroll: true });

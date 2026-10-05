@@ -37,7 +37,8 @@ test('every interface has a name, a desk hint and its tabs, and always ends with
     assert.ok(![w.label, w.hint, w.about].some((s) => s.includes('—')), kind);
   }
   assert.equal(WORKSPACES.screening.tabs[0], 'watch');
-  assert.equal(WORKSPACES.board.tabs[0], 'board');
+  // The Design board opens on the live canvas, with the images it compares right after (see shared/design-canvas.ts).
+  assert.deepEqual(WORKSPACES.board.tabs.slice(0, 2), ['canvas', 'board']);
   assert.equal(WORKSPACES.reader.tabs[0], 'read');
   assert.deepEqual(WORKSPACES.files.tabs, ['files']);
   assert.equal(workspaceHint('video-editor'), 'Open the screening room');

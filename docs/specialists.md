@@ -25,7 +25,7 @@ Each role opens with an interface made for what it hands back. Press **E** at th
 | Interface | Role | What it is for |
 | --- | --- | --- |
 | **Screening room** | Video Editor | Watch each cut, leave notes at timestamps, send them back as a revision request, and approve the final version. |
-| **Design board** | Designer | Compare images side by side and at YouTube size, pick one, or ask for variations. |
+| **Design board** | Designer | Watch designs take shape live on the [Canvas](design-canvas.md) and pin notes to their elements; compare images side by side and at YouTube size, pick one, or ask for variations. |
 | **Reports** | Researcher | Read reports with their sources listed beside them, ask about them, and approve them. |
 | **Files** | Any other role, and general agents | The conversation with the files the worker links or makes, as before. |
 

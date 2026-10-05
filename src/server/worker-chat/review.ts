@@ -9,7 +9,7 @@ import type { Floor } from '../floor.js';
 // variations, a question) as the browser sends it. The prompt itself is written on the server by
 // shared/workspace.ts's `reviewText`, from the files' real paths.
 
-const MAX_FILES = 4, MAX_NOTES = 50, MAX_NOTE = 1000, MAX_TEXT = 4000;
+const MAX_FILES = 4, MAX_NOTES = 50, MAX_NOTE = 1000, MAX_TEXT = 4000, MAX_WHERE = 600;
 /** The same rule as a typed message: no control characters but tab and newline. */
 const CONTROL = /[\x00-\x08\x0b-\x1f\x7f]/;
 const absent = (v: unknown) => v === undefined || v === null;
@@ -34,10 +34,12 @@ export function parseReview(body: unknown): ReviewRequest | { error: string } {
   if (!absent(b.notes)) {
     if (!Array.isArray(b.notes) || b.notes.length > MAX_NOTES) return { error: `Send up to ${MAX_NOTES} notes at a time` };
     for (const n of b.notes as unknown[]) {
-      const { at, text } = (n && typeof n === 'object' ? n : {}) as Record<string, unknown>;
+      const { at, text, where } = (n && typeof n === 'object' ? n : {}) as Record<string, unknown>;
       if (typeof at !== 'number' || !Number.isFinite(at) || at < 0) return { error: 'Each note needs its time in the video' };
       if (typeof text !== 'string' || !text.trim() || text.length > MAX_NOTE || CONTROL.test(text)) return { error: `Write each note in up to ${MAX_NOTE.toLocaleString('en-US')} characters` };
-      notes.push({ at: Math.round(at * 1000) / 1000, text: text.trim() });
+      // A note on a design says which element it's pinned to (see shared/design-canvas.ts).
+      if (!absent(where) && (typeof where !== 'string' || !where.trim() || where.length > MAX_WHERE || CONTROL.test(where))) return { error: 'Pin each note to an element of the design' };
+      notes.push({ at: Math.round(at * 1000) / 1000, text: text.trim(), ...(typeof where === 'string' ? { where: where.trim() } : {}) });
     }
     notes = notes.sort((x, y) => x.at - y.at);
   }
