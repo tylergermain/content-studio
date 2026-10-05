@@ -212,6 +212,7 @@ export class Floor {
     );
     this.workers.hiringPolicy = (owner,specialist,kind) => ctx.hiringAllowed?.(this,owner,specialist,kind);
     this.workers.wing = () => this.plan.wing;
+    this.workers.projectAt = (deskId) => this.plan.deskProject(deskId);
 
     this.github = new GitHub(
       def.dir,

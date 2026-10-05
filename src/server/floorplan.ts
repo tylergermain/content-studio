@@ -6,6 +6,8 @@ import { structureKey } from '../shared/mezzanine.js';
 import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type FloorRoom } from '../shared/floorplan.js';
 import { DESK_BY_ID, MEETING_SEATS, WING, type SeatDef } from '../shared/layout.js';
 import { meetingOf } from '../shared/meeting-place.js';
+import type { WorkerProject } from '../shared/project-rooms.js';
+import { checkProjects, deskProject } from './project-rooms.js';
 
 /**
  * A floor's own layout: the signs over its desks, how far its back office is built out, and where its
@@ -14,9 +16,13 @@ import { meetingOf } from '../shared/meeting-place.js';
 export class FloorPlanStore {
   private plan: FloorPlan;
   private file: string;
+  /** The floor's own folder, which its project rooms' folders are checked against (see checkProjects). */
+  private floorDir: string;
 
-  constructor(dataDir: string) {
+  /** `home` is the folder a project room's folder has to be inside (see checkProjects): whoever runs the office's own. */
+  constructor(dataDir: string, private home?: string) {
     this.file = path.join(dataDir, 'floorplan.json');
+    this.floorDir = path.dirname(dataDir);
     this.plan = this.load();
   }
 
@@ -41,6 +47,11 @@ export class FloorPlanStore {
   /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without the boss's office. */
   seat(id: string): SeatDef | undefined {
     return floorSeat(layoutFurniture(this.plan), this.plan.wing, id, roomOf(this.plan));
+  }
+
+  /** The project room the desk `deskId` is in, as a worker hired there keeps it (see shared/project-rooms.ts). */
+  deskProject(deskId: string): WorkerProject | undefined {
+    return deskProject({ desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan) }, deskId);
   }
 
   /** Hangs a sign over a desk, or takes it down (no text). What it did, for the toast, or why it couldn't. */
@@ -107,6 +118,8 @@ export class FloorPlanStore {
     for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
     // The meeting's seats are the meeting place's: it doesn't move out from under whoever's in one.
     if (meetingOf(room) !== meetingOf(this.plan.room) && MEETING_SEATS.some((d) => taken(d.id))) return 'Clear the meeting room before moving the meeting place';
+    const project = checkProjects(layout.furniture, this.floorDir, this.home);
+    if (project) return project;
     const look = cleanLook(raw.look);
     const { look: _was, room: _had, ...rest } = this.plan;
     const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), ...(Object.keys(room).length ? { room } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };

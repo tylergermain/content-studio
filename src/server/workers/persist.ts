@@ -10,6 +10,7 @@ import { midTurn } from './lifecycle.js';
 import type { Worker } from './types.js';
 import { COLORS, newWorker } from './worker.js';
 import { validRepos } from './worktree.js';
+import { cleanWorkerProject } from '../../shared/project-rooms.js';
 
 /** What a worker with a live terminal can be doing. */
 const RUNNING = new Set<unknown>(['starting', 'idle', 'working', 'done', 'needs_input'] satisfies WorkerStatus[]);
@@ -24,6 +25,7 @@ export function saveWorkers(file: string, workers: Iterable<Worker>, stopping: b
     model: info.model,
     effort: info.effort,
     specialist: info.specialist,
+    project: info.project,
     deskId: info.deskId,
     name: info.name,
     color: info.color,
@@ -78,6 +80,7 @@ export function restoreWorkers(file: string, workers: Map<string, Worker>, defau
         model: savedModel(provider, s.model),
         effort: savedEffort(provider, s.effort),
         specialist: typeof s.specialist === 'string' && /^[a-z][a-z0-9-]{0,47}$/.test(s.specialist) ? s.specialist : undefined,
+        project: cleanWorkerProject(s.project),
         deskId: s.deskId,
         name: s.name ?? 'Worker',
         color: s.color ?? COLORS[0],

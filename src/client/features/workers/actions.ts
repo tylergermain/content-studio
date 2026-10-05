@@ -17,7 +17,7 @@ import { aside, key } from '../../core/hint';
 import type { Parts } from '../../core/parts';
 import { stationInfo, stationName } from '../../core/stations';
 import { askNotifyPermission, notifyPermission } from '../../notify';
-import { repoChoices } from '../../shared/hiring';
+import { deskLabel, hireNote, repoChoices, worktreeAt } from '../../shared/hiring';
 import { store } from '../../state';
 import { openAsk } from '../../ui/ask';
 import { STATUS_LABEL, clip, closeAllModals, h, toast } from '../../ui/dom';
@@ -99,12 +99,12 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       if (officeIsFull()) return;
       openPrompt({
         title: `✨ New task at ${desk.label}`,
-        subtitle: 'A fresh worker will sit down and start on this right away.',
+        subtitle: hireNote(deskId, 'A fresh worker will sit down and start on this right away.'),
         warning: pressureNote(store.machine),
         submitLabel: 'Hire & start',
         providerOption: true,
       specialistOption: true,
-        worktreeOption: !!store.project?.branch,
+        worktreeOption: worktreeAt(deskId),
         repoOptions: repoChoices(),
         onSubmit: (text, o) => hire(deskId, text, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, o.specialist),
       });
@@ -134,14 +134,14 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     if (officeIsFull()) return;
     openPrompt({
       title: `✨ Hire a worker at ${desk.label}`,
-      subtitle: 'You can start with an empty prompt and send work later.',
+      subtitle: hireNote(deskId, 'You can start with an empty prompt and send work later.'),
       warning: pressureNote(store.machine),
       placeholder: 'Optional first task…',
       submitLabel: 'Hire & start',
       allowEmpty: true,
       providerOption: true,
       specialistOption: true,
-      worktreeOption: !!store.project?.branch,
+      worktreeOption: worktreeAt(deskId),
       repoOptions: repoChoices(),
       onSubmit: (text, o) => hire(deskId, text || undefined, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, o.specialist),
     });
@@ -455,9 +455,9 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     openAsk({
       title,
       ...text,
-      newDesk: desk ? plan().byId.get(desk)!.label : undefined,
+      newDesk: desk ? deskLabel(desk, plan().byId.get(desk)!.label) : undefined,
       workers: awake.map((w) => ({ id: w.id, name: w.name, color: w.color, status: w.status })),
-      worktreeOption: !!store.project?.branch,
+      worktreeOption: desk ? worktreeAt(desk) : !!store.project?.branch,
       providerOption: true,
       repoOptions: repoChoices(),
       onSubmit: (prompt, to, worktree, provider, model, effort, repos, specialist) => {

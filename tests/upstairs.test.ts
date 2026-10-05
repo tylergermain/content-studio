@@ -44,13 +44,13 @@ test('a piece upstairs stands on the deck: what you bump into starts there, and 
   assert.equal(pieceAway(down('sofa', 15, -12), 1), true);
 });
 
-test('upstairs is for furniture: not what the office has one of, what is played with, or what hangs from its ceiling', () => {
+test('upstairs is for furniture: not what the office has one of, what is played with, what hangs from its ceiling, or a project room', () => {
   for (const kind of FURNITURE_KINDS) {
     const k = kindDef(kind);
-    assert.equal(canGoUp(kind), !k.fixed && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel', kind);
+    assert.equal(canGoUp(kind), !k.fixed && !k.project && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel', kind);
   }
   assert.ok(canGoUp('sofa') && canGoUp('wall') && canGoUp('painting') && canGoUp('doorway') && canGoUp('neon') && canGoUp('team-desk'));
-  assert.ok(!canGoUp('whiteboard') && !canGoUp('trampoline') && !canGoUp('ticker') && !canGoUp('hoop') && !canGoUp('jukebox') && !canGoUp('ceiling-panel'));
+  assert.ok(!canGoUp('whiteboard') && !canGoUp('trampoline') && !canGoUp('ticker') && !canGoUp('hoop') && !canGoUp('jukebox') && !canGoUp('ceiling-panel') && !canGoUp('project-room'));
 
   const clean = cleanFurniture([
     { ...up('sofa', 0, 9), id: 'a' },

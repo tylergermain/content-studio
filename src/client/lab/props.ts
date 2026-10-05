@@ -18,6 +18,7 @@ import { buildGong } from '../features/gong/world';
 import { ROTOR_TURNS, buildHeli, poseHeli } from '../features/heli/model';
 import { buildJukebox } from '../features/jukebox/world';
 import { buildKitchen } from '../world/kitchen';
+import { buildPiece } from '../world/office/furniture';
 import { preloadModels } from '../world/models';
 import { DESK_BOOKS, FLOOR_PLANTS, buildDesk, coffeeTable, deskBooks, deskMug, loungeCouch, plant, pouf } from '../world/office';
 import { toon } from '../world/toon';
@@ -75,6 +76,17 @@ const SHOW: Record<string, () => Shown> = {
     const object = new THREE.Group();
     const at = [0, 3.5, 5.3, 6.6];
     [loungeCouch(), coffeeTable(), pouf('#06d6a0'), pouf('#ffd166')].forEach((o, i) => object.add(o.translateX(at[i])));
+    return { object };
+  },
+  project_room: () => {
+    // A project room under two desks, as the builder lays one (see shared/project-rooms.ts): name=<text> renames it.
+    const object = new THREE.Group();
+    object.add(buildPiece({ id: 'room', kind: 'project-room', x: 0, z: 0, rotY: 0, color: '#7ab8ff', text: q.get('name') ?? 'Kenna Platform', w: 8, d: 6 }).group);
+    [0, 1].forEach((i) => {
+      const desk = buildDesk({ ...DESKS[i], x: -1.7 + i * 3.4, z: -0.7, rotY: 0 }, i, toon('#e8a87c'));
+      desk.vacancy.visible = false;
+      object.add(desk.group);
+    });
     return { object };
   },
   lambo: () => ({ object: supercar('lambo', '#ffd166').root }),

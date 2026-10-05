@@ -14,6 +14,8 @@ agents/video-editor/
 
 The agent starts in its role folder. `AGENTS.md` describes the role, and `CLAUDE.md` points Claude Code to those instructions. The floor's parent instructions still apply. Production paths are relative to the floor root, two levels above the specialist folder. Shared floor content remains visible in the worker's content previews, and so do the files it links in folders an admin shares with the floor, such as a render folder outside the project (see [sharing a folder with the floor](worker-chat.md#sharing-a-folder-with-the-floor)). Worker sessions and role choices survive office restarts.
 
+A specialist hired at a desk in a [project room](office-builder.md#project-rooms) still starts in its role folder, and its first request tells it the room's project folder and app, so it does the task's work there.
+
 These are persistent local processes with shared floor access. A role folder does not enforce filesystem, tool, network, or desktop isolation. The existing bypass permission defaults still apply. Specialists currently use the main floor folder rather than a separate git worktree, meeting seat, or board station. Coordinate edits to shared files. A future container or VM runner would provide actual computer isolation.
 
 ## Interfaces

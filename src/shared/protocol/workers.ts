@@ -2,6 +2,7 @@
 
 import type { AgentEffort, AgentProvider } from './agents.js';
 import type { Usage } from './usage.js';
+import type { WorkerProject } from '../project-rooms.js';
 
 export type WorkerStatus =
   | 'starting' // PTY launched, agent booting
@@ -37,6 +38,8 @@ export interface WorkerInfo {
   effort?: AgentEffort;
   specialist?: string;
   deskId: string;
+  /** The project room its desk was in when it was hired, and that room's project: it works in the project's folder (see shared/project-rooms.ts). */
+  project?: WorkerProject;
   name: string;
   color: string;
   status: WorkerStatus;
