@@ -4,7 +4,7 @@
  * press and its edges, snap turning's flick, where a trigger pull goes, and the things the trigger
  * doesn't do in VR yet. controllers.ts reads the pads through these; interact.ts and locomotion.ts act on them.
  */
-import type { Btn } from './types';
+import type { Btn, Hand } from './types';
 
 /** How far a stick must lean (0–1) before it counts: Touch sticks rest a little off centre. */
 export const DEADZONE = 0.15;
@@ -114,4 +114,48 @@ export function triggerRoute(o: { onPanel: boolean; windowUp: boolean; blocked: 
 export function aPress(heldMs: number, mic: boolean): 'wait' | 'talk' | 'keyboard' {
   if (!mic) return 'keyboard';
   return heldMs >= HOLD_MS ? 'talk' : 'wait';
+}
+
+/**
+ * With one controller (a flat battery, a broken one, one put down), how long the other must have been
+ * missing before its jobs move over to the one there is: a controller can drop out for a moment.
+ */
+export const SOLO_AFTER_MS = 1500;
+/** With one controller, B (or Y) held this long brings up the HUD sheet rather than going back. */
+export const SHEET_HOLD_MS = 500;
+/** With one controller, its stick clicked in and held this long opens the perf overlay. */
+export const PERF_HOLD_MS = 1200;
+
+/**
+ * The hand that's on its own: the one controller the headset reports while the other has been
+ * missing for SOLO_AFTER_MS, else null (both there, or neither). `seen` is when each was last there,
+ * in performance.now()'s ms.
+ */
+export function soloHand(now: number, seen: Readonly<Record<Hand, number>>, there: Readonly<Record<Hand, boolean>>): Hand | null {
+  if (there.left === there.right) return null;
+  const only: Hand = there.left ? 'left' : 'right';
+  return now - seen[only === 'left' ? 'right' : 'left'] >= SOLO_AFTER_MS ? only : null;
+}
+
+/**
+ * One stick doing both sticks' jobs: leaning more to a side than forward or back, it snap-turns
+ * (`turnX`); otherwise it walks forward or back (`walk`, + is back, as sticks have it), with no
+ * sidestep. Written into `out`.
+ */
+export function soloStick(x: number, y: number, out = { turnX: 0, walk: 0 }): { turnX: number; walk: number } {
+  const side = Math.abs(x) > Math.abs(y);
+  out.turnX = side ? x : 0;
+  out.walk = side ? 0 : y;
+  return out;
+}
+
+/**
+ * A button that does one thing held and another tapped: 'hold' the frame it has been down `holdMs`
+ * (once a press: `done` says it already went), 'tap' when it comes up before that, else null.
+ */
+export function holdOrTap(b: Btn, heldMs: number, done: boolean, holdMs: number): 'hold' | 'tap' | null {
+  if (done) return null;
+  if (b.pressed && heldMs >= holdMs) return 'hold';
+  if (b.up) return 'tap';
+  return null;
 }

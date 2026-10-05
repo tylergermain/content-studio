@@ -2,6 +2,8 @@
  * Getting about on the sticks: the left one walks you the way you look (as far as it's pushed, as
  * fast; click it in to run, until you let it go), and the right one turns you a snap at a time
  * (30°, or 45° in the prefs). Pushing the left stick off a seat gets you up, as walking off does.
+ * With only one controller (pads.solo) its stick does both: forward and back walk, a flick to the side
+ * turns, and while its ray is on a panel it scrolls the panel instead of walking.
  * On the ladder, a pole or in a car, which go by the keys, the left stick holds W, A, S and D down
  * for you. With the comfort vignette on (VrPrefs.vignette), the edges of the view dim while the
  * stick moves you.
@@ -10,7 +12,7 @@ import * as THREE from 'three';
 import type { Ctx } from '../../core/context';
 import { noOutline } from '../../core/outline';
 import type { VrControllers, VrRig, VrSession } from './types';
-import { snapStep, stickKeys } from './input-map';
+import { snapStep, soloStick, stickKeys } from './input-map';
 import { keyDown, keyUp } from './keys';
 
 /** On a rig, a key goes down with the stick pushed this far its way, and up again under LET_GO. */
@@ -43,28 +45,45 @@ export function startLocomotion(ctx: Ctx, s: VrSession, pads: VrControllers, rig
     }
   }
 
+  const split = { turnX: 0, walk: 0 };
+
   // After the rig's own steer tick, so you go the way your head looks this frame.
   s.tick('steer', ({ dt }) => {
-    const left = pads.left.connected ? pads.left.stick : NONE;
-    const right = pads.right.connected ? pads.right.stick : NONE;
-    const snap = snapStep(armed, right.x);
+    // The stick that walks and the one that turns: the left and the right, or the one there is.
+    const solo = pads.solo;
+    const walker = pads.byHand(solo ?? 'left');
+    const turner = pads.byHand(solo ?? 'right');
+    let x = walker.connected ? walker.stick.x : NONE.x;
+    let y = walker.connected ? walker.stick.y : NONE.y;
+    let turnX = turner.connected ? turner.stick.x : NONE.x;
+    if (solo) {
+      soloStick(x, y, split);
+      // On a rig the stick is all keys (a car steers with A and D), so it doesn't turn you there.
+      if (player.rig) turnX = 0;
+      else {
+        turnX = split.turnX;
+        x = 0;
+        y = pads.onPanel[solo] ? 0 : split.walk;
+      }
+    }
+    const snap = snapStep(armed, turnX);
     armed = snap.armed;
     // Pushed right is a turn to the right: camYaw goes the other way.
     if (snap.turn) rig.turn(-snap.turn * THREE.MathUtils.degToRad(s.prefs.snapDeg));
-    const push = Math.hypot(left.x, left.y);
-    if (pads.left.stickPress.down) running = true;
+    const push = Math.hypot(x, y);
+    if (walker.stickPress.down) running = true;
     else if (push < REST) running = false;
     if (player.rig) {
       stick.x = stick.z = 0;
       stick.run = false;
       // Down past PRESS, and held until back under LET_GO.
-      const pressed = stickKeys(left.x, left.y, PRESS);
-      const kept = stickKeys(left.x, left.y, LET_GO);
+      const pressed = stickKeys(x, y, PRESS);
+      const kept = stickKeys(x, y, LET_GO);
       for (const code of RIG_KEYS) hold(code, pressed.includes(code) || (held.has(code) && kept.includes(code)));
     } else {
       for (const code of held) hold(code, false);
-      stick.x = left.x;
-      stick.z = left.y;
+      stick.x = x;
+      stick.z = y;
       stick.run = running;
     }
     vignette.update(dt, s.prefs.vignette && push > REST);

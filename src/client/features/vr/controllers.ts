@@ -9,7 +9,7 @@
  */
 import * as THREE from 'three';
 import type { Ctx } from '../../core/context';
-import { IDLE, deadzone2, readButton } from './input-map';
+import { IDLE, deadzone2, readButton, soloHand } from './input-map';
 import type { Btn, Hand, VrControllers, VrHand, VrSession } from './types';
 
 /** The 'xr-standard' gamepad's buttons, as a Touch controller has them (WebXR Gamepads Module). */
@@ -164,10 +164,19 @@ export function startControllers(ctx: Ctx, s: VrSession): VrControllers {
   const right = new Pad('right', beamGeo, dotGeo);
   let dom: Hand = s.prefs.dominant;
   for (const p of [left, right]) ctx.scene.add(p.grip, p.aim);
+  /** When each controller was last there (from the session's start, so one that never turns up counts as gone). */
+  const start = performance.now();
+  const seen: Record<Hand, number> = { left: start, right: start };
+  const there: Record<Hand, boolean> = { left: false, right: false };
+  let solo: Hand | null = null;
 
   const pads: VrControllers = {
     left,
     right,
+    get solo() {
+      return solo;
+    },
+    onPanel: { left: false, right: false },
     /** The hand that pulled its trigger last (or the prefs' to start with), unless it's put down and the other isn't. */
     get dominant(): Hand {
       const other: Hand = dom === 'left' ? 'right' : 'left';
@@ -176,7 +185,7 @@ export function startControllers(ctx: Ctx, s: VrSession): VrControllers {
     byHand: (h) => (h === 'left' ? left : right),
   };
 
-  s.tick('pre', () => {
+  s.tick('pre', ({ now }) => {
     let l: XRInputSource | null = null;
     let r: XRInputSource | null = null;
     for (const src of s.xr.inputSources) {
@@ -186,6 +195,11 @@ export function startControllers(ctx: Ctx, s: VrSession): VrControllers {
     }
     left.read(l);
     right.read(r);
+    there.left = !!l;
+    there.right = !!r;
+    if (l) seen.left = now;
+    if (r) seen.right = now;
+    solo = soloHand(now, seen, there);
     const frame = s.frame();
     if (frame) for (const p of [left, right]) p.pose(frame, s.world());
     if (right.trigger.down) dom = 'right';

@@ -1,9 +1,10 @@
 // VR's controls as plain numbers (features/vr/input-map.ts) and its keys by name (keys-table.ts): the
 // sticks' dead zone, a button's press and edges, snap turning's flick, where a trigger pull goes, what
-// the trigger won't do in VR yet, and the keys the trigger, the keyboard panel and the hint's chips press.
+// the trigger won't do in VR yet, playing with one controller, and the keys the trigger, the keyboard
+// panel and the hint's chips press.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEADZONE, HOLD_MS, IDLE, PRESS, RELEASE, VR_BLOCKED, aPress, deadzone, deadzone2, readButton, snapStep, stickKeys, triggerRoute } from '../src/client/features/vr/input-map.js';
+import { DEADZONE, HOLD_MS, IDLE, PERF_HOLD_MS, PRESS, RELEASE, SHEET_HOLD_MS, SOLO_AFTER_MS, VR_BLOCKED, aPress, deadzone, deadzone2, holdOrTap, readButton, snapStep, soloHand, soloStick, stickKeys, triggerRoute } from '../src/client/features/vr/input-map.js';
 import { codeOfChar, codeOfChip, keyInfo, vrLabel } from '../src/client/features/vr/keys-table.js';
 import type { Btn } from '../src/client/features/vr/types.js';
 
@@ -86,6 +87,46 @@ test('snap turning turns once per flick and re-arms only once the stick comes ba
     turns.push(r.turn);
   }
   assert.deepEqual(turns, [0, 0, 1, 0, 0, 0, 0, 0, 1, 0, -1, 0, 0]);
+});
+
+test('with one controller missing a while, the other is on its own; a moment out of sight is not missing', () => {
+  const both = { left: true, right: true };
+  const rightOnly = { left: false, right: true };
+  const leftOnly = { left: true, right: false };
+  assert.equal(soloHand(10_000, { left: 9_990, right: 10_000 }, both), null);
+  // The left dropped out just now: not yet.
+  assert.equal(soloHand(10_000, { left: 10_000 - SOLO_AFTER_MS / 2, right: 10_000 }, rightOnly), null);
+  // Gone long enough (or never there since the session started): the right is on its own.
+  assert.equal(soloHand(10_000, { left: 10_000 - SOLO_AFTER_MS, right: 10_000 }, rightOnly), 'right');
+  assert.equal(soloHand(10_000, { left: 10_000, right: 0 }, leftOnly), 'left');
+  // Neither there: nobody is on their own.
+  assert.equal(soloHand(10_000, { left: 0, right: 0 }, { left: false, right: false }), null);
+});
+
+test('a lone stick walks forward and back, turns when flicked more sideways than not, and never sidesteps', () => {
+  const out = { turnX: 0, walk: 0 };
+  assert.deepEqual(soloStick(0, -1, out), { turnX: 0, walk: -1 });
+  assert.equal(soloStick(0.3, -0.9, out), out, 'written into out, nothing new each frame');
+  assert.deepEqual(out, { turnX: 0, walk: -0.9 });
+  assert.deepEqual(soloStick(0.9, -0.2), { turnX: 0.9, walk: 0 });
+  assert.deepEqual(soloStick(-0.8, 0.5), { turnX: -0.8, walk: 0 });
+  assert.deepEqual(soloStick(0, 0), { turnX: 0, walk: 0 });
+});
+
+test('a lone controller tells a held B from a tapped one, and a long press of its stick from a click', () => {
+  const down: Btn = { pressed: true, down: true, up: false, value: 1 };
+  const held: Btn = { pressed: true, down: false, up: false, value: 1 };
+  const up: Btn = { pressed: false, down: false, up: true, value: 0 };
+  assert.equal(holdOrTap(down, 0, false, SHEET_HOLD_MS), null);
+  assert.equal(holdOrTap(held, SHEET_HOLD_MS - 1, false, SHEET_HOLD_MS), null);
+  assert.equal(holdOrTap(held, SHEET_HOLD_MS, false, SHEET_HOLD_MS), 'hold');
+  // Once it's gone off as a hold, neither more holding nor letting go does anything more.
+  assert.equal(holdOrTap(held, SHEET_HOLD_MS * 3, true, SHEET_HOLD_MS), null);
+  assert.equal(holdOrTap(up, SHEET_HOLD_MS * 3, true, SHEET_HOLD_MS), null);
+  // Let go before then: a tap.
+  assert.equal(holdOrTap(up, SHEET_HOLD_MS / 2, false, SHEET_HOLD_MS), 'tap');
+  assert.equal(holdOrTap(IDLE, 0, false, SHEET_HOLD_MS), null);
+  assert.ok(PERF_HOLD_MS > SHEET_HOLD_MS, 'the perf overlay takes a longer hold than the menu');
 });
 
 test('a stick holds W A S D past half way, for the ladder, a pole and a car', () => {

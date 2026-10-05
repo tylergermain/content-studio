@@ -55,7 +55,13 @@ export interface VrHand {
   readonly stick: { readonly x: number; readonly y: number };   // deadzoned, -1..1, y + = down/back
   pulse(strength: number, ms: number): void;
 }
-export interface VrControllers { readonly left: VrHand; readonly right: VrHand; readonly dominant: Hand; byHand(h: Hand): VrHand }
+export interface VrControllers {
+  readonly left: VrHand; readonly right: VrHand; readonly dominant: Hand; byHand(h: Hand): VrHand;
+  /** The one controller there is, when the other's been missing a while (input-map.ts soloHand): its stick and buttons do both hands' jobs. */
+  readonly solo: Hand | null;
+  /** Whether each hand's ray was on a panel last frame (set by interact.ts), so a lone stick scrolling one doesn't walk you too. */
+  readonly onPanel: Record<Hand, boolean>;
+}
 
 export interface PanelHit { readonly panel: string; readonly point: THREE.Vector3; readonly uv: THREE.Vector2; readonly distance: number }
 export interface NativePanel {

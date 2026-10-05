@@ -416,7 +416,7 @@ const expect = (ok, what) => {
 const near = (a, b, eps) => Math.abs(a - b) <= eps;
 const flat = (a, b) => Math.hypot(a[0] - b[0], a[2] - b[2]);
 
-export const SCENARIOS = ['desktop', 'enter', 'height', 'walk', 'wall', 'stick', 'snap', 'grip', 'elevator', 'sheet', 'chat', 'terminal', 'seat', 'arcade', 'presence', 'fade', 'leave'];
+export const SCENARIOS = ['desktop', 'enter', 'height', 'walk', 'wall', 'stick', 'snap', 'solo', 'grip', 'elevator', 'sheet', 'chat', 'terminal', 'seat', 'arcade', 'presence', 'fade', 'leave'];
 
 async function main() {
   wanted = new Set(process.argv.slice(2).filter((a) => SCENARIOS.includes(a)));
@@ -560,6 +560,48 @@ async function main() {
       expect(near(Math.abs(two), 2 * Math.abs(one), 3), `two flicks: ${two.toFixed(1)}°`);
       expect(one < 0, 'right turns clockwise (camYaw down)');
       return `${one.toFixed(0)}° a flick`;
+    });
+
+    await scenario('solo', page, async () => {
+      // One controller (Tyler's left one is dead): the right one's stick walks and turns, B held is the menu.
+      await middle();
+      await page.evaluate(() => { window.__xr.controllers.left.connected = false; });
+      await sleep(2200);
+      await frames(page, 4);
+      const solo = await page.evaluate(() => window.__vr.pads?.solo ?? null);
+      expect(solo === 'right', `with the left controller gone the right isn't on its own (${solo})`);
+      const a = await where(page);
+      // Held for some frames rather than some seconds: a loaded machine may draw only one frame a second.
+      await stick(page, 'right', 0, -1);
+      await frames(page, 6);
+      await stick(page, 'right', 0, 0);
+      await frames(page, 3);
+      const b = await where(page);
+      const walked = flat(a.feet, b.feet);
+      expect(walked > 0.3, `the right stick forward walked ${walked.toFixed(2)} m`);
+      expect(Math.abs(wrap(b.camYaw - a.camYaw)) < 0.05, 'walking forward turned you');
+      await stick(page, 'right', 1, 0.1);
+      await frames(page, 4);
+      await stick(page, 'right', 0, 0);
+      await frames(page, 3);
+      const c = await where(page);
+      const turned = wrap(c.camYaw - b.camYaw) / DEG;
+      expect(near(Math.abs(turned), 30, 3) || near(Math.abs(turned), 45, 3), `a sideways flick turned ${turned.toFixed(1)}°`);
+      expect(flat(b.feet, c.feet) < 0.05, 'a sideways flick walked you');
+      await button(page, 'right', 'b-button', 1);
+      await sleep(800);
+      await frames(page, 4);
+      await button(page, 'right', 'b-button', 0);
+      await frames(page, 20);
+      expect(await panelUp(page, 'hud'), 'B held brought up no HUD sheet');
+      await press(page, 'right', 'b-button');
+      await frames(page, 20);
+      expect(!(await panelUp(page, 'hud')), 'a tap of B left the HUD sheet up');
+      await page.evaluate(() => { window.__xr.controllers.left.connected = true; });
+      await frames(page, 10);
+      const back = await page.evaluate(() => window.__vr.pads?.solo ?? null);
+      expect(back === null, `with both back the right is still on its own (${back})`);
+      return `walked ${walked.toFixed(2)} m, ${turned.toFixed(0)}° a flick, B held: menu`;
     });
 
     await scenario('grip', page, async () => {

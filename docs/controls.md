@@ -65,3 +65,4 @@ In a Meta Quest's browser, **🥽 Enter VR** (bottom right) puts you in the offi
 | X | The HUD sheet: the ☰ menu, people, workers and chat |
 | A | The keyboard; held in a field with a 🎤, push to talk |
 | Both sticks clicked | The perf overlay and Leave VR |
+| Only one controller | Its stick walks (forward and back) and turns (flick sideways); B / Y tapped is back and held is the HUD sheet; its stick held in is the perf overlay (see [VR](vr.md#with-one-controller)) |

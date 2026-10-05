@@ -12,6 +12,9 @@
  *   exactly as the key does.
  * - X: the HUD sheet. A: the keyboard; held in a text field that has a 🎤, push to talk (Ctrl+Space).
  * - Both sticks clicked: the perf overlay.
+ * - With only one controller (pads.solo), it does the other's jobs too: B (or Y) tapped is back and
+ *   held is the HUD sheet, A (or X) is the keyboard, its stick scrolls the panel its ray is on, and its
+ *   stick clicked in and held is the perf overlay.
  *
  * Which way a press goes is settled when it goes down and kept until it comes up, wherever the ray
  * wanders meanwhile; a key pressed by both hands at once is held until both let go.
@@ -23,9 +26,9 @@ import type { Frame } from '../../core/registry';
 import { isTyping } from '../../player';
 import { modalOpen, toast } from '../../ui/dom';
 import { beam } from './controllers';
-import { IDLE, VR_BLOCKED, aPress, triggerRoute, type TriggerRoute } from './input-map';
+import { IDLE, PERF_HOLD_MS, SHEET_HOLD_MS, VR_BLOCKED, aPress, holdOrTap, triggerRoute, type TriggerRoute } from './input-map';
 import { focusedElement, keyDown, keyUp, tapKey } from './keys';
-import type { Btn, Hand, PanelHit, PanelHost, VrControllers, VrPerf, VrSession } from './types';
+import type { Btn, Hand, PanelHit, PanelHost, VrControllers, VrHand, VrPerf, VrSession } from './types';
 
 const HANDS: readonly Hand[] = ['left', 'right'];
 /** The hint bar's panel (its id starts so): pointing at it keeps aiming where you were, since its chips are for that. */
@@ -92,15 +95,52 @@ export function startInteract(ctx: Ctx, parts: Pick<Parts, 'pointer'>, s: VrSess
     }
   }
 
+  // ---- One controller: B / Y held for the sheet, the stick held in for the perf overlay ----
+  let wasSolo: Hand | null = null;
+  const solos = { backAt: 0, backDone: false, stickAt: 0, stickDone: false };
+  function soloButtons(p: VrHand, now: number) {
+    const b = p.secondary;
+    if (b.down) {
+      solos.backAt = now;
+      solos.backDone = false;
+    }
+    const back = holdOrTap(b, now - solos.backAt, solos.backDone, SHEET_HOLD_MS);
+    if (back === 'hold') {
+      solos.backDone = true;
+      panels.toggleSheet();
+      p.pulse(0.3, 25);
+    } else if (back === 'tap' && !panels.back()) tapKey('Escape');
+    pressA(p.primary, now);
+    const sp = p.stickPress;
+    if (sp.down) {
+      solos.stickAt = now;
+      solos.stickDone = false;
+    }
+    if (holdOrTap(sp, now - solos.stickAt, solos.stickDone, PERF_HOLD_MS) === 'hold') {
+      solos.stickDone = true;
+      perf.toggle();
+    }
+  }
+
   // ---- Each frame, once the pointer has found what the aiming hand points at ----
   s.tick('aim', ({ now }: Frame) => {
     const windowUp = modalOpen();
     for (const hand of HANDS) {
       const p = pads.byHand(hand);
       hits[hand] = p.connected ? panels.hit(p.ray) : null;
+      pads.onPanel[hand] = !!hits[hand];
     }
-    // The right stick scrolls whichever panel a ray is on, the right hand's first.
-    const scrolling: Hand | null = hits.right ? 'right' : hits.left ? 'left' : null;
+    const solo = pads.solo;
+    if (solo !== wasSolo) {
+      wasSolo = solo;
+      if (solo) {
+        const [a, b] = solo === 'right' ? ['A', 'B'] : ['X', 'Y'];
+        toast(`One controller: its stick walks (forward and back) and turns (flick it sideways). Hold ${b} for the menu, tap ${b} to go back, ${a} for the keyboard.`);
+      }
+    }
+    // The right stick scrolls whichever panel a ray is on, the right hand's first; a lone one, the panel it points at.
+    const scroller = pads.byHand(solo ?? 'right');
+    const scrolling: Hand | null = solo ? (hits[solo] ? solo : null) : hits.right ? 'right' : hits.left ? 'left' : null;
     const dominant = pads.dominant;
 
     for (const hand of HANDS) {
@@ -123,7 +163,7 @@ export function startInteract(ctx: Ctx, parts: Pick<Parts, 'pointer'>, s: VrSess
       }
       // Every panel hears where each ray is (hover, and leaving), and the trigger when the press is theirs;
       // the right stick scrolls, unless it's pushing away the panel its hand holds.
-      const scroll = scrolling === hand && !(hand === 'right' && st.grip === 'grab') ? pads.right.stick.y : 0;
+      const scroll = scrolling === hand && !(hand === scroller.hand && st.grip === 'grab') ? scroller.stick.y : 0;
       panels.point(hand, hit, st.trigger === 'panel' ? t : IDLE, scroll);
       // Under a window, the world off its panel (the builder's floor): the aiming hand's hover, and a press that went there to its end.
       if (st.trigger === 'world' || (windowUp && !hit && hand === dominant && p.connected)) {
@@ -150,13 +190,18 @@ export function startInteract(ctx: Ctx, parts: Pick<Parts, 'pointer'>, s: VrSess
       }
 
       // B / Y: back; Escape goes where a key would, so the top window's own Esc handler closes it.
-      if (p.secondary.down && !panels.back()) tapKey('Escape');
+      // A lone controller's B / Y goes when it's let go (held, it's the sheet: see soloButtons).
+      if (!solo && p.secondary.down && !panels.back()) tapKey('Escape');
 
       // The pointer: to the panel it's on, else a long one for the aiming hand (warm on something to use).
       if (hit) beam(p, hit.distance, true, true);
       else beam(p, hand === dominant && !windowUp ? REACH_LONG : REACH_SHORT, hand === dominant && !windowUp && !!pointer.target(), false);
     }
 
+    if (solo) {
+      soloButtons(pads.byHand(solo), now);
+      return;
+    }
     if (pads.left.primary.down) panels.toggleSheet();
     pressA(pads.right.primary, now);
     const { left, right } = pads;
