@@ -2,6 +2,7 @@
 // the page (or anyone else) put there, so every one is checked before it's used.
 import { MAX_FLOORS } from '../../shared/floors.js';
 import { streetBelow } from '../../shared/layout.js';
+import { GROUNDS } from '../../shared/mainstreet.js';
 
 export const str = (v: unknown, max: number) => (typeof v === 'string' ? v.slice(0, max) : '');
 /** Which of a worker's repositories a Changes message is about: another floor's (see WorkerInfo.repos), or none for its own. */
@@ -21,8 +22,9 @@ export function arrivalSpot(at: unknown): Spot | undefined {
   if (!at || typeof at !== 'object') return undefined;
   const a = at as Record<string, unknown>;
   const clamp = (v: unknown, lo: number, hi: number) => Math.min(hi, Math.max(lo, num(v)));
-  // Down on the street from a floor high up, the street is a long way down.
-  return { x: clamp(a.x, -60, 60), y: clamp(a.y, streetBelow(MAX_FLOORS - 1), 10), z: clamp(a.z, -60, 60), rotY: num(a.rotY) };
+  // Down on the street from a floor high up, the street is a long way down; out along Main Street, Putt Street
+  // or wherever Friday One set you down, a long way out.
+  return { x: clamp(a.x, -GROUNDS, GROUNDS), y: clamp(a.y, streetBelow(MAX_FLOORS - 1), 10), z: clamp(a.z, -GROUNDS, GROUNDS), rotY: num(a.rotY) };
 }
 /** The spot someone coming back in says they were standing in (see Net.connect), if they say. */
 export function spotFrom(q: URLSearchParams): ReturnType<typeof arrivalSpot> {

@@ -32,9 +32,11 @@ import type { installEmotes } from '../features/emotes';
 import type { installGoat } from '../features/goat';
 import type { installGolf } from '../features/golf';
 import type { installGallery, installHanging } from '../features/hanging';
+import type { installHeli } from '../features/heli';
 import type { installHud } from '../features/hud';
 import type { installJukebox } from '../features/jukebox';
 import type { installMeeting } from '../features/meeting';
+import type { installMiniGolf } from '../features/minigolf';
 import type { installNeedsYou } from '../features/needsyou';
 import type { installPeers } from '../features/peers';
 import type { installRooftop } from '../features/rooftop';
@@ -111,6 +113,10 @@ export interface Parts {
   hanging: Made<typeof installHanging>;
   climbing: Made<typeof installClimbing>;
   cars: Made<typeof installCars>;
+  /** Putt Street, the mini golf course on Main Street. */
+  putt: Made<typeof installMiniGolf>;
+  /** Friday One, the helicopter. */
+  heli: Made<typeof installHeli>;
   peers: Made<typeof installPeers>;
   walking: Made<typeof installWalking>;
   views: Made<typeof installWorkerViews>;

@@ -1,0 +1,48 @@
+/* Putt Street on the HUD: the scorecard at the top left while you're in a round (it takes no clicks
+   or keys), the putting meter at the top while you're over your ball, and the Round-over window. */
+
+/* The scorecard: players down the side, holes 1–9 and the total across, par under the holes. */
+.putt-card { position: absolute; left: 12px; top: 72px; padding: 8px 10px 9px; font-size: 12px; pointer-events: none !important; max-width: calc(100vw - 24px); }
+.caffeine:not(.hidden) ~ .putt-card { top: 120px; }
+#hud:has(.putt-card:not(.hidden)) #shares { top: 210px; }
+.putt-card-head { display: flex; align-items: baseline; gap: 6px; margin: 0 2px 6px; font-size: 13px; font-weight: 600; white-space: nowrap; }
+.putt-card-head .putt-now { color: var(--good-ink); }
+.putt-card-head .putt-clock { margin-left: auto; padding-left: 10px; color: var(--muted); font-weight: 500; font-variant-numeric: tabular-nums; }
+.putt-card-head .putt-clock.late { color: var(--bad-ink); }
+.putt-table { border-collapse: separate; border-spacing: 0; font-variant-numeric: tabular-nums; }
+.putt-table th, .putt-table td { min-width: 20px; padding: 2px 3px; text-align: center; font-weight: 500; }
+.putt-table th { color: var(--muted); font-size: 11px; font-weight: 600; }
+.putt-table .who { text-align: left; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding-right: 8px; }
+.putt-table .who .dot { display: inline-block; width: 8px; height: 8px; margin-right: 5px; vertical-align: 0; }
+.putt-table tr.par td { color: var(--muted); font-size: 11px; }
+.putt-table .now { background: var(--good-tint); }
+.putt-table th.now { color: var(--good-ink); border-radius: var(--r-xs) var(--r-xs) 0 0; }
+.putt-table tr:last-child .now { border-radius: 0 0 var(--r-xs) var(--r-xs); }
+.putt-table tr.up .who { font-weight: 700; }
+.putt-table .tot { font-weight: 700; padding-left: 8px; }
+.putt-table .under { color: var(--good-ink); font-weight: 700; }
+.putt-table .ace { color: #fff; background: var(--good); border-radius: 50%; }
+.putt-card-foot { margin: 6px 2px 0; color: var(--muted); font-size: 12px; }
+
+/* Over your ball: the meter runs up and back down while Space is held; the mark is your last putt. */
+.putt-meter { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); width: min(320px, calc(100vw - 32px)); padding: 8px 12px 9px; display: grid; gap: 7px; font-size: 13px; font-weight: 600; text-align: center; pointer-events: none !important; }
+.putt-bar { position: relative; height: 8px; border-radius: 999px; background: linear-gradient(90deg, #34c759, #ffcc00 70%, #ff3b30); overflow: hidden; }
+/* Covers the part of the meter's colors that isn't filled, from the right. */
+.putt-rest { position: absolute; inset: 0 0 0 auto; width: 100%; background: #dcdce1; }
+.putt-last { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
+.putt-info { font-weight: 500; font-variant-numeric: tabular-nums; }
+#hud:has(.putt-meter:not(.hidden)) #toasts { translate: 0 48px; }
+
+/* Round over: the card, everyone's, and what you did. */
+.modal.putt-over { width: min(560px, 100%); }
+.putt-over .body { display: grid; gap: 14px; }
+.putt-over .putt-table { width: 100%; font-size: 13px; }
+.putt-over .putt-table .who { max-width: 140px; }
+.putt-over .putt-table tr.mine td { background-image: linear-gradient(var(--accent-tint), var(--accent-tint)); }
+.putt-over .putt-table tr.win .who::after { content: ' 🏆'; }
+.putt-news { display: flex; flex-wrap: wrap; gap: 8px; }
+.putt-news .pill { font-size: 13px; padding: 4px 10px; }
+.putt-news .pill.record { background: var(--warn); color: var(--ink); }
+.putt-news .pill.good { background: var(--good-tint); color: var(--good-ink); }
+.putt-over .putt-total { margin: 0; font-size: 15px; }
+.putt-over .putt-total b { font-size: 22px; font-variant-numeric: tabular-nums; }
