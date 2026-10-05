@@ -9,7 +9,7 @@ import { DOG_NAME_MAX, cleanDogName } from '../../shared/dog';
 import { h, openModal, timeAgo } from './dom';
 import { agentFields, choiceLabel, officeChoice } from './provider';
 import { openPromptEditor, rewrittenPrompts } from './prompts';
-import { choiceRow } from './settings-rows';
+import { addedSettings, choiceRow, type Scope } from './settings-rows';
 
 const VIEWS: [ViewMode, string, string][] = [
   ['first', '👀 First person', 'See through your own eyes. Click the office to look around with the mouse and click things to use them. Esc frees the mouse.'],
@@ -25,14 +25,12 @@ export type SettingsPane = 'you' | 'sound' | 'notify' | 'building' | 'workers';
 
 const PANES: { id: SettingsPane; icon: string; label: string; blurb: string }[] = [
   { id: 'you', icon: '🧍', label: 'You', blurb: 'How you look, how you see the office, and how you’re signed in.' },
-  { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, and how voice chat works.' },
+  { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, how voice chat works, and your webcam.' },
   { id: 'notify', icon: '🔔', label: 'Notifications', blurb: 'Hear about a worker that needs someone, or finished, while you’re somewhere else.' },
   { id: 'building', icon: '🏢', label: 'Building', blurb: 'The decorations, the sky, the dog, and where new floors are cloned.' },
   { id: 'workers', icon: '🤖', label: 'Workers', blurb: 'What workers start on, how many run at once, when they go home and what the office tells them.' },
 ];
 
-/** Who a setting is for, shown by its name: some are yours alone, some the whole office's. */
-type Scope = 'you' | 'floor' | 'office';
 const SCOPE: Record<Scope, [label: string, title: string]> = {
   you: ['Just you', 'Only for you, kept in this browser'],
   floor: ['This floor', 'The same for everyone on this floor'],
@@ -460,6 +458,14 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     ],
   };
 
+  // The ones features added (see addSetting), after each pane's own.
+  const closers: (() => void)[] = [];
+  for (const s of addedSettings()) {
+    const { body, close } = s.make();
+    panes[s.pane].push(setting(s.title, s.scope, ...body));
+    if (close) closers.push(close);
+  }
+
   // The categories down the side, the one picked on the right.
   const nav = h('nav.settings-nav', { role: 'tablist', 'aria-orientation': 'vertical', 'aria-label': 'Settings' });
   const tabs = new Map<SettingsPane, HTMLButtonElement>();
@@ -511,6 +517,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       offLimit.forEach((off) => off());
       offDir.forEach((off) => off());
       offPrompts.forEach((off) => off());
+      closers.forEach((off) => off());
     },
   });
   show(first ?? lastPane);

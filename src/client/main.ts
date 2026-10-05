@@ -69,6 +69,7 @@ import { installStudio } from './features/studio';
 import { installWorkstation } from './features/workstation';
 import { installWhiteboard } from './features/whiteboard';
 import { installWhisky } from './features/whisky';
+import { installWebcam } from './features/webcam';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
@@ -194,6 +195,7 @@ installChat(ctx);
 parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 parts.hud = installHud(ctx, core, parts);
+installWebcam(ctx, { remotes: parts.peers.remotes });
 
 // ---- Main loop ---------------------------------------------------------------------------------------
 fitWindow(ctx);

@@ -30,6 +30,8 @@ export interface PeerInfo {
   voice: boolean;
   muted: boolean;
   sharing: boolean;
+  /** Their webcam is their face (see protocol/webcam.ts): the picture comes over the voice connection. */
+  webcam?: boolean;
   /** On a smoke break, cigarette in hand. */
   smoking?: boolean;
   /** At a golf tee on the balcony, club in hand. */

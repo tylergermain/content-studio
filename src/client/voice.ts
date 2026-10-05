@@ -1,11 +1,20 @@
 import type { Net } from './net';
 import { store } from './state';
+import { camMid, heardCam, isCamLine, openCam, sendCam, theirCam, theirCamLine } from './voice-camera';
 
 interface Conn {
   pc: RTCPeerConnection;
   polite: boolean;
   makingOffer: boolean;
   ignoreOffer: boolean;
+  /** An answer of theirs is being applied. An offer that comes meanwhile is no collision: the connection is stable as soon as it has been. */
+  settingAnswer: boolean;
+  /** How many times the connection has been started over (see Voice.startOver). Both sides count together, and every signal says which one it's for. */
+  gen: number;
+  /** Times in a row it was started over because an offer or an answer wouldn't apply, since one last did. */
+  failed: number;
+  /** Their signals, applied one at a time in the order they came. */
+  queue: Promise<void>;
   audio: HTMLAudioElement;
   audioStream?: MediaStream;
   screen?: MediaStream;
@@ -15,11 +24,46 @@ interface Conn {
   analyser?: AnalyserNode;
 }
 
-type Signal = { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null };
+type Signal = { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null; gen?: number; cam?: string };
+
+/** How many times in a row a connection is started over before it's left as it is. */
+const RETRIES = 3;
+
+/** What a connection keeps about the RTCPeerConnection it has now, as it is with a new one: nothing made, sent or received yet. */
+function fresh() {
+  return {
+    pc: new RTCPeerConnection({ iceServers: store.ice }),
+    makingOffer: false,
+    ignoreOffer: false,
+    settingAnswer: false,
+    audioStream: undefined,
+    screen: undefined,
+    micSender: undefined,
+    screenSender: undefined,
+    level: 0,
+    analyser: undefined,
+  } satisfies Partial<Conn>;
+}
 
 /**
  * Mesh WebRTC for voice + screen share. Signaling rides the office WebSocket.
- * Uses the "perfect negotiation" pattern so either side can add tracks at any time.
+ *
+ * Either side can change the connection at any time, the same moment as the other included, and what
+ * each is sending still arrives. Three things see to that:
+ *
+ * - There's little to agree on. A connection keeps one line for audio and one for video, plus the
+ *   webcam's own line (voice-camera.ts), each made the first time either side sends that kind and open
+ *   both ways from then on. A track goes on its line and comes off it again (`carry`, `takeOff`,
+ *   `sendCamera`) without the two sides negotiating anything.
+ * - What is negotiated (a line that isn't there yet) follows the "perfect negotiation" pattern: when
+ *   both make an offer at once, the impolite side's stands and the polite side's gives way. Signals are
+ *   applied one at a time, in the order they came.
+ * - The polite side never gives way by rolling its offer back, which is where Chrome (154) loses
+ *   tracks: on a connection that had agreed on nothing, every later offer of that side's is refused (it
+ *   keeps the header extension ids it picked for the rolled-back offer, and they clash with the ones the
+ *   other side's offer brought); on one that had, what that side was sending stops. So with nothing
+ *   agreed on it takes a new RTCPeerConnection and answers on that, and otherwise the connection is
+ *   started over on both sides (`startOver`), as it is when an offer or an answer won't apply at all.
  */
 export class Voice {
   readonly conns = new Map<string, Conn>();
@@ -99,24 +143,14 @@ export class Voice {
       this.localAnalyser.fftSize = 1024;
       src.connect(this.localAnalyser);
     }
-    const track = this.mic.getAudioTracks()[0];
-    for (const c of this.conns.values()) c.micSender = c.pc.addTrack(track, this.mic);
+    for (const c of this.conns.values()) c.micSender = this.carry(c, this.mic.getAudioTracks()[0], this.mic);
     this.changed();
     return null;
   }
 
   leaveVoice() {
     if (!this.mic) return;
-    for (const c of this.conns.values()) {
-      if (c.micSender) {
-        try {
-          c.pc.removeTrack(c.micSender);
-        } catch {
-          // connection closed
-        }
-        c.micSender = undefined;
-      }
-    }
+    for (const c of this.conns.values()) c.micSender = this.takeOff(c.micSender);
     this.mic.getTracks().forEach((t) => t.stop());
     this.mic = null;
     this.localAnalyser = null;
@@ -168,23 +202,14 @@ export class Voice {
     const track = this.screen.getVideoTracks()[0];
     track.contentHint = 'detail';
     track.addEventListener('ended', () => this.stopShare());
-    for (const c of this.conns.values()) c.screenSender = c.pc.addTrack(track, this.screen);
+    for (const c of this.conns.values()) c.screenSender = this.carry(c, track, this.screen);
     this.changed();
     return null;
   }
 
   stopShare() {
     if (!this.screen) return;
-    for (const c of this.conns.values()) {
-      if (c.screenSender) {
-        try {
-          c.pc.removeTrack(c.screenSender);
-        } catch {
-          // closed
-        }
-        c.screenSender = undefined;
-      }
-    }
+    for (const c of this.conns.values()) c.screenSender = this.takeOff(c.screenSender);
     this.screen.getTracks().forEach((t) => t.stop());
     this.screen = null;
     this.changed();
@@ -201,25 +226,73 @@ export class Voice {
     for (const id of [...this.conns.keys()]) this.drop(id);
   }
 
+  sendCamera(peerId: string, track: MediaStreamTrack | null, scale?: number) {
+    const c = this.conns.get(peerId);
+    if (c) sendCam(c.pc, track, scale, c.polite);
+  }
+
+  remoteCamera(peerId: string): MediaStreamTrack | null {
+    const c = this.conns.get(peerId);
+    return c ? theirCam(c.pc) : null;
+  }
+
   /** Proximity voice: louder when you're close, never fully silent. */
   setVolume(peerId: string, volume: number) {
     const c = this.conns.get(peerId);
     if (c) c.audio.volume = Math.max(0, Math.min(1, volume));
   }
 
-  async handleSignal(from: string, data: Signal) {
+  /** A signal from a peer. A connection applies its own one at a time, in the order they came. */
+  handleSignal(from: string, data: Signal): Promise<void> {
     const c = this.conns.get(from) ?? this.connect(from);
-    const { pc } = c;
+    c.queue = c.queue.then(() => this.apply(from, c, data));
+    return c.queue;
+  }
+
+  private async apply(id: string, c: Conn, data: Signal) {
+    if (this.conns.get(id) !== c) return;
+    const gen = data.gen ?? 0;
+    // For a connection we've since started over.
+    if (gen < c.gen) return;
+    let { pc } = c;
     try {
+      // They started theirs over, and this is the first we hear of it: so do we.
+      if (gen > c.gen) pc = this.restart(id, c, gen);
       if (data.description) {
-        const collision = data.description.type === 'offer' && (c.makingOffer || pc.signalingState !== 'stable');
+        const { description } = data;
+        // Signals are applied one at a time, so no offer is looked at while an answer is being set; the
+        // check is the pattern's own all the same, and right by itself.
+        const readyForOffer = !c.makingOffer && (pc.signalingState === 'stable' || c.settingAnswer);
+        const collision = description.type === 'offer' && !readyForOffer;
         c.ignoreOffer = !c.polite && collision;
         if (c.ignoreOffer) return;
-        await pc.setRemoteDescription(data.description);
-        if (data.description.type === 'offer') {
-          await pc.setLocalDescription();
-          this.signal(from, { description: pc.localDescription!.toJSON() });
+        // We're the polite side and our own offer gives way, though never by rolling back (see the class
+        // comment). On a connection that has agreed on something, both sides start over, and this offer
+        // of theirs goes with the connection it was for.
+        if (collision && pc.currentRemoteDescription) return this.startOver(id, c);
+        // With nothing agreed on yet there's nothing to lose: a new RTCPeerConnection takes their offer.
+        // They ignored ours, so they've nothing to be told.
+        if (collision) pc = this.reopen(id, c);
+        heardCam(pc, data.cam);
+        c.settingAnswer = description.type === 'answer';
+        try {
+          await pc.setRemoteDescription(description);
+        } finally {
+          c.settingAnswer = false;
         }
+        if (c.pc !== pc) return;
+        if (description.type === 'offer') {
+          // Every line of theirs is answered open both ways, so a track of ours can go on it at any time.
+          for (const line of pc.getTransceivers()) if (line.direction === 'recvonly') line.direction = 'sendrecv';
+          openCam(pc);
+          // A new RTCPeerConnection carries nothing yet. Now their offer is in, our tracks go on the lines
+          // it brought, and a line it didn't bring is offered once this is answered.
+          if (collision) this.addTracks(c);
+          await pc.setLocalDescription();
+          if (c.pc !== pc) return;
+          this.signal(id, c, { description: pc.localDescription!.toJSON() });
+        }
+        c.failed = 0;
       } else if (data.candidate !== undefined) {
         try {
           await pc.addIceCandidate(data.candidate ?? undefined);
@@ -228,12 +301,36 @@ export class Voice {
         }
       }
     } catch (err) {
+      // Closed under it (the peer left, or the connection was started over): there's nothing to put right.
+      if (c.pc !== pc || this.conns.get(id) !== c) return;
       console.warn('rtc signal failed', err);
+      if (data.description) this.startOver(id, c, true);
     }
   }
 
-  private signal(to: string, data: Signal) {
-    this.net.send({ t: 'rtc', to, data });
+  private signal(to: string, c: Conn, data: Signal) {
+    this.net.send({ t: 'rtc', to, data: { ...data, gen: c.gen, cam: camMid(c.pc) } });
+  }
+
+  /**
+   * The connection starts again from nothing, with what we're sending, and the peer is told to do the
+   * same: every signal carries `gen`, and a higher one than theirs is what tells them. It's what gets a
+   * connection past an offer or an answer that won't apply (`failed`: that would leave the two sides
+   * out of step for good), and what the polite side does where the pattern has it roll back.
+   */
+  private startOver(id: string, c: Conn, failed = false) {
+    if (failed && ++c.failed > RETRIES) return;
+    this.restart(id, c, c.gen + 1);
+    this.signal(id, c, {});
+  }
+
+  private restart(id: string, c: Conn, gen: number): RTCPeerConnection {
+    c.gen = gen;
+    const pc = this.reopen(id, c);
+    this.addTracks(c);
+    // What was coming in is gone until it's back.
+    this.listeners.forEach((fn) => fn());
+    return pc;
   }
 
   private ensureAudioCtx() {
@@ -248,28 +345,89 @@ export class Voice {
   }
 
   private connect(id: string): Conn {
-    const pc = new RTCPeerConnection({ iceServers: store.ice });
     const audio = new Audio();
     audio.autoplay = true;
-    const c: Conn = { pc, polite: store.you < id, makingOffer: false, ignoreOffer: false, audio, level: 0 };
+    const c: Conn = { ...fresh(), polite: store.you < id, gen: 0, failed: 0, queue: Promise.resolve(), audio };
     this.conns.set(id, c);
+    this.wire(id, c);
+    this.addTracks(c);
+    return c;
+  }
 
+  /** A new RTCPeerConnection for a connection, in place of the one it had. It sends nothing yet (see addTracks). */
+  private reopen(id: string, c: Conn): RTCPeerConnection {
+    const old = c.pc;
+    old.onnegotiationneeded = old.onicecandidate = old.oniceconnectionstatechange = old.ontrack = null;
+    old.close();
+    c.audio.srcObject = null;
+    Object.assign(c, fresh());
+    this.wire(id, c);
+    return c.pc;
+  }
+
+  /** Puts what we're sending on a connection: the mic if we're in voice, the screen if we're sharing. */
+  private addTracks(c: Conn) {
+    if (this.mic && !c.micSender) c.micSender = this.carry(c, this.mic.getAudioTracks()[0], this.mic);
+    if (this.screen && !c.screenSender) c.screenSender = this.carry(c, this.screen.getVideoTracks()[0], this.screen);
+  }
+
+  /**
+   * Puts a track of ours on a connection: on the line it has for that kind, which takes nothing more
+   * than that, or on a new line, which the two sides then negotiate. Never on a webcam's line, ours or
+   * theirs (see voice-camera.ts). addTrack would take one of the track's kind that nothing of ours is on
+   * and that was never agreed to send on (theirs, while their offer of it is being answered), so while
+   * there's one like that the new line is made with addTransceiver, which never takes a line. Otherwise
+   * it's addTrack (a mic's always): a line of that kind that their offer brings as this goes on is the
+   * one it takes. A line from addTransceiver never is (JSEP 5.10), so it would be a second line beside
+   * theirs, which they'd answer open and send nothing on, and which ontrack would have us play instead.
+   */
+  private carry(c: Conn, track: MediaStreamTrack, stream: MediaStream): RTCRtpSender {
+    const cam = (t: RTCRtpTransceiver) => isCamLine(c.pc, t);
+    const line = c.pc.getTransceivers().find((t) => t.receiver.track.kind === track.kind && t.direction !== 'stopped' && !cam(t));
+    if (!line) {
+      const sent = (t: RTCRtpTransceiver) => t.currentDirection === 'sendrecv' || t.currentDirection === 'sendonly';
+      const takeable = c.pc.getTransceivers().some((t) => cam(t) && t.receiver.track.kind === track.kind && !t.sender.track && !sent(t));
+      return takeable ? c.pc.addTransceiver(track, { streams: [stream] }).sender : c.pc.addTrack(track, stream);
+    }
+    // A line of theirs from before lines were answered open (an older page's): opening it is negotiated.
+    if (line.direction !== 'sendrecv') line.direction = 'sendrecv';
+    void line.sender.replaceTrack(track).catch(() => {});
+    return line.sender;
+  }
+
+  /** Takes our track off the line it was on. The line stays, for the next one. */
+  private takeOff(sender: RTCRtpSender | undefined): undefined {
+    // It only fails on a connection that's closed.
+    void sender?.replaceTrack(null).catch(() => {});
+  }
+
+  /** Follows a connection's RTCPeerConnection: offers when it needs one, sends its candidates, takes in what arrives. */
+  private wire(id: string, c: Conn) {
+    const { pc, audio } = c;
     pc.onnegotiationneeded = async () => {
       try {
         c.makingOffer = true;
         await pc.setLocalDescription();
-        this.signal(id, { description: pc.localDescription!.toJSON() });
+        if (c.pc === pc) this.signal(id, c, { description: pc.localDescription!.toJSON() });
       } catch (err) {
+        // Closed under it (the peer left, or the connection was started over): there's nothing to put right.
+        if (c.pc !== pc || this.conns.get(id) !== c) return;
         console.warn('rtc negotiation failed', err);
+        // In its turn among their signals: one of those may be half applied, and a connection closed
+        // under that never says so.
+        c.queue = c.queue.then(() => {
+          if (c.pc === pc && this.conns.get(id) === c) this.startOver(id, c, true);
+        });
       } finally {
-        c.makingOffer = false;
+        if (c.pc === pc) c.makingOffer = false;
       }
     };
-    pc.onicecandidate = ({ candidate }) => this.signal(id, { candidate: candidate ? candidate.toJSON() : null });
+    pc.onicecandidate = ({ candidate }) => this.signal(id, c, { candidate: candidate ? candidate.toJSON() : null });
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === 'failed') pc.restartIce();
     };
-    pc.ontrack = ({ track, streams }) => {
+    pc.ontrack = ({ track, streams, transceiver }) => {
+      if (theirCamLine(pc, transceiver)) return this.listeners.forEach((fn) => fn());
       const stream = streams[0] ?? new MediaStream([track]);
       if (track.kind === 'audio') {
         c.audioStream = stream;
@@ -296,11 +454,6 @@ export class Voice {
       }
       this.listeners.forEach((fn) => fn());
     };
-
-    // Share whatever we're already sending.
-    if (this.mic) c.micSender = pc.addTrack(this.mic.getAudioTracks()[0], this.mic);
-    if (this.screen) c.screenSender = pc.addTrack(this.screen.getVideoTracks()[0], this.screen);
-    return c;
   }
 
   private drop(id: string) {

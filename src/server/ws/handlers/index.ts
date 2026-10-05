@@ -25,6 +25,7 @@ import { servicesView, settingsHandlers } from './settings.js';
 import { signinsHandlers } from './signins.js';
 import { teamHandlers } from './team.js';
 import { usageHandlers } from './usage.js';
+import { webcamHandlers } from './webcam.js';
 import { whiteboardHandlers, whiteboardHooks, whiteboardView } from './whiteboard.js';
 import { whiskyHandlers, whiskyHooks, whiskyView } from './whisky.js';
 import { workerHandlers, workerHooks, workersView } from './workers.js';
@@ -56,6 +57,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...signinsHandlers,
   ...teamHandlers,
   ...usageHandlers,
+  ...webcamHandlers,
   ...whiteboardHandlers,
   ...whiskyHandlers,
   ...workerHandlers,
