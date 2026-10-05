@@ -2,6 +2,9 @@ import * as THREE from 'three';
 import type { FloorPalette } from '../../../shared/floors';
 import { street } from '../outside';
 import { cars } from '../../features/cars/world';
+import { heliPark } from '../../features/heli/world';
+import { mainStreet } from '../../features/mainstreet/world';
+import { puttCourse } from '../../features/minigolf/world';
 import { scenic } from '../scenic';
 import { forecourt } from '../forecourt';
 import { toon, toonUnique } from '../toon';
@@ -56,7 +59,8 @@ function floorPlan() {
     panelling,
     balcony,
     tee,
-    ...downstairs(cars, street, green, scenic, forecourt),
+    // Main Street's plots, Putt Street and Friday One go down with the street, under every floor.
+    ...downstairs(cars, street, green, scenic, forecourt, mainStreet, puttCourse, heliPark),
     plug,
     tower,
     desks,

@@ -91,6 +91,12 @@ export function buildRoad(kit: ScenicKit): Road {
   return { asphalt, roadU, creekLine, bridge };
 }
 
+/**
+ * The SCENIC LOOP billboard across the street from the garage, facing it: its middle. Its board is
+ * 8.4 m wide, so it stands in x 23.8..32.2, between Friday Park (x ..22) and Plot 7 (x 34..).
+ */
+export const BILLBOARD = { x: 28, z: 37, width: 8.4 } as const;
+
 /** A wooden sign on two posts, `text` on its face, facing `rotY` (its face toward +z turned by that). */
 function signpost(into: THREE.Group, labels: THREE.Group, x: number, z: number, rotY: number, text: string, width = 5) {
   const g = new THREE.Group();
@@ -111,24 +117,26 @@ function signpost(into: THREE.Group, labels: THREE.Group, x: number, z: number, 
 /** The signs to the loop at the town's ends, and one at the start of each stretch. */
 export function buildSigns(kit: ScenicKit) {
   const { parts, labels, colliders, taken } = kit;
-  // A billboard across the street from the garage, and a sign at each end of the street.
+  // A billboard across the street from the garage, and a sign at each end of the street. The
+  // billboard stands in the gap between Friday Park and Plot 7 (BILLBOARD), on nobody's plot.
   {
+    const { x, z } = BILLBOARD;
     const g = new THREE.Group();
     const wood = toon('#5c4033');
     for (const sx of [-1, 1]) g.add(mesh(box(0.3, 5.6, 0.3), wood, sx * 3.2, 2.8, 0));
     g.add(mesh(box(8.4, 3.2, 0.25), toon('#264653'), 0, 4.1, 0));
-    g.position.set(24, G, 37);
+    g.position.set(x, G, z);
     g.rotation.y = Math.PI;
     parts.meadow.add(g);
-    colliders.push({ minX: 20.6, maxX: 27.4, minZ: 36.8, maxZ: 37.2, bottom: G, top: G + 5.6 });
+    colliders.push({ minX: x - 3.4, maxX: x + 3.4, minZ: z - 0.2, maxZ: z + 0.2, bottom: G, top: G + 5.6 });
     const title = textPlane('🏎️ SCENIC LOOP', { color: '#ffd166', size: 72 });
     title.scale.setScalar(1.35);
-    title.position.set(24, G + 4.75, 36.85);
+    title.position.set(x, G + 4.75, z - 0.15);
     title.rotation.y = Math.PI;
     const sub = textPlane('🌾 farm · 🌲 pines · 🏔️ mountains · 🏖️ beach — 1.4 km, either way ⟷', { color: '#f1faee', size: 44 });
     const w = (sub.geometry.parameters as { width: number }).width;
     sub.scale.setScalar(7.8 / w);
-    sub.position.set(24, G + 3.55, 36.85);
+    sub.position.set(x, G + 3.55, z - 0.15);
     sub.rotation.y = Math.PI;
     labels.add(title, sub);
   }

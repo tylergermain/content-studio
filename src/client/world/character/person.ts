@@ -13,7 +13,7 @@ import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
 import { cigarette, coffeeMug, drinkGlass, putDownGlass, undress } from './props';
 import { styleHair } from './person-hair';
-import { clubSwing, strike, swingStep, type Golf } from './person-golf';
+import { clubSwing, strike, swingStep, type Club, type Golf } from './person-golf';
 import { propPosition, throwStep, type Oche } from './person-throw';
 import { poseEmote, type Emoting } from './person-emote';
 
@@ -468,8 +468,8 @@ export class Person {
     this.grip = grip;
   }
 
-  /** At the golf tee with a club in both hands, over the ball (the ball in front of their feet, the hole off to their left), or not. */
-  setGolf(on: boolean) {
+  /** At the golf tee (or on Putt Street, `club` a putter) with a club in both hands, over the ball (in front of their feet, the hole off to their left), or not. */
+  setGolf(on: boolean, club: Club = 'driver') {
     if (on === !!this.golf) return;
     if (!on) {
       const { swing } = this.golf!;
@@ -480,9 +480,9 @@ export class Person {
       for (const limb of [this.armL, this.armR, this.legL, this.legR]) limb.rotation.set(0, 0, 0);
       return;
     }
-    const swing = clubSwing();
+    const swing = clubSwing(club);
     this.body.add(swing);
-    this.golf = { swing, back: 0, want: 0, top: 0, swingT: -1, autoT: -1, power: 0 };
+    this.golf = { swing, club, back: 0, want: 0, top: 0, swingT: -1, autoT: -1, power: 0 };
   }
 
   /** Taking the club back, `k` of the way (0 at the ball, 1 as far as it goes), the harder to hit it. */

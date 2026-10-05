@@ -22,26 +22,8 @@ export const FACADE = {
   concrete: '#d3d6dd',
 } as const;
 
-/**
- * The tower: `storeys` tall from the bottom office floor (storey 0) up, however many floors there
- * are. The real floors are the bottom ones; over them it's three bars of glass stacked and shifted
- * like the Friday Labs mark, each from storey `from` up to (not including) `to`, `minX`..`maxX` along
- * the building (its z is the building's). A storey of a bar is a `spandrel`, `glass`, a `spandrel`
- * and `glass` again, with a mullion every `mullion`; at each bar's foot a `seam` `height` high, from
- * `below` under that storey's floor, set back `inset`.
- */
-export const TOWER = {
-  storeys: 15,
-  bars: [
-    { from: 3, to: 7, minX: -15.9, maxX: 18.3 },
-    { from: 7, to: 11, minX: -20.7, maxX: 15.9 },
-    { from: 11, to: 15, minX: -18.3, maxX: 18.3 },
-  ],
-  glass: 3.25,
-  spandrel: 0.3,
-  mullion: 2.44,
-  seam: { below: 0.3, height: 1.2, inset: 0.5 },
-} as const;
+/** The tower's shape: in shared/tower.ts, so the office's server can fly Friday One round it too. */
+export { TOWER } from '../../shared/tower';
 
 /** The building's name, and its lockup (the mark and the name, white on transparent) for the signs. */
 export const BUILDING = { name: 'FRIDAY LABS', lockup: '/brand/friday-labs-wordmark-white.png' } as const;

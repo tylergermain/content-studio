@@ -9,12 +9,15 @@ import type { ChangesClientMsg, ChangesServerMsg } from './protocol/changes.js';
 import type { FloorClientMsg, FloorServerMsg, PlanClientMsg } from './protocol/floors.js';
 import type { GitHubClientMsg, GitHubServerMsg } from './protocol/github.js';
 import type { GoatClientMsg, GoatServerMsg } from './protocol/goat.js';
+import type { HeliClientMsg, HeliServerMsg } from './protocol/heli.js';
 import type { HoopClientMsg, HoopServerMsg } from './protocol/hoop.js';
 import type { MeetingClientMsg, MeetingServerMsg } from './protocol/meetings.js';
+import type { PuttClientMsg, PuttServerMsg } from './protocol/minigolf.js';
 import type { PresenceClientMsg, PresenceServerMsg } from './protocol/presence.js';
 import type { QueueClientMsg, QueueServerMsg } from './protocol/queue.js';
 import type { RooftopClientMsg, RooftopServerMsg } from './protocol/rooftop.js';
 import type { SettingsClientMsg, SettingsServerMsg } from './protocol/settings.js';
+import type { StreetClientMsg, StreetServerMsg } from './protocol/street.js';
 import type { StudioClientMsg, StudioServerMsg } from './protocol/studio.js';
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
@@ -28,12 +31,15 @@ export * from './protocol/changes.js';
 export * from './protocol/floors.js';
 export * from './protocol/github.js';
 export * from './protocol/goat.js';
+export * from './protocol/heli.js';
 export * from './protocol/hoop.js';
 export * from './protocol/meetings.js';
+export * from './protocol/minigolf.js';
 export * from './protocol/presence.js';
 export * from './protocol/queue.js';
 export * from './protocol/rooftop.js';
 export * from './protocol/settings.js';
+export * from './protocol/street.js';
 export * from './protocol/studio.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
@@ -64,6 +70,9 @@ export type ClientMsg =
   | CarClientMsg
   | DogClientMsg
   | GoatClientMsg
+  | StreetClientMsg
+  | PuttClientMsg
+  | HeliClientMsg
   | StudioClientMsg
   | HoopClientMsg
   | WhiskyClientMsg;
@@ -82,6 +91,9 @@ export type ServerMsg =
   | UsageServerMsg
   | ToysServerMsg
   | GoatServerMsg
+  | StreetServerMsg
+  | PuttServerMsg
+  | HeliServerMsg
   | StudioServerMsg
   | WatchServerMsg
   | HoopServerMsg

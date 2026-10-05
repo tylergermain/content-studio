@@ -42,7 +42,7 @@ export interface RemotePeer {
 }
 
 /** Registers what follows the people in the office (store 'peers' and 'cars'), their ticks, and chat and peer.act. */
-export function installPeers(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'puff' | 'worlds' | 'cars' | 'walking' | 'talk' | 'hud'>) {
+export function installPeers(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'puff' | 'worlds' | 'cars' | 'heli' | 'walking' | 'talk' | 'hud'>) {
   const { scene, voice, sound, player, office } = ctx;
   const { plan } = parts.worlds;
   const remotes = new Map<string, RemotePeer>();
@@ -82,7 +82,7 @@ export function installPeers(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'puff
       r.person.holdDrink(peer.drink ? (DRINK_BY_ID.get(peer.drink) ?? null) : null);
       r.person.carry(peer.carrying);
       r.person.read(!!peer.reading);
-      r.person.sit(store.carOf(id) ? SEAT_HIPS : peer.seat ? (seatOn(plan(), peer.seat)?.hips ?? null) : null);
+      r.person.sit(store.carOf(id) || store.heliSeatOf(id) ? SEAT_HIPS : peer.seat ? (seatOn(plan(), peer.seat)?.hips ?? null) : null);
       r.person.setDoing(whereabouts(peer, store.carOf(id)));
     }
     for (const [id, r] of remotes) {
@@ -98,13 +98,15 @@ export function installPeers(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'puff
   store.on('peers', syncPeers);
   // Into a car or out of one: sitting in it, or back on their feet.
   store.on('cars', syncPeers);
+  // The same for Friday One.
+  store.on('heli', syncPeers);
 
   ctx.ticks.add('others', ({ dt, t, now }) => {
     for (const [id, r] of remotes) {
       const p = store.peers.get(id);
       if (!p) continue;
-      // Sitting, they're wherever their seat puts them; in a car, right in it as it goes.
-      const ride = parts.cars.rideOf(id);
+      // Sitting, they're wherever their seat puts them; in a car or Friday One, right in it as it goes.
+      const ride = parts.cars.rideOf(id) ?? parts.heli.rideOf(id);
       const sat = ride ?? (p.seat ? seatOn(plan(), p.seat) : undefined);
       const at = sat ?? p;
       r.target.set(at.x, at.y, at.z);

@@ -16,6 +16,8 @@ Outside, the building is a 15-storey Friday Labs tower. The real floors are its 
 
 The building has one goat, Marc, on its bottom floor beside that floor's dog: he grazes on the plants, nibbles the rugs and gets the zoomies, and **E** pets him, after which he follows you about for a minute. The lounge's arcade cabinet and the boss's monitor play the same four games (Minesweeper, Blockfall, 2048 and Snake) against one high-score table per game for the whole building. The scoreboard beside the basketball hoop keeps the building's longest shots, and two people at the court can play PIG (**P** asks). See [Features](docs/features.md).
 
+The street out front is **Main Street** now. Plots either side of the tower and across the road are for other businesses: a street admin (one of the office's admins) claims one at its FOR LEASE board or the map board in Friday Park, and everyone on every floor sees a building site go up, with a tower crane slewing over it, or the shell of the business's tower, 1 to 8 storeys in its colors. Across the road, **Friday Park** has golf's first hole and a heliport, and **Putt Street** is a nine-hole mini golf course (par 26) for groups of up to four, with a windmill, a loop-the-loop, a volcano and a record board; the office referees every putt, and every page plays the same roll. **Friday One**, the helicopter on the heliport, is for street admins to fly round the tower and out over the town, with up to three riding along; it lands only where it's safe, never on anyone, and flies itself home if its pilot leaves. See [Main Street](docs/main-street.md), [Putt Street](docs/mini-golf.md) and [Friday One](docs/helicopter.md).
+
 Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, the back office, and which floor Marc lives on (he follows only an admin into the elevator). Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
 
 The original project's features and setup documentation follow below. Its MIT license and attribution are preserved. The `content-studio` command is available alongside `agent-office`.
@@ -66,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Together.** Voice, chat, screen sharing on the lounge TV, a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
 - **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
-There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
+There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach, and out front Main Street, with plots for other businesses, a mini golf course and a helicopter to fly over it all): see [docs/features.md](docs/features.md).
 
 ## Requirements
 
@@ -405,6 +407,9 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## More
 
 - [Features](docs/features.md): everything in the office, room by room
+- [Main Street](docs/main-street.md): the plots either side of Friday Tower, claiming one as a building site or a shell, Friday Park, and `street.json`
+- [Putt Street](docs/mini-golf.md): the nine-hole mini golf course on Main Street, its rules, its meter and its records
+- [Friday One](docs/helicopter.md): the helicopter: who flies it, the keys, where it lands and where it never will
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself

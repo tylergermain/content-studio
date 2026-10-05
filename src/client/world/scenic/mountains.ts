@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mulberry32 } from '../../../shared/rng';
-import { FOOTHILLS, MOUNTAINS, TUNNEL } from '../../../shared/scenic';
+import { FOOTHILLS, MOUNTAINS, SPURS } from '../../../shared/scenic';
 import { mergeByColor, mesh, toon } from '../toon';
 import { G, type ScenicKit } from './kit';
 
@@ -75,14 +75,7 @@ export function buildMountains(kit: ScenicKit) {
       taken.push({ x, z, r: r * 0.8 });
     });
     // The spur the tunnel goes through, and the shoulders of rock either side of each end of it.
-    const T = TUNNEL;
-    const spurs: [number, number, number, number][] = [
-      [T.x0 + 1, T.z - 22, 12, 17],
-      [T.x0 + 2, T.z + 27, 15, 26],
-      [T.x1 - 1, T.z - 22, 12, 16],
-      [T.x1 - 2, T.z + 27, 15, 27],
-    ];
-    spurs.forEach(([x, z, r, h], k) => mountain(tris, x, z, r, h, 300 + k));
+    SPURS.forEach(([x, z, r, h], k) => mountain(tris, x, z, r, h, 300 + k));
     const group = new THREE.Group();
     for (const m of mountainMeshes(tris, { grass: '#6a994e', rock: '#8e8aa0', dark: '#77738a', snow: '#f4f7fb' })) group.add(m);
     const range = mergeByColor(group);
