@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PUTT } from '../../../shared/mainstreet';
+import { arcadeFelt } from './arcade';
 import { heightAt } from '../../../shared/minigolf/physics';
 import { CUP, type Cone, type Felt, type Hole } from '../../../shared/minigolf/types';
 import { mesh, toon } from '../toon';
@@ -10,10 +10,10 @@ import { sideGeometry, soup, stripGeometry, topGeometry } from './shapes';
 // cup, and the rubber mat it's teed up on. Into `parts`, which is merged afterwards (see hole.ts), so
 // the felt's few colors are a few draw calls for the whole course.
 
-const FELT = toon(PUTT.felt);
+const FELT = arcadeFelt('#58c96a');
 /** The felt's sides, and a patch that's up a slope or banked a shade darker, so a ramp reads as one. */
 const FELT_SIDE = toon('#2c7a37');
-const FELT_SLOPE = toon('#379442');
+const FELT_SLOPE = arcadeFelt('#43af60');
 /** The painted edge a jump launches off, and the volcano's crater and its glowing rim. */
 const LIP = toon('#ffd166');
 /** The volcano's slopes are painted rock (still felt underneath, for the ball). */

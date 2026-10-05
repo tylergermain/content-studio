@@ -4,6 +4,7 @@ import { BALL_R } from '../../../shared/minigolf/types';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import type { Person } from '../../world/character';
+import { pullPower } from './arcade';
 import { distText, feltAt, meterAt, nth, stanceAt, wrapAngle, yawTo } from './play';
 
 // Putting (E at your ball on your turn): you stand side on to the ball with the putter, and the camera
@@ -19,17 +20,17 @@ const TURN = 0.5;
 /** Let go with the meter under this and it's no putt at all: Space only tapped. */
 const MIN_POWER = 0.004;
 /** The aim line on the felt: this long, a dot every so far. */
-const AIM_LINE = 1.2;
+const AIM_LINE = 2.8;
 const DOTS = 12;
 /**
  * Behind the ball along the line while aiming, and up, and a little to the side away from you so you
  * don't stand in your own way; then following it, back and up.
  */
-const AIM_BACK = 2.6;
-const AIM_UP = 1.4;
-const AIM_SIDE = 0.55;
-const CHASE_BACK = 3;
-const CHASE_UP = 2;
+const AIM_BACK = 4;
+const AIM_UP = 2.8;
+const AIM_SIDE = 0.2;
+const CHASE_BACK = 4;
+const CHASE_UP = 3;
 /** How long the camera stays on a ball that's stopped, before you're over it again (or stepping away), in seconds. */
 const LINGER = 1.1;
 const LINGER_DONE = 2.2;
@@ -69,6 +70,10 @@ export class Putter {
   aim = 0;
   /** When the meter started running (performance.now()), while Space is held. */
   private chargeAt = 0;
+  private source: 'space' | 'mouse' = 'space';
+  private pull = 0;
+  private overview = false;
+  private readonly percentage: HTMLElement;
   /** How hard the last putt was, marked on the meter. */
   private lastPower = -1;
   /** When the last putt was sent (performance.now()), and how long the ball's been still since. */
@@ -98,19 +103,32 @@ export class Putter {
     private readonly hooks: PutterHooks,
   ) {
     this.rest = h('span.putt-rest');
+    this.percentage = h('span.putt-power', {}, '0%');
     this.mark = h('span.putt-last');
     this.info = h('div.putt-info');
     this.title = h('div.putt-title');
-    this.panel = h('div.putt-meter.panel.hidden', { 'aria-label': 'Putting' }, this.title, h('div.putt-bar', {}, this.rest, this.mark), this.info);
+    this.panel = h('div.putt-meter.panel.hidden', { 'aria-label': 'Putting' }, this.title, h('div.putt-bar', {}, this.rest, this.mark), this.percentage, this.info, h('div.putt-controls', {}, 'Mouse to aim · Hold left click + pull back to power · Release to putt · C overview · Space also works'));
     $('hud').append(this.panel);
-    const dot = new THREE.CircleGeometry(0.014, 10).rotateX(-Math.PI / 2);
-    const white = new THREE.MeshBasicMaterial({ color: '#fffaf3', transparent: true, opacity: 0.9, depthWrite: false });
+    const dot = new THREE.CircleGeometry(0.024, 10).rotateX(-Math.PI / 2);
+    const white = new THREE.MeshBasicMaterial({ color: '#fffaf3', transparent: true, opacity: 0.95, depthWrite: false });
     for (let i = 0; i < DOTS; i++) this.line.add(new THREE.Mesh(dot, white));
     this.line.visible = false;
     window.addEventListener('keydown', (e) => this.key(e, true));
     window.addEventListener('keyup', (e) => this.key(e, false));
     // Tabbed away mid-putt: the key never comes back up, so it's no putt.
     window.addEventListener('blur', () => this.letGo());
+    window.addEventListener('pointerdown', (e) => {
+      if (e.button !== 0 || this.stage !== 'aim' || modalOpen() || !(e.target instanceof HTMLCanvasElement || document.pointerLockElement)) return;
+      e.preventDefault(); e.stopImmediatePropagation(); this.source = 'mouse'; this.pull = 0; this.stage = 'charge'; this.overview = false;
+    }, true);
+    window.addEventListener('pointermove', (e) => {
+      if (this.stage !== 'charge' || this.source !== 'mouse') return;
+      this.pull = pullPower(this.pull, e.movementY);
+      e.stopImmediatePropagation();
+    }, true);
+    window.addEventListener('pointerup', (e) => {
+      if (e.button === 0 && this.stage === 'charge' && this.source === 'mouse') { e.stopImmediatePropagation(); this.release(); }
+    }, true);
   }
 
   get active(): boolean {
@@ -123,7 +141,7 @@ export class Putter {
 
   /** How full the meter is right now (0..1), while Space is held. */
   get power(): number {
-    return this.stage === 'charge' ? meterAt((performance.now() - this.chargeAt) / 1000) : 0;
+    return this.stage === 'charge' ? this.source === 'mouse' ? this.pull : meterAt((performance.now() - this.chargeAt) / 1000) : 0;
   }
 
   /** Over your ball on hole `hole` (0..8) with the putter, aiming at the cup. */
@@ -131,6 +149,7 @@ export class Putter {
     const ball = this.hooks.ball();
     if (this.stage || !ball || !HOLES[hole]) return false;
     this.hole = hole;
+    this.overview = false;
     this.overBall(ball);
     const p = this.player;
     p.rig = () => this.stand();
@@ -170,7 +189,7 @@ export class Putter {
   update(dt: number): void {
     if (!this.stage) return;
     const p = this.player;
-    if (this.stage === 'aim' || this.stage === 'charge') {
+    if (this.stage === 'aim' || (this.stage === 'charge' && this.source === 'space')) {
       // The mouse turns your view as it always does (camYaw); that's the aim, along with the keys.
       let aim = wrapAngle(p.camYaw - Math.PI);
       if (p.holding('KeyA', 'ArrowLeft')) aim += TURN * dt;
@@ -227,22 +246,26 @@ export class Putter {
   }
 
   private key(e: KeyboardEvent, down: boolean) {
+    if (this.stage && e.code === 'KeyC' && !isTyping(e) && !modalOpen()) {
+      if (down && !e.repeat && this.stage === 'aim') this.overview = !this.overview;
+      e.preventDefault(); e.stopImmediatePropagation(); return;
+    }
     if (!this.stage || e.code !== 'Space') return;
     if (down && (e.repeat || isTyping(e) || modalOpen() || e.metaKey || e.ctrlKey || e.altKey)) return;
     if (down && this.stage === 'aim') {
       this.stage = 'charge';
+      this.source = 'space'; this.overview = false;
       this.chargeAt = performance.now();
-    } else if (!down && this.stage === 'charge') {
-      const power = this.power;
-      if (power < MIN_POWER) return this.letGo();
-      this.lastPower = power;
-      this.stage = 'watch';
-      this.sentAt = performance.now();
-      this.still = 0;
-      this.heading = this.aim;
-      this.me.golfHit();
-      this.hooks.stroke(this.aim, power);
-    }
+    } else if (!down && this.stage === 'charge' && this.source === 'space') this.release();
+  }
+
+  private release() {
+    if (modalOpen()) return this.letGo();
+    const power = this.power;
+    if (power < MIN_POWER) return this.letGo();
+    this.lastPower = power; this.stage = 'watch'; this.sentAt = performance.now();
+    this.still = 0; this.heading = this.aim;
+    this.me.golfHit(); this.hooks.stroke(this.aim, power);
   }
 
   /** The dotted line from the ball the way you're aiming, on the felt, while you aim. */
@@ -267,7 +290,11 @@ export class Putter {
   private placeCamera(dt: number) {
     const street = this.hooks.street();
     const ball = this.stage === 'watch' ? this.hooks.ball() : null;
-    if (ball) {
+    if (this.overview && this.stage === 'aim') {
+      const cell = HOLES[this.hole].cell;
+      want.set(cell.x, street + 13, cell.z - 5);
+      target.set(cell.x, street + 0.3, cell.z);
+    } else if (ball) {
       // Following it: behind it the way it's going, and up, looking at it.
       const yaw = this.heading;
       want.set(ball.x - Math.sin(yaw) * CHASE_BACK, street + ball.y + CHASE_UP, ball.z - Math.cos(yaw) * CHASE_BACK);
@@ -294,6 +321,7 @@ export class Putter {
     const power = this.stage === 'charge' ? this.power : this.stage === 'aim' ? 0 : this.lastPower;
     if (power !== this.drawnPower) {
       this.drawnPower = power;
+      this.percentage.textContent = `${Math.round(Math.max(0, power) * 100)}% power`;
       this.rest.style.width = `${(1 - Math.max(0, power)) * 100}%`;
     }
     const taken = this.hooks.taken();

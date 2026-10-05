@@ -5,6 +5,7 @@ import type { Hole } from '../../../shared/minigolf/types';
 import type { StreetBox } from '../outside';
 import { mesh, textPlane, toon } from '../toon';
 import type { Collider } from '../types';
+import { cupFlag } from './arcade';
 import { archPosts, buildArch } from './arch';
 import { buildFelt } from './felt';
 import { buildHills } from './hill';
@@ -40,6 +41,7 @@ export interface HoleView {
 /** Hole `hole` on its cell; what never moves goes into `statics`, unmerged (see mergeByMaterial). */
 export function buildHole(hole: Hole, statics: THREE.Group): HoleView {
   const group = new THREE.Group();
+  group.add(cupFlag(hole));
   const parts = statics;
   const colliders: Collider[] = [];
   const obstacles: StreetBox[] = [];

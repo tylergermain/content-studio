@@ -453,3 +453,5 @@ Look at an agent and press **Q** for an in-world live voice conversation. They t
 Hire dialogs honor the configured default agent (or the office-wide choice in Settings) and offer saved specialists. Opening an agent shows its chat and its role's workspace, with the raw Terminal available from that window; the desk hint says which workspace E opens. A link in a worker's message opens the file in the workspace; a link into a folder outside the floor reads **Not shared with the office** until an admin clicks **Share … with this floor** under it, and **Stop sharing** at the foot of the workspace takes the folder back. See [content preview and links](docs/worker-chat.md#content-preview-and-links).
 
 The AI Innovators floor has a **Skill library** in place of its Docs shelf, with searchable instruction snapshots, categories, Git history, comparisons, and admin-only version saves and restores. See [the skill library](docs/skill-library.md).
+
+Putt Street now has arcade-style mouse pull-back shots, a percentage power meter, numbered cup pins, checker greens, and a C-key hole overview. Space putting remains available. See [mini golf controls](docs/mini-golf.md).

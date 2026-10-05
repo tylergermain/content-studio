@@ -46,3 +46,15 @@
 .putt-news .pill.good { background: var(--good-tint); color: var(--good-ink); }
 .putt-over .putt-total { margin: 0; font-size: 15px; }
 .putt-over .putt-total b { font-size: 22px; font-variant-numeric: tabular-nums; }
+
+/* Arcade putting HUD stays below the course view, separate from the scorecard. */
+.putt-meter { top:auto; bottom:32px; width:min(520px,calc(100vw - 32px)); padding:16px 20px; border:1px solid #ffffff45; border-radius:18px; background:#172d36ed; color:#fff; box-shadow:0 12px 40px #0004; gap:10px; }
+.putt-title { font-size:17px; }
+.putt-bar { height:16px; box-shadow:inset 0 0 0 1px #fff3; }
+.putt-rest { background:#314751; }
+.putt-last { background:#fff; width:3px; }
+.putt-power { font-size:23px; font-variant-numeric:tabular-nums; }
+.putt-controls { color:#c3d5dc; font-size:11px; font-weight:400; line-height:1.6; }
+.putt-card { background:#172d36ed; color:#fff; border-radius:12px; }
+.putt-card :is(th,.putt-clock,.putt-card-foot) { color:#c3d5dc; }
+@media(max-width:600px) { .putt-meter { bottom:18px; padding:12px; } .putt-title { font-size:14px; } .putt-card { font-size:10px; left:8px; max-width:calc(100vw - 16px); } .putt-table :is(th,td) { min-width:14px; padding:2px; } .putt-table .who { max-width:62px; } }
