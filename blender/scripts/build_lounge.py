@@ -20,8 +20,8 @@ time):
 Each piece is a root of its own, `sofa`, `pillow`, `pouf` and `coffee_table`, standing on the floor
 at the origin under its middle and facing forward (the pillow's origin is under its middle too, at
 its bottom edge). world/office/ turns the sofa round to face the TV and leans a pillow on it either side
-of the middle. The pieces keep the old code-built lounge's sizes, so its colliders, seats and the
-holiday pumpkin on the table fit as before. The roots' names and the material names are a contract
+of the middle. The pieces keep the old code-built lounge's sizes, so its colliders and seats fit
+as before. The roots' names and the material names are a contract
 with world/office/props.ts and tests/lounge-model.test.ts, so rename them in all three places.
 
 The pieces are built the way build_furniture.py builds the office's desks and chairs, and use its
@@ -60,8 +60,8 @@ def material(name):
 SOFA = {"length": 4.2, "depth": 1.0}
 # The seat cushions' tops. A sitter's bottom is 0.1 under their hips, so they sink a little in.
 SEAT_TOP = 0.47
-# The coffee table in world/office/: a round top 0.9 round, its surface at 0.46 (the holiday pumpkin
-# stands on it), inside a collider 0.8 either way of its middle.
+# The coffee table in world/office/: a round top 0.9 round, its surface at 0.46, inside a collider
+# 0.8 either way of its middle.
 TABLE = {"radius": 0.9, "height": 0.46}
 # A floor pouf in world/office/: a collider 0.5 either way of its middle with its top on the pouf's, and
 # a sitter's hips 0.42 up and 0.1 back from its middle. Its top is a touch under their hips, so they sink a little in and their

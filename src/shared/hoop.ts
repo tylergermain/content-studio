@@ -28,8 +28,10 @@ export const BALL = {
    * on the side away from the coffee machine, so walking up to it doesn't pour you a coffee.
    */
   home: { x: HOOP.face + 0.7, z: HOOP.z - 0.8 },
-  /** The fastest anyone throws it, in m/s. */
+  /** The fastest anyone throws it with both hands, in m/s: every shot from inside the green's old range (see hoop-range.ts). */
   maxSpeed: 16,
+  /** The fastest a one-armed heave from way out goes (m/s): enough to reach the hoop from the far corner under the ceiling. */
+  heaveSpeed: 28,
 } as const;
 
 /** A throw: where the ball left someone's hands, how fast, who threw it, and how long ago (ms) as the office sent it. */
@@ -51,13 +53,18 @@ export interface BallShot {
 export interface BallState {
   holder?: string;
   shot?: BallShot;
+  /**
+   * Whose ball it is to pick up, while a game of PIG is on (see shared/pig.ts): theirs alone, or
+   * nobody's ('') while a shot is on its way. None: anyone's.
+   */
+  for?: string;
 }
 
-/** Whether a throw from the page is one the office passes on: from somewhere on the floor, no faster than anyone throws. */
+/** Whether a throw from the page is one the office passes on: from somewhere on the floor, no faster than anyone throws (a heave, the fastest). */
 export function throwOk(s: { x: number; y: number; z: number; vx: number; vy: number; vz: number }): boolean {
   const n = [s.x, s.y, s.z, s.vx, s.vy, s.vz];
   if (!n.every((v) => typeof v === 'number' && Number.isFinite(v))) return false;
-  if (Math.hypot(s.vx, s.vy, s.vz) > BALL.maxSpeed + 1e-6) return false;
+  if (Math.hypot(s.vx, s.vy, s.vz) > BALL.heaveSpeed + 1e-6) return false;
   return inBounds(s.x, s.y, s.z, 1);
 }
 
@@ -103,23 +110,29 @@ export interface BallSim {
   still: boolean;
   /** It fell through the ceiling of the floor below (or out of the building): back under the hoop it goes. */
   lost: boolean;
-  /** It went in (at most once a throw), and what it touched on the way: the rim, the backboard. */
+  /** It went in (at most once a throw), and what it touched on the way: the rim, the backboard, the ceiling. */
   scored: boolean;
-  touched: { rim: boolean; board: boolean };
+  touched: { rim: boolean; board: boolean; ceiling: boolean };
   /** It came up through the ring from underneath, which doesn't count when it drops back through. */
   under: boolean;
+  /**
+   * Thrown harder than anyone throws with both hands (BALL.maxSpeed): only a heave from way out is (see
+   * shared/hoop-range.ts). One of those that's been off the ceiling is dead, and doesn't count through the ring.
+   */
+  heave: boolean;
 }
 
 /** Steps a second is cut into: every page cuts it the same way, so every page sees the same bounces. */
 export const STEP = 1 / 120;
-const GRAVITY = 9.8;
+export const GRAVITY = 9.8;
 /** How long a throw can bounce about before it's let lie wherever it is. */
 const MAX_TIME = 25;
 /** The part of the speed into a surface the ball keeps, bouncing back off it. */
 const BOUNCE = { floor: 0.7, rim: 0.55, board: 0.62, other: 0.58 } as const;
 
 export function launch(s: { x: number; y: number; z: number; vx: number; vy: number; vz: number }): BallSim {
-  return { x: s.x, y: s.y, z: s.z, vx: s.vx, vy: s.vy, vz: s.vz, t: 0, still: false, lost: false, scored: false, touched: { rim: false, board: false }, under: false };
+  const heave = Math.hypot(s.vx, s.vy, s.vz) > BALL.maxSpeed + 1e-6;
+  return { x: s.x, y: s.y, z: s.z, vx: s.vx, vy: s.vy, vz: s.vz, t: 0, still: false, lost: false, scored: false, touched: { rim: false, board: false, ceiling: false }, under: false, heave };
 }
 
 /** The solids near enough to the floor for the ball to reach; the rest of the building (the street, other floors) can't be. */
@@ -133,6 +146,17 @@ export function backboard(): Solid {
   return { minX: HOOP.face - b.thick, maxX: HOOP.face, minZ: HOOP.z - b.width / 2, maxZ: HOOP.z + b.width / 2, bottom: b.bottom, top: b.top, board: true };
 }
 
+/**
+ * The arms holding the backboard off the wall, and the plate they're bolted to, as one block behind it.
+ * A ball only gets there over the top of the board, or through it: a heave's fast enough to go
+ * through the thin board between one step and the next, and this throws it back out.
+ */
+export function hoopArms(): Solid {
+  const b = HOOP.board;
+  const midY = (b.bottom + b.top) / 2;
+  return { minX: FLOOR.minX, maxX: HOOP.face - b.thick, minZ: HOOP.z - 0.45, maxZ: HOOP.z + 0.45, bottom: midY - 0.8, top: midY + 0.3 };
+}
+
 /** Moves the ball on by one STEP, bouncing it off `solids` and the rim. Hits go in `hits`, if given. */
 export function step(s: BallSim, solids: readonly Solid[], hits?: BallHit[]) {
   if (s.still || s.lost) return;
@@ -144,11 +168,12 @@ export function step(s: BallSim, solids: readonly Solid[], hits?: BallHit[]) {
   s.vy -= GRAVITY * STEP;
   s.t += STEP;
 
-  // Through the ring? Its middle has to cross the rim's height inside it, on the way down.
+  // Through the ring? Its middle has to cross the rim's height inside it, on the way down. A heave
+  // that's been off the ceiling drops through like any loose ball: it doesn't count.
   const rim = HOOP.rim;
   const off = Math.hypot(s.x - rim.x, s.z - rim.z);
   if (off < rim.r - 0.03) {
-    if (y0 >= rim.y && s.y < rim.y && !s.under && !s.scored) {
+    if (y0 >= rim.y && s.y < rim.y && !s.under && !s.scored && !(s.heave && s.touched.ceiling)) {
       s.scored = true;
       hits?.push({ kind: 'score', speed: -s.vy });
       // The net catches it and lets it drop.
@@ -249,6 +274,8 @@ function hitBox(s: BallSim, c: Solid, hits?: BallHit[]): boolean {
   s.x += nx * depth;
   s.y += ny * depth;
   s.z += nz * depth;
+  // Anything from the ceiling up is the ceiling, however lightly it's touched (see step).
+  if (minY >= WALL_HEIGHT) s.touched.ceiling = true;
   const board = !!c.board;
   const speed = bounce(s, nx, ny, nz, board ? BOUNCE.board : ny > 0.7 ? BOUNCE.floor : BOUNCE.other);
   if (speed > 0.25) {
@@ -299,16 +326,16 @@ export const RETURN_AFTER = 3;
 
 /**
  * How fast to throw from `from`, `pitch` radians up from level, to drop through the middle of the
- * ring: null if no speed does it at that angle (or it's too far to throw).
+ * ring: null if no speed does it at that angle (or it's faster than `top`, as hard as anyone throws).
  */
-export function idealSpeed(from: { x: number; y: number; z: number }, pitch: number): number | null {
+export function idealSpeed(from: { x: number; y: number; z: number }, pitch: number, top: number = BALL.maxSpeed): number | null {
   const dx = Math.hypot(HOOP.rim.x - from.x, HOOP.rim.z - from.z);
   const dy = HOOP.rim.y - from.y;
   const c = Math.cos(pitch);
   const lift = dx * Math.tan(pitch) - dy;
   if (c <= 0 || lift <= 0) return null;
   const v = Math.sqrt((GRAVITY * dx * dx) / (2 * c * c * lift));
-  return v <= BALL.maxSpeed ? v : null;
+  return v <= top ? v : null;
 }
 
 /**
@@ -346,7 +373,7 @@ export const SWEET = { at: 0.78, width: 0.08 } as const;
  * of (or past) the sweet spot. Past it the shot goes long quickly: a little late banks in off the
  * glass, and as hard as you throw (where the meter turns back, so it's easy to hit) misses.
  */
-const SWEET_SLOPE = { short: 0.25, long: 0.8 } as const;
+export const SWEET_SLOPE = { short: 0.25, long: 0.8 } as const;
 /** The wind-up meter goes up in this long, then back down, and so on until you let go. */
 export const WIND_UP = 1.05;
 

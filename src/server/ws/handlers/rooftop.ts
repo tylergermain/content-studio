@@ -13,7 +13,7 @@ export const rooftopHandlers = {
   golf(ctx, c, msg) {
     const [yaw, loft, power] = [num(msg.yaw), num(msg.loft), num(msg.power)];
     if (!c.peer.golfing || Math.abs(yaw) > 2 || loft < 0 || loft > 1.6 || power < 0 || power > 1 || !throttle(c, 'golf', 800)) return;
-    ctx.toNeighbors(c, { t: 'golf', id: c.id, yaw, loft, power });
+    ctx.toNeighbors(c, { t: 'golf', id: c.id, yaw, loft, power, ...(c.peer.golfBay ? { bay: c.peer.golfBay } : {}) });
   },
   toss(ctx, c, msg) {
     // Only at the line they stepped up to, and no quicker than anyone throws.

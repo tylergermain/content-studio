@@ -21,21 +21,16 @@ const BUDGET = 600;
  */
 const CEILINGS: Readonly<Record<string, number>> = {
   'src/server/dsh.ts': 1148,
-  'src/server/workers/manager.ts': 1029,
+  'src/server/workers/manager.ts': 1021,
   'src/client/features/rooftop/world.ts': 989,
-  'src/client/world/sky.ts': 966,
+  'src/client/world/sky.ts': 775,
   'src/server/meetings.ts': 764,
-  'src/client/features/workers/sendhome.ts': 718,
-  'src/client/world/holiday.ts': 702,
-  'src/client/features/dog/world.ts': 702,
-  'src/client/world/character/person.ts': 699,
+  'src/client/world/character/person.ts': 653,
+  'src/client/features/dog/world.ts': 685,
   'src/server/signins.ts': 660,
   'src/client/dnb.ts': 641,
-  'src/client/features/golf/world.ts': 635,
   'src/client/features/bargames/world.ts': 617,
   'src/client/world/city.ts': 613,
-  'src/client/world/character/worker.ts': 605,
-  'src/client/world/costumes.ts': 603,
 };
 
 const SPLIT = 'Split it along the registries instead (see docs/code-layout.md).';

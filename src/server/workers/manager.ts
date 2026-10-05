@@ -1,3 +1,5 @@
+import { prepareSpecialist, specialistFolder } from '../specialists/profiles.js';
+import { specialistLaunch } from '../specialists/launch.js';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
 import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, WorkerKind, WorkerRepo, WorkerStatus } from '../../shared/protocol.js';
@@ -17,7 +19,6 @@ import { DropStore } from '../drops.js';
 import type { Capacity } from '../machine.js';
 import { PROVIDERS, providerAdapter, titleNoise, type LaunchPlan, type ProviderFloor } from '../providers/index.js';
 import { launchAcp } from './acp.js';
-import { clockWork } from './clock.js';
 import { childEnv } from './env.js';
 import { midTurn } from './lifecycle.js';
 import { restoreWorkers, saveWorkers } from './persist.js';
@@ -29,7 +30,6 @@ import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, Worke
 import { clamp, safeEq, truncate } from './util.js';
 import { COLORS, NAMES, newWorker } from './worker.js';
 import { WorkerTrees, lostMessage } from './worktree.js';
-
 const SCREEN_INTERVAL_MS = 250;
 /** How often a steady typist's "last typed" time is refreshed for everyone. */
 const TYPED_REFRESH_MS = 15_000;
@@ -63,13 +63,12 @@ export class WorkerManager {
   private worktrees: WorkerTrees;
   private prs: WorkerPrs;
   private usageTimer: NodeJS.Timeout;
-  /** Runs the workers' terminals outside the office, so they outlive a restart of it (see ptys.ts). */
   private host: PtyHost;
   /** Each worker's terminal on disk, so a restart doesn't wipe it (see history.ts). */
   private scrollback: ScrollbackStore;
   private drops: DropStore;
   private saveTimer: NodeJS.Timeout;
-  /** How many rows the floor's back office is built out: its desks past that aren't there to hire at (see WING). */
+  hiringPolicy?: (owner: string | undefined, specialist: string | undefined, kind: WorkerKind) => string | undefined;
   wing: () => number = () => 0;
 
   constructor(
@@ -181,6 +180,7 @@ export class WorkerManager {
     return [...this.workers.values()].map((w) => w.info);
   }
 
+  sessionContext(id: string) { return this.workers.get(id); }
   get(id: string): WorkerInfo | undefined {
     return this.workers.get(id)?.info;
   }
@@ -219,7 +219,8 @@ export class WorkerManager {
    * (see meetings.ts), in the meeting's own worktree, which everyone at the table shares. `repos` are
    * other floors' repositories a worker in its own worktree works in too (see makeWorkspace).
    */
-  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], via?: 'herald'): WorkerInfo | string {
+  spawn(deskId: string, by: string, prompt?: string, worktree = false, kind: WorkerKind = 'agent', provider?: AgentProvider, model?: string, effort?: AgentEffort, meeting?: { id: string; worktree?: WorkerInfo['worktree'] }, owner?: string, repos: RepoSource[] = [], specialist?: string): WorkerInfo | string {
+    const denied = this.hiringPolicy?.(owner,specialist,kind); if(denied) return denied;
     // Nobody picked (a board agent, say): the office's default worker, model and effort included.
     if (kind === 'agent' && provider === undefined) ({ provider, model, effort } = this.officeDefault);
     const selectedProvider = kind === 'agent' ? provider : undefined;
@@ -230,7 +231,7 @@ export class WorkerManager {
     const seat = DESK_BY_ID.get(deskId);
     if (!seat) return 'Unknown desk';
     if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
-    if (this.deskOccupied(deskId)) return seat.station ? `The ${STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
+    if (this.deskOccupied(deskId)) return seat.station ? `The ${this.prompts?.stationName?.(seat.station) ?? STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
     if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
     if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
     if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
@@ -247,9 +248,11 @@ export class WorkerManager {
     if (owner && signIn && this.runAs && !this.runAs.claudeReady(owner)) return this.runAs.why(signIn);
     const full = this.capacity?.full();
     if (full) return full;
+    let profile;
+    try { if (specialist) { if(kind !== 'agent' || worktree || meeting || seat.station || repos.length) return 'Specialists use their folder on the main floor'; profile = prepareSpecialist(this.dir,specialist,selectedProvider); } } catch(e) { return e instanceof Error ? e.message : 'Could not prepare specialist'; }
     const used = new Set([...this.workers.values()].map((w) => w.info.name.replace(/ 🐚$/, '')));
-    const agent = seat.station && STATION_AGENT[seat.station];
-    const name = agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
+    const agent = seat.station && { ...STATION_AGENT[seat.station], name: this.prompts?.stationName?.(seat.station) ?? STATION_AGENT[seat.station].name };
+    const name = profile ? `${profile.name}${used.has(profile.name) ? ' '+(this.workers.size+1) : ''}` : agent ? agent.name : (NAMES.find((n) => !used.has(n)) ?? `Worker ${this.workers.size + 1}`);
     const id = randomBytes(6).toString('hex');
     let wt: WorkerInfo['worktree'] = meeting?.worktree;
     let others: WorkerRepo[] | undefined;
@@ -270,6 +273,7 @@ export class WorkerManager {
       id,
       kind,
       provider: selectedProvider,
+      specialist,
       model: takesModel(selectedProvider) ? model : undefined,
       effort: takesEffort(selectedProvider) ? effort : undefined,
       deskId,
@@ -279,7 +283,6 @@ export class WorkerManager {
       acked: true,
       createdBy: by,
       createdAt: Date.now(),
-      ...(via ? { via } : {}),
       prompt: kind === 'shell' ? undefined : prompt?.trim() || undefined,
       worktree: wt,
       repos: others,
@@ -309,9 +312,9 @@ export class WorkerManager {
   resume(id: string, prompt?: string): string | undefined {
     const w = this.workers.get(id);
     if (!w) return 'No such worker';
+    const denied = this.hiringPolicy?.(w.owner,w.info.specialist,w.info.kind); if(denied) return denied;
     if (w.pty || w.dsh) return 'Worker is already running';
     if (this.worktrees.checkLost(w, true)) return lostMessage(w.info);
-    clockWork(w.info, 'starting');
     w.info.status = 'starting';
     w.info.exitCode = undefined;
     const station = DESK_BY_ID.get(w.info.deskId)?.station;
@@ -387,7 +390,7 @@ export class WorkerManager {
     w.term?.dispose();
     this.scrollback.remove(id);
     this.drops.remove(id);
-    this.events.remove(id, w.info);
+    this.events.remove(id);
     this.persist();
     return this.worktrees.sendHome(w.info, cleanup, landed, landedRepos);
   }
@@ -631,13 +634,10 @@ export class WorkerManager {
     else this.host.stop();
   }
 
-  // ---------------------------------------------------------------------------
-
   private launch(w: Worker, prompt: string | undefined, resumeSessionId: string | undefined) {
     const { info } = w;
     // Its folder was deleted meanwhile: it waits, marked lost, for someone to rebuild it or send it home.
     if (this.worktrees.checkLost(w)) {
-      clockWork(info, 'exited');
       info.status = 'exited';
       this.emitUpdate(w);
       return;
@@ -663,8 +663,8 @@ export class WorkerManager {
     const command = this.command(info);
     const commandPath = isShell ? undefined : configured ? this.agentPath : resolveCommand(command);
     const base = isShell ? (WIN && !process.env.SHELL ? [] : ['-l']) : configured ? [...this.agentArgs] : [];
-    // Its provider's command line, and anything it sets for this run (see ProviderAdapter.launch).
     const plan: LaunchPlan = adapter ? adapter.launch({ h: this.handleOf(w), args: base, prompt, resumeSessionId, station: DESK_BY_ID.get(info.deskId)?.station, cwd, setup: this.setups[adapter.id] }) : { args: base };
+    try { Object.assign(plan,specialistLaunch(plan,info,this.dir)); } catch(e) { this.startFailed(w,e instanceof Error?e.message:'Invalid specialist tools'); return; }
     const { args } = plan;
     if (plan.rotateToken) w.hookToken = randomBytes(16).toString('hex');
     const env = childEnv();
@@ -727,7 +727,6 @@ export class WorkerManager {
     }
     // One that says itself when it's up (see ProviderAdapter.bootHint) starts out 'starting'.
     if (!adapter?.bootHint) {
-      clockWork(info, 'idle');
       info.status = 'idle';
     }
     this.follow(w, proc, term, resumeSessionId);
@@ -751,7 +750,6 @@ export class WorkerManager {
     this.setTitle(w, adopted.title);
     // A hook that came in since the office started already says how it's doing.
     if (info.status === 'offline') {
-      clockWork(info, saved.status);
       info.status = saved.status;
       info.acked = saved.acked;
       info.waitingSince = saved.waitingSince;
@@ -816,7 +814,6 @@ export class WorkerManager {
         return;
       }
       info.exitCode = exitCode;
-      clockWork(info, 'exited');
       info.status = 'exited';
       const hint = info.kind === 'shell' ? ' — press R to restart' : info.sessionId ? ' — press R to resume' : '';
       const msg = `\r\n\x1b[2m[${info.name} exited with code ${exitCode}${hint}]\x1b[0m\r\n`;
@@ -843,7 +840,6 @@ export class WorkerManager {
   private startFailed(w: Worker, message: string) {
     const what = this.command(w.info);
     const msg = `\r\n\x1b[31mFailed to start ${what}: ${message}\x1b[0m\r\n`;
-    clockWork(w.info, 'exited');
     w.info.status = 'exited';
     w.info.exitCode = -1;
     w.term?.write(msg);
@@ -854,18 +850,16 @@ export class WorkerManager {
     this.emitUpdate(w);
   }
 
-  /** What a worker's terminal runs: the shell, the configured agent command, or another provider's CLI. */
   private command(info: WorkerInfo): string {
     return info.kind === 'shell' ? defaultShell() : providerCommand(info.provider ?? this.defaultProvider, this.agentCmd);
   }
 
-  /** Where a worker works: its worktree, a workspace for a worker across repositories, or the project itself. */
   private cwd(info: WorkerInfo): string {
+    if(info.specialist) return specialistFolder(this.dir,info.specialist);
     const rel = workspaceOf(info);
     return rel ? path.join(this.dir, rel) : this.dir;
   }
 
-  /** Hooks fire in bursts (every tool call); one read a moment later covers the whole burst. */
   private scheduleScan(w: Worker) {
     if (w.scanTimer) return;
     w.scanTimer = setTimeout(() => {
@@ -874,7 +868,6 @@ export class WorkerManager {
     }, 300);
   }
 
-  /** Picks up what the session logged since last time and books the difference. */
   private scanUsage(w: Worker) {
     const usage = w.info.kind === 'agent' ? providerAdapter(w.info.provider)?.usage : undefined;
     if (usage?.scan) {
@@ -906,7 +899,6 @@ export class WorkerManager {
   private setStatus(w: Worker, status: WorkerStatus) {
     if (w.info.status === status) return;
     if (w.info.status === 'needs_input') w.leftNeedsInputAt = Date.now();
-    clockWork(w.info, status);
     w.info.status = status;
     // Done, idle or asleep: it's not acting anything out any more.
     if (status !== 'working' && status !== 'needs_input') w.info.action = undefined;

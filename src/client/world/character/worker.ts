@@ -1,18 +1,17 @@
 import * as THREE from 'three';
-import type { Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
+import type { AgentProvider, Theme, WorkerAction, WorkerStatus, WorkerTask } from '../../../shared/protocol';
 import { isAsleep, type WorkerPr } from '../../../shared/status';
-import { beard, grime, peasantGarb, type Beard, type PeasantGarb } from '../costumes';
 import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import type { WorkerRig } from './rig';
 import { ease, popIn } from './curves';
 import { undress } from './props';
 import { ACT_MIN, DESPAIR_MIN, TWIRL_TIME, WAIT_CYCLE, WAIT_HOPS, blendStance, type Act, type Stance } from './worker-stance';
-import { STATUS_BULB, bubbleFor } from './worker-badges';
+import { bubbleFor } from './worker-badges';
 import { globe, papers } from './worker-props';
 import { DANCE, groove, type Dancing, type Stage } from './worker-dance';
-import { DEAD, STARVED, bones, crossedEyes, slump } from './worker-jail';
 import { packUp, waddle, type Leaving } from './worker-leave';
-import { dressUp, growBeard, wearGarb } from './worker-dress';
+import { dressUp } from './worker-dress';
+import { Antenna } from './worker-antenna';
 
 /** The little Claude worker that sits at a desk. Forward is +z. */
 export class Worker {
@@ -20,8 +19,8 @@ export class Worker {
   private body = new THREE.Group();
   /** Its moving parts, for what poses them from the other files here (a dance, a cell, a costume). */
   private rig: WorkerRig;
-  private bulb: THREE.MeshToonMaterial;
-  private bulbMesh: THREE.Mesh;
+  /** Its antenna: the stalk, its status light, and on that the emblem of what it runs on (see worker-antenna.ts). */
+  private antenna = new Antenna(this.body);
   private armL: THREE.Object3D;
   private armR: THREE.Object3D;
   private bubble: THREE.Sprite | null = null;
@@ -74,29 +73,8 @@ export class Worker {
   /** Dressed up for a holiday (see setCostume), and what it's wearing. */
   private costume: Theme | null = null;
   private outfit: THREE.Object3D[] = [];
-  /** Where it is in its own shamble, so a room full of zombies doesn't sway in step. */
-  private phase = Math.random() * Math.PI * 2;
   /** How far through its stride it is, walking in. */
   private stride = 0;
-  /** How quick its steps are, next to a walk: more running, less shuffling (see Court). */
-  gait = 1;
-  /** Its headset, which a peasant doesn't wear. */
-  private headset: THREE.Object3D[] = [];
-  /** What it wears on the map it's on (see setOutfit): a peasant's smock and coif, or its own skin. */
-  private garb: PeasantGarb | null = null;
-  /** How worn out it looks, 0–1 (see setAge), and the beard, brows and dirt that show it. */
-  private age = 0;
-  private whiskers: Beard | null = null;
-  private dirt: { part: THREE.Object3D; at: number }[] = [];
-  /** Locked up in a dungeon (see setJailed): how thin it's got, whether it's starved to death yet, and how far it has rotted since. */
-  private jailed: { thin: number; dead: boolean; rot: number } | null = null;
-  /** Which way it keeled over when it died, and what's left of it after: X for eyes, and its bones. */
-  private fell = 1;
-  private crosses: THREE.Object3D[] = [];
-  private skeleton: THREE.Group | null = null;
-  /** Something it's muttering in its cell, and for how many more seconds. */
-  private mutterT = 0;
-  private label = '';
 
   constructor(
     name: string,
@@ -124,18 +102,7 @@ export class Worker {
     const band = mesh(new THREE.TorusGeometry(0.29, 0.025, 6, 20, Math.PI), toon('#2b2d42'), 0, 0.72, 0, false);
     band.rotation.y = Math.PI / 2;
     this.body.add(band);
-    this.headset.push(band);
-    for (const sx of [-1, 1]) {
-      const cup = mesh(new THREE.SphereGeometry(0.07, 10, 8), toon('#2b2d42'), sx * 0.29, 0.72, 0, false);
-      this.body.add(cup);
-      this.headset.push(cup);
-    }
-    // Antenna with status bulb
-    this.body.add(mesh(new THREE.CylinderGeometry(0.015, 0.015, 0.22, 6), toon('#2b2d42'), 0, 1.07, 0, false));
-    this.bulb = toonUnique(STATUS_BULB.starting);
-    this.bulb.emissive = new THREE.Color(STATUS_BULB.starting).multiplyScalar(0.6);
-    this.bulbMesh = mesh(new THREE.SphereGeometry(0.075, 12, 10), this.bulb, 0, 1.2, 0, false);
-    this.body.add(this.bulbMesh);
+    for (const sx of [-1, 1]) this.body.add(mesh(new THREE.SphereGeometry(0.07, 10, 8), toon('#2b2d42'), sx * 0.29, 0.72, 0, false));
 
     const arm = (x: number) => {
       const pivot = new THREE.Group();
@@ -161,13 +128,18 @@ export class Worker {
     for (const prop of [this.papers.group, this.globe.group]) prop.visible = false;
     this.root.add(this.globe.group);
 
-    this.rig = { root: this.root, body: this.body, skin: this.skin, armL: this.armL, armR: this.armR, feet: this.feet, pupils: this.pupils, bulb: this.bulb, bulbMesh: this.bulbMesh, props: [this.papers.group, this.globe.group] };
+    this.rig = { root: this.root, body: this.body, skin: this.skin, armL: this.armL, armR: this.armR, feet: this.feet, pupils: this.pupils, bulb: this.antenna.bulb, bulbMesh: this.antenna.light, props: [this.papers.group, this.globe.group] };
     this.setName(name);
   }
 
   /** Where the globe floats, in its own space: beside its laptop, where the card over its head doesn't hide it. */
   setPropSpot(at: THREE.Vector3) {
     this.spot.copy(at);
+  }
+
+  /** What it runs on, which the emblem on its antenna shows: none (a shared shell, the bartender) wears the plain one. */
+  setProvider(provider: AgentProvider | undefined) {
+    this.antenna.wear(provider);
   }
 
   /** What its latest tool call was, to act out while it's working. */
@@ -181,65 +153,15 @@ export class Worker {
     this.cheer(1.2);
   }
 
-  /** Dresses it up for a holiday (a zombie for Halloween, an elf for Christmas), or back in its own skin (null). */
+  /** Dresses it up for a holiday (an elf for Christmas), or back in its own skin (null). */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
     undress(this.outfit);
     dressUp(this.rig, theme, this.color, this.outfit);
-    // An elf's hat goes on over the coif.
-    if (this.garb) this.garb.cap.visible = theme !== 'christmas';
-  }
-
-  /**
-   * Dresses it for the map it's on: a peasant's smock, rope belt and coif, in place of its headset,
-   * or back in just its own skin (null).
-   */
-  setOutfit(outfit: 'peasant' | null) {
-    if (!!this.garb === (outfit === 'peasant')) return;
-    if (this.garb) {
-      undress([this.garb.body, this.garb.cap]);
-      this.garb.cloth.dispose();
-      this.garb = null;
-    }
-    if (outfit === 'peasant') {
-      let seed = 0;
-      for (const ch of this.color) seed = (seed * 31 + ch.charCodeAt(0)) | 0;
-      this.garb = peasantGarb(seed);
-      this.body.add(this.garb.body, this.garb.cap);
-      this.garb.cap.visible = this.costume !== 'christmas';
-    }
-    for (const h of this.headset) h.visible = !this.garb;
-    this.setAge(this.age, true);
-  }
-
-  /**
-   * How worn out it looks, 0 (fresh) to 1 (it's worked for as long as the map says a worker can
-   * before it's spent): its beard grows out and goes grey, it gets grubby and patched, it droops,
-   * and it slows down.
-   */
-  setAge(k: number, force = false) {
-    const age = Math.max(0, Math.min(1, k));
-    if (!force && Math.abs(age - this.age) < 0.004) return;
-    this.age = age;
-    if (age > 0.02 && !this.whiskers) {
-      this.whiskers = beard();
-      this.body.add(this.whiskers.group);
-      this.dirt = grime();
-      for (const d of this.dirt) this.body.add(d.part);
-    }
-    if (this.whiskers) growBeard(this.whiskers, age);
-    for (const d of this.dirt) d.part.visible = age >= d.at;
-    if (this.garb) wearGarb(this.garb, age);
-  }
-
-  /** How fast it walks, next to a fresh worker: a worn-out one shuffles. */
-  get pace(): number {
-    return 1 - 0.3 * this.age;
   }
 
   setName(name: string) {
-    this.label = name;
     if (this.nameTag) {
       this.root.remove(this.nameTag);
       disposeSprite(this.nameTag);
@@ -252,14 +174,8 @@ export class Worker {
   setStatus(status: WorkerStatus, bounce: boolean) {
     this.status = status;
     this.bouncing = bounce;
-    if (!this.dancing) this.paintBulb();
+    if (!this.dancing) this.antenna.paint(status);
     this.drawBubble();
-  }
-
-  private paintBulb() {
-    const c = STATUS_BULB[this.status] ?? '#adb5bd';
-    this.bulb.color.set(c);
-    this.bulb.emissive.set(c).multiplyScalar(0.7);
   }
 
   /** Jumps for joy, arms up, for a few seconds. */
@@ -319,8 +235,7 @@ export class Worker {
     this.armR.position.set(0.3, 0.55, 0.05);
     this.feet.forEach((f, i) => f.position.set(i ? 0.12 : -0.12, 0.2, 0.05));
     for (const p of this.pupils) p.position.y = 0.7;
-    this.bulb.color.set(STATUS_BULB.exited);
-    this.bulb.emissive.set('#000000');
+    this.antenna.dark();
     if (this.bubble) {
       this.root.remove(this.bubble);
       disposeSprite(this.bubble);
@@ -361,78 +276,9 @@ export class Worker {
     if (this.bubble) this.root.add(this.bubble);
   }
 
-  /**
-   * Locked up in a dungeon for good (see shared/maps/dungeon.ts): sitting slumped on the floor of its
-   * cell, thinner the longer it's been there (`thin`, 0–1), then dead, keeled over, then rotting down
-   * to its bones (`rot`, 0–1). Its light's out, and nothing it was doing shows any more.
-   */
-  setJailed(k: { thin: number; dead: boolean; rot: number }) {
-    const first = !this.jailed;
-    const was = this.jailed;
-    this.jailed = { ...k };
-    if (first) {
-      this.bouncing = false;
-      this.cheerT = 0;
-      this.twirlT = -1;
-      this.dancing = null;
-      for (const prop of [this.papers.group, this.globe.group]) prop.visible = false;
-      this.bulb.color.set(STATUS_BULB.exited);
-      this.bulb.emissive.set('#000000');
-      if (this.bubble) {
-        this.root.remove(this.bubble);
-        disposeSprite(this.bubble);
-        this.bubble = null;
-      }
-      this.bubbleKey = 'jailed';
-      this.fell = Math.random() < 0.5 ? -1 : 1;
-    }
-    // Pale and sallow as it starves, grey-green once it's dead, and darker as it rots.
-    this.skin.color.set(this.color).lerp(STARVED, 0.55 * k.thin);
-    if (k.dead) this.skin.color.lerp(DEAD, 0.55 + 0.35 * k.rot);
-    if (k.dead && !this.crosses.length) this.crosses.push(...crossedEyes(this.body));
-    for (const e of this.eyes) e.visible = !k.dead;
-    for (const c of this.crosses) c.visible = k.dead;
-    if (k.dead && k.rot > 0.2 && !this.skeleton) {
-      this.skeleton = bones();
-      this.root.add(this.skeleton);
-    }
-    const stage = !k.dead ? 0 : k.rot < 1 ? 1 : 2;
-    const wasStage = !was ? -1 : !was.dead ? 0 : was.rot < 1 ? 1 : 2;
-    if (stage !== wasStage) this.setName(this.label.replace(/^[☠💀]\uFE0F? /u, '').replace(/^/, stage === 1 ? '☠️ ' : stage === 2 ? '💀 ' : ''));
-  }
-
-  /** Mutters something in its cell (only while it's alive). */
-  mutter(text: string, seconds = 4) {
-    if (!this.jailed || this.jailed.dead) return;
-    if (this.bubble) {
-      this.root.remove(this.bubble);
-      disposeSprite(this.bubble);
-    }
-    this.bubble = textSprite(text, { bg: '#e9ecef', size: 30 });
-    this.bubble.position.y = 1.5;
-    this.root.add(this.bubble);
-    this.mutterT = seconds;
-  }
-
-  /** In its cell: slumped against the wall, breathing slow, or keeled over and rotting. */
-  private languish(dt: number, t: number) {
-    const { thin, dead } = this.jailed!;
-    slump(this.rig, this.jailed!, this.skeleton, this.fell, this.phase, t);
-    this.bulbMesh.scale.setScalar(1);
-    this.blink(dt, dead ? 1 : 1 - 0.55 * thin);
-    if (this.mutterT > 0) {
-      this.mutterT -= dt;
-      if (this.mutterT <= 0 && this.bubble) {
-        this.root.remove(this.bubble);
-        disposeSprite(this.bubble);
-        this.bubble = null;
-      }
-    }
-    if (this.nameTag) this.nameTag.position.y = dead ? 0.95 : 1.4;
-  }
-
   update(dt: number, t: number) {
-    if (this.jailed) return this.languish(dt, t);
+    // Its emblem stands still once it's packing, and spins as if at work through a dance.
+    this.antenna.update(dt, t, this.leaving ? 'exited' : this.dancing ? 'working' : this.status);
     if (this.leaving) return this.carry(this.leaving, dt, t);
     if (this.dancing) return this.boogie(this.dancing, dt, t);
     this.cheerT = Math.max(0, this.cheerT - dt);
@@ -461,23 +307,14 @@ export class Worker {
       : this.status === 'working' ? (this.action ?? 'type')
       : 'rest';
     const s = this.pose(act, dt, t);
-    // A zombie at rest stands with its arms out in front of it, groping, listing to one side and swaying.
-    const shamble = this.costume === 'halloween' ? Math.min(1, this.acts.get('rest') ?? 0) : 0;
-    if (shamble > 0) {
-      s.armLx += (-1.4 + Math.sin(t * 1.6 + this.phase) * 0.12 - s.armLx) * shamble;
-      s.armRx += (-1.4 + Math.sin(t * 1.6 + this.phase + 1.3) * 0.12 - s.armRx) * shamble;
-      s.roll += (0.09 + Math.sin(t * 1.1 + this.phase) * 0.05) * shamble;
-    }
 
     this.armL.rotation.set(s.armLx, 0, s.armLz);
     this.armR.rotation.set(s.armRx, 0, s.armRz);
     this.armL.position.set(-0.3 + s.reach * 0.07, 0.55 - s.drop, 0.05 + s.reach * 0.12);
     this.armR.position.set(0.3 - s.reach * 0.07, 0.55 - s.drop + s.reach * 0.04, 0.05 + s.reach * 0.14);
     this.feet.forEach((f, i) => f.position.set(i ? 0.12 : -0.12, 0.2 + (i ? s.tap * 0.07 : 0), 0.05 + s.kick + (i ? s.tap * 0.03 : 0)));
-    for (const p of this.pupils) p.position.y = 0.7 + s.look - 0.02 * this.age;
-    // Worn out, it hunches over and its eyes droop.
-    this.body.rotation.x = s.lean + 0.2 * this.age;
-    s.lid = Math.min(s.lid, 1 - 0.38 * this.age);
+    for (const p of this.pupils) p.position.y = 0.7 + s.look;
+    this.body.rotation.x = s.lean;
     let twirl = 0;
     if (this.twirlT >= 0) {
       this.twirlT += dt;
@@ -499,12 +336,11 @@ export class Worker {
     this.body.rotation.z = isAsleep(this.status) ? Math.sin(t * 1.5) * 0.08 : s.roll;
     this.props(dt, t);
     this.blink(dt, s.lid);
-    this.bulbMesh.scale.setScalar(this.status === 'needs_input' ? 1 + Math.abs(Math.sin(t * 8)) * 0.5 : 1);
     if (this.bubble) this.bubble.position.y = (this.bubbleIsCard ? 1.74 : 1.95) + (hopping ? this.body.position.y : 0) + Math.sin(t * 3) * 0.03;
     if (this.nameTag) this.nameTag.position.y = 1.55 + (hopping ? this.body.position.y : 0);
     // Walking in to a meeting: the same waddle as on the way out, without the box.
     if (this.walking || this.stride) {
-      this.stride = this.walking ? this.stride + dt * 9 * this.pace * this.gait : 0;
+      this.stride = this.walking ? this.stride + dt * 9 : 0;
       const s = Math.sin(this.stride);
       this.feet.forEach((f, i) => {
         const step = i ? -s : s;
@@ -575,8 +411,7 @@ export class Worker {
     this.body.scale.setScalar(1);
     for (const a of [this.armL, this.armR]) a.rotation.z = 0;
     for (const f of this.feet) f.position.set(f.position.x, 0.2, 0.05);
-    this.bulbMesh.scale.setScalar(1);
-    this.paintBulb();
+    this.antenna.paint(this.status);
   }
 
   /** `lid` narrows the eyes (1 = wide open) between blinks. */
@@ -590,16 +425,6 @@ export class Worker {
   dispose() {
     if (this.bubble) disposeSprite(this.bubble);
     if (this.nameTag) disposeSprite(this.nameTag);
-    undress(this.crosses);
-    if (this.skeleton) undress([this.skeleton]);
     undress(this.outfit);
-    if (this.garb) {
-      undress([this.garb.body, this.garb.cap]);
-      this.garb.cloth.dispose();
-    }
-    if (this.whiskers) {
-      undress([this.whiskers.group, ...this.dirt.map((d) => d.part)]);
-      this.whiskers.hair.dispose();
-    }
   }
 }

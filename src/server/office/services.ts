@@ -13,7 +13,8 @@ import { Machine } from '../machine.js';
 import type { Floor } from '../floor.js';
 import { Sky } from '../sky.js';
 import { Themes } from '../theme.js';
-import { Maps } from '../maps.js';
+import { Feeds } from '../feeds.js';
+import { Watch } from '../watch.js';
 import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
 import type { ServiceInfo, ServicesState } from '../../shared/protocol.js';
@@ -26,12 +27,25 @@ export function createServices(ctx: Ctx): BuildingServices {
   // Day, night and the weather outside the windows, the same for everyone.
   const sky = new Sky({ city: cfg.city, weather: cfg.weather }, (state) => ctx.broadcast({ t: 'sky', state }));
   sky.start();
-  // Halloween or Christmas all over the building, the same for everyone (⚙️ Settings). On 'auto' it
+  // Christmas all over the building, the same for everyone (⚙️ Settings). On 'auto' it
   // goes by the calendar at the office, the sky's clock.
   const themes = new Themes(cfg.dataDir, () => sky.state.utcOffset, (state) => ctx.broadcast({ t: 'theme', state }));
   themes.start();
-  // What the building looks like inside: the office, the castle, or a map of your own (⚙️ Settings).
-  const maps = new Maps(cfg.dataDir);
+  // The market's prices, Slack and Metricool, for the floors whose boards and tickers show them.
+  const feeds = new Feeds(cfg.dataDir, {
+    floors: () => floors.values(),
+    studio: (floor) => ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() }),
+    ticker: (floor) => ctx.toFloor(floor, { t: 'ticker', ticker: feeds.ticker(floor.studio.symbols()) }, true),
+    integrations: (state) => ctx.broadcast({ t: 'integrations', state }),
+  });
+  feeds.start();
+  // The newest videos from the YouTube channels each floor watches, for its screens.
+  const watch = new Watch({
+    floors: () => floors.values(),
+    watch: (floor) => ctx.toFloor(floor, { t: 'watch', watch: watch.state(floor.studio.watching()) }),
+    studio: (floor) => ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() }),
+  });
+  watch.start();
   // The prompts the office writes for workers by itself, and the worker everyone starts on (⚙️ Settings).
   const configured = configuredProvider(cfg.agentCmd);
   const prompts = new OfficePrompts(cfg.dataDir, { list: agentProviders(configured), configured }, (state) => ctx.broadcast({ t: 'prompts', state }));
@@ -124,7 +138,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, themes, maps, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, feeds, watch, themes, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */

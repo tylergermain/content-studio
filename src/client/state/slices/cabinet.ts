@@ -1,12 +1,12 @@
-import type { CabinetFrame, CabinetState } from '../../../shared/cabinet';
+import type { CabinetState, GameFrame } from '../../../shared/cabinet';
 import type { Slice } from '../store';
 
 declare module '../store' {
   interface Store {
-    /** Who's at the arcade cabinet on your floor, and the building's high scores. */
+    /** Who's at the arcade cabinet on your floor, and the building's high scores: every game's table (see tableOf in shared/cabinet.ts). */
     cabinet: CabinetState;
     /** The game on the cabinet as its player last sent it; null while nobody plays. */
-    cabinetFrame: CabinetFrame | null;
+    cabinetFrame: GameFrame | null;
   }
   interface Topics {
     cabinet: true;
@@ -21,8 +21,10 @@ export const cabinet: Slice = {
   },
   on: {
     cabinet(s, m) {
-      // Nobody at it any more: the last game's screen goes with them.
-      if (!m.state.player || m.state.player.id !== s.cabinet.player?.id) s.cabinetFrame = null;
+      // Nobody at it any more, or on to another game: the last game's screen goes with it.
+      const p = m.state.player;
+      const was = s.cabinet.player;
+      if (!p || p.id !== was?.id || p.game !== was.game) s.cabinetFrame = null;
       s.cabinet = m.state;
       return ['cabinet'];
     },

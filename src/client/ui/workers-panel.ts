@@ -26,7 +26,7 @@ export function renderWorkers(onOpen: (id: string) => void) {
     ul.append(
       h(
         'li',
-        { class: asking ? 'needs-you-row' : '', onclick: () => onOpen(w.id), title: asking ? `${w.name} needs you: open its terminal to answer` : `Open ${w.name}'s terminal` },
+        { class: asking ? 'needs-you-row' : '', onclick: () => onOpen(w.id), title: asking ? `${w.name} needs you: open its ${w.kind === 'agent' ? 'chat' : 'terminal'} to answer` : `Open ${w.name}'s ${w.kind === 'agent' ? 'chat and previews' : 'terminal'}` },
         h('span.dot', { style: `background:${w.color}` }),
         h('span.name', {}, w.name, sub ? h('span.sub', {}, sub) : null,
           usageState === 'tracked' && w.usage ? h('span.cost', { title: usageTitle(w.usage, providerKind) }, usageLabel(w.usage, providerKind)) : null),

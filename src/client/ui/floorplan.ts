@@ -3,7 +3,10 @@ import { LABEL_IDEAS, MAX_LABEL, SIGN_COLORS, cleanLabel, rowDesks, signColor, s
 import { DESK_BY_ID, WING } from '../../shared/layout';
 import type { Net } from '../net';
 import { store } from '../state';
-import { h, openModal } from './dom';
+import { ADMINS_BUILD } from './building-admin';
+import { h, openModal, toast } from './dom';
+
+export { expandSign } from './building-admin';
 
 const COLOR_KEY = 'agent-office.signColor';
 function lastColor(): string {
@@ -105,8 +108,13 @@ export function openDeskLabel(net: Net, deskId: string) {
   input.select();
 }
 
-/** E at the sign in the back office (or on the wall where it goes through): build it out, or wall it up. */
+/**
+ * E at the sign in the back office (or on the wall where it goes through): build it out, or wall it up.
+ * It changes the floor's shape for everyone on it, so it's an admin's to do (the sign's hint, expandSign,
+ * offers nobody else the key).
+ */
 export function openExpand(net: Net) {
+  if (!store.me.admin) return void toast(ADMINS_BUILD, 'warn');
   const close = h('button.btn.close', { type: 'button', 'aria-label': 'Close' }, '✕');
   const status = h('div.expand-status');
   const expand = h('button.btn.primary', { type: 'button' }) as HTMLButtonElement;

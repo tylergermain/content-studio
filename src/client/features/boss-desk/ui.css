@@ -1,0 +1,51 @@
+/* The boss's desk (features/boss-desk/ui.ts): the desk's menu, the call strip its windows carry, and
+   the window a guest watches the boss's screen in. The game itself is the arcade's (.arcade in
+   styles/hud.css), and the guest's window is the screen share viewer's frame (.modal.viewer there). */
+
+.modal.desk-menu { width: min(520px, 100%); }
+.desk-menu .body { display: flex; flex-direction: column; gap: 10px; }
+.desk-menu .setting-note { margin: 2px 0 0; }
+
+/* What there is to do at the desk: one wide row to share, and a tile for each game. */
+.desk-row, .desk-tile { display: flex; align-items: center; gap: 12px; width: 100%; min-width: 0; padding: 12px 14px; text-align: left; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); cursor: pointer; transition: background-color .15s var(--ease), border-color .15s var(--ease), box-shadow .15s var(--ease); }
+.desk-row:hover, .desk-tile:hover { background: var(--control); }
+.desk-row:focus-visible, .desk-tile:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-ring); }
+.desk-row.on { background: var(--accent-tint); border-color: var(--accent-ring); }
+.desk-icon { flex: none; width: 30px; font-size: 24px; line-height: 1; text-align: center; }
+.desk-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.desk-name { display: flex; align-items: center; gap: 8px; }
+.desk-name b { font-size: 15px; font-weight: 600; }
+.desk-text small { font-size: 12px; font-weight: 400; color: var(--muted); line-height: 1.35; }
+.desk-label { margin-top: 4px; font-size: 12px; font-weight: 500; color: var(--muted); }
+.desk-tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.desk-tile { align-items: flex-start; }
+/* What you picked the last time you sat here: it has the focus too, so Enter does it again. */
+.desk-last { flex: none; padding: 1px 8px; border-radius: 999px; background: var(--accent-tint); color: var(--accent-text); font-size: 11px; font-weight: 600; white-space: nowrap; }
+
+/* The call: who's at the desk (the dot goes green while they talk), and your mic. */
+.desk-call { display: flex; align-items: center; gap: 8px; flex: none; min-width: 0; }
+.desk-chips { display: flex; gap: 6px; min-width: 0; }
+.desk-chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 999px; background: var(--wash); font-size: 12px; font-weight: 500; white-space: nowrap; }
+.desk-chip::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--wash-2); }
+.desk-chip.speaking::before { background: var(--good); box-shadow: 0 0 0 3px var(--good-tint); }
+/* At the desk, but not in the call. */
+.desk-chip.out { color: var(--muted); background: none; box-shadow: inset 0 0 0 1px var(--hairline); }
+.desk-call .btn { padding: 4px 11px; font-size: 13px; }
+
+/* A guest's window with nothing live to show is a call, and the size of one: who's at the desk, and
+   what would bring a picture up. With a screen to show it's the viewer's full width again. */
+.modal.viewer.desk-view { transition: width .25s var(--ease); }
+.modal.viewer.desk-view.calling { width: min(520px, 100%); }
+.desk-view .desk-empty { display: grid; place-content: center; justify-items: center; gap: 6px; padding: 36px 24px 32px; text-align: center; }
+.desk-empty .desk-icon { width: auto; font-size: 52px; margin-bottom: 8px; }
+.desk-empty b { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+.desk-empty span { font-size: 15px; font-weight: 400; color: var(--muted); }
+.desk-empty small { margin-top: 12px; font-size: 12px; font-weight: 400; color: var(--muted); }
+
+@media (max-width: 520px) {
+  .desk-tiles { grid-template-columns: 1fr; }
+  .desk-chips { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .desk-row, .desk-tile, .modal.viewer.desk-view { transition: none; }
+}

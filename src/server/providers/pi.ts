@@ -1,3 +1,5 @@
+import { localPiModel } from '../../shared/studio-policy.js';
+import { studioPermissionArgs } from './studio-launch.js';
 // Pi: an extension the office writes and loads with --extension (see ../pi.ts), so the person's own
 // Pi login, settings, packages and extensions stay as they are. It reports on /hooks/pi in the same
 // statuses as OpenCode's plugin. Each desk keeps its sessions in a folder of its own, so a worker
@@ -25,7 +27,7 @@ export const pi: ProviderAdapter<StatusState, PiSetup> = {
     mkdirSync(sessionDir, { recursive: true, mode: 0o700 });
     h.state.error = false;
     // --session-id picks up the desk's own conversation, even one Pi hadn't written to disk yet.
-    return { args: piArgs(args, { extension: setup.extension, sessionDir, sessionId: resumeSessionId, model: info.model, effort: info.effort, prompt }), rotateToken: true };
+    return { args: piArgs(studioPermissionArgs('pi', args), { extension: setup.extension, sessionDir, sessionId: resumeSessionId, model: localPiModel(info.model), effort: info.effort, prompt }), rotateToken: true };
   },
   bootHint: 'Open the terminal: complete Pi login or project setup',
   hook: {

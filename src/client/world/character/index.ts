@@ -1,4 +1,4 @@
-// People: the chibi Person everyone in the office is (you, everyone else, the castle's guards) and the
+// People: the chibi Person everyone in the office is (you and everyone else) and the
 // little Worker at a desk, what they hold, and the timing of how they move.
 export { Person, type Pose } from './person';
 export { Worker } from './worker';

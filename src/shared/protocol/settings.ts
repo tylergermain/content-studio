@@ -1,6 +1,5 @@
-// ⚙️ Settings and the building's services: notifications, the machine, upgrades, the sky, holidays, maps, prompts.
+// ⚙️ Settings and the building's services: notifications, the machine, upgrades, the sky, holidays, prompts.
 
-import type { CustomMap } from '../maps/index.js';
 import type { PromptId } from '../prompts.js';
 import type { AgentChoice } from './agents.js';
 
@@ -130,7 +129,7 @@ export interface SkyState {
 }
 
 /** A holiday the whole building dresses up for (see shared/theme.ts). */
-export type Theme = 'halloween' | 'christmas';
+export type Theme = 'christmas';
 /** What someone picked in ⚙️ Settings: a holiday, none, or whichever the calendar says. */
 export type ThemePick = Theme | 'auto' | 'off';
 
@@ -140,19 +139,6 @@ export interface ThemeState {
   /** What's up right now: the pick, or for 'auto' the holiday it is at the office. Null for none. */
   active: Theme | null;
   /** Who picked it, and when. Unset for the default (auto). */
-  by?: string;
-  at?: number;
-}
-
-/**
- * The building's map: what every floor looks like inside (the office, the castle, or one of your
- * own), the same for everyone (see shared/maps). Custom maps come from the office's
- * .agent-office/maps/ folder, each with its whole config, or why it won't load.
- */
-export interface MapState {
-  pick: string;
-  custom: CustomMap[];
-  /** Who picked it, and when. Unset for the default (the office). */
   by?: string;
   at?: number;
 }
@@ -179,8 +165,6 @@ export type SettingsClientMsg =
   | { t: 'upgrade.start' }
   /** Dress the building up for a holiday, take the decorations down ('off'), or follow the calendar ('auto'). */
   | { t: 'theme.set'; pick: ThemePick }
-  /** Change the building's map (see MapState), or with no map, read the custom maps' folder again. */
-  | { t: 'map.set'; map?: string }
   /** Workers whose pull request merged go home by themselves (true), or wait to be sent home. */
   | { t: 'leaveOnMerge.set'; on: boolean }
   /** Rewrite one of the office's prompts (admins only); null puts the default back. */
@@ -195,6 +179,5 @@ export type SettingsServerMsg =
   | { t: 'machine'; state: MachineState }
   | { t: 'sky'; state: SkyState }
   | { t: 'theme'; state: ThemeState }
-  | { t: 'map'; state: MapState }
   | { t: 'prompts'; state: PromptsState }
   | { t: 'leaveOnMerge'; state: LeaveOnMergeState };

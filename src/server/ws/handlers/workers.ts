@@ -1,3 +1,4 @@
+import { employeeWorkerError } from '../../org-chart/access.js';
 // Workers at their desks and the board agents at their kiosks: hiring them, their terminals, their
 // worktrees and pull requests.
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
@@ -10,7 +11,6 @@ import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 const CLEANUPS = new Set(['keep', 'worktree', 'all']);
 
 export const workersView: ViewPieces['workers'] = (_ctx, floor) => floor?.workers.list() ?? [];
-export const jailView: ViewPieces['jail'] = (_ctx, floor) => floor?.jail.state() ?? { prisoners: [], bones: 0 };
 
 /** The least time between two 'term.typing' notes from one person in one terminal. */
 const TYPING_GAP_MS = 500;
@@ -21,6 +21,7 @@ export const workerHandlers = {
     const floor = here(ctx, c);
     if (!floor) return;
     const kind = msg.kind === 'shell' ? 'shell' : 'agent';
+    const denied=floor.workers.hiringPolicy?.(c.accountId,str(msg.specialist,48)||undefined,kind);if(denied)return ctx.warn(c,denied);
     if (kind === 'agent' && msg.provider !== undefined && (!isAgentProvider(msg.provider) || !floor.project.agentProviders.includes(msg.provider))) {
       ctx.warn(c, 'Unknown agent provider');
       return;
@@ -36,7 +37,7 @@ export const workerHandlers = {
     }
     // A shell is theirs too: `claude auth login` or `gh auth login` typed there signs them in.
     const hire = () => {
-      const r = floor.workers.spawn(str(msg.deskId, 32), who, str(msg.prompt, 20000) || undefined, msg.worktree === true, kind, msg.provider, model, effort, undefined, c.accountId, repos, msg.via === 'herald' ? 'herald' : undefined);
+      const r = floor.workers.spawn(str(msg.deskId, 32), who, str(msg.prompt, 20000) || undefined, msg.worktree === true, kind, msg.provider, model, effort, undefined, c.accountId, repos, str(msg.specialist,48) || undefined);
       const issue = kind === 'agent' ? issueNumber(msg.issue) : undefined;
       const across = repos.length ? ` across ${[floor.def.name, ...repos.map((x) => x.name)].join(' + ')}` : '';
       if (typeof r === 'string') ctx.warn(c, r);
@@ -49,11 +50,13 @@ export const workerHandlers = {
   },
   'worker.resume'(ctx, c, msg) {
     const w = workerOf(ctx, msg.workerId);
+    if(w) { const denied=employeeWorkerError(ctx,w.floor,c.accountId,w.wid);if(denied)return ctx.warn(c,denied); }
     ctx.warn(c, w ? w.floor.workers.resume(w.wid) : 'No such worker');
   },
   'worker.kill'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if(w) { const denied=employeeWorkerError(ctx,w.floor,c.accountId,w.wid);if(denied)return ctx.warn(c,denied); }
     if (!w) return;
     const { floor, info } = w;
     // The worker leaves right away; its worktree is dealt with after that, and the outcome follows.
@@ -74,6 +77,7 @@ export const workerHandlers = {
   'worker.rebuild'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if(w) { const denied=employeeWorkerError(ctx,w.floor,c.accountId,w.wid);if(denied)return ctx.warn(c,denied); }
     if (!w) return;
     const { floor } = w;
     // With `all`, every worker on the floor whose worktree was deleted, this one first.
@@ -82,6 +86,7 @@ export const workerHandlers = {
       const names: string[] = [];
       const notes: string[] = [];
       for (const id of ids) {
+        if(employeeWorkerError(ctx,floor,c.accountId,id))continue;
         const info = floor.workers.get(id);
         // Sent home meanwhile, or back already with one before it (the rest of a meeting's table).
         if (!info || (id !== w.wid && !info.lost)) continue;
@@ -116,6 +121,7 @@ export const workerHandlers = {
   'worker.prompt'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if(w) { const denied=employeeWorkerError(ctx,w.floor,c.accountId,w.wid);if(denied)return ctx.warn(c,denied); }
     const err = w ? w.floor.workers.prompt(w.wid, str(msg.prompt, 20000), who) : 'No such worker';
     ctx.warn(c, err);
     const issue = w?.info.kind === 'agent' ? issueNumber(msg.issue) : undefined;
@@ -128,6 +134,7 @@ export const workerHandlers = {
     const who = c.peer.name;
     const floor = here(ctx, c);
     if (!floor) return;
+    if(!ctx.meOf(c.accountId).admin)return ctx.warn(c,'Employees can hire and prompt only their allowed specialists');
     const deskId = str(msg.deskId, 32);
     // Nobody there yet: whoever asks first hires it, on their own sign-ins.
     const hires = !floor.workers.deskOccupied(deskId);
@@ -140,6 +147,7 @@ export const workerHandlers = {
   'worker.pr'(ctx, c, msg) {
     const who = c.peer.name;
     const w = workerOf(ctx, msg.workerId);
+    if(w) { const denied=employeeWorkerError(ctx,w.floor,c.accountId,w.wid);if(denied)return ctx.warn(c,denied); }
     if (!w) return;
     const { floor, wid } = w;
     ctx.withGitHub(c, (as) => void floor.workers.openPr(wid, who, as).then((r) => {
@@ -167,7 +175,9 @@ export const workerHandlers = {
   },
   'term.input'(ctx, c, msg) {
     const who = c.peer.name;
-    if (c.attached.has(msg.workerId)) ctx.workerFloor(msg.workerId)?.workers.write(msg.workerId, str(msg.data, 64 * 1024), who);
+    const floor=ctx.workerFloor(msg.workerId);
+    if(floor) { const denied=employeeWorkerError(ctx,floor,c.accountId,msg.workerId);if(denied)return ctx.warn(c,denied); }
+    if (floor && c.attached.has(msg.workerId)) floor.workers.write(msg.workerId, str(msg.data, 64 * 1024), who);
   },
   'term.typing'(ctx, c, msg) {
     // Everyone else in that terminal sees who's typing. A typist says so about once a second.

@@ -9,7 +9,15 @@ changing its script and running it again.
 | --- | --- |
 | `scripts/aokit.py` | The kit every script uses: shapes, one smooth skin, painted patches, rigs and clips, export, review renders |
 | `scripts/build_<name>.py` | One model (or a small set), exported as `src/client/models/<name>.glb` |
+| `scripts/furnkit.py` | The kit the studio's furniture packs share, over `aokit.py`: shapes in the office's own axes (`at()`, `spin()`, `block`, `slab`, `rod`, `tube`, `fillet`, `turned`, `ball`, `sweep`), a `Piece` with a material slot per material, and a review sheet per piece |
+| `scripts/build_rooms.py` | `rooms.glb`: the walls a floor is divided with (`wall`, `wall_short`, `glass_wall`, `glass_short`, `wood_wall`, `wood_short`) |
+| `scripts/build_studio.py` | `studio.glb`: `long_table`, `podcast_desk`, `screen`, `ticker`, `softbox`, `camera`, `backdrop`, `lounge_chair`, `stool`, `credenza`, `neon` |
+| `scripts/build_greenery.py` | `greenery.glb`: `fiddle_leaf`, `palm`, `bird_of_paradise`, `pothos`, `planter`, each with its `<name>_leaves` hung under it as in `plants.glb`. It borrows its leaf helpers from `build_plants.py`, so a change to those changes both packs |
+| `scripts/build_play.py` | `play.glb`: the things to play with, each a root named for its kind with the parts that move hung under it, their origins at their pivots (`PLAY_PARTS` in `world/office/furniture-play.ts` lists the names) |
+| `scripts/build_whisky.py` | `whisky.glb`: the whisky cabinet, one root `whisky_cabinet` (a walnut sideboard, its tray, the bottle and its box) with what the pour moves hung under it, origins at their pivots (`whisky_decanter` with `whisky_stopper` and `whisky_decanter_whisky` under it, `whisky_glass_0` to `_3` each with its `_dram`), and the surfaces the office paints its canvases on (`whisky_label`, the wrap all the way round the bottle, `whisky_crest`, `whisky_box_art`), UV mapped and exported with `uvs=True`. `WHISKY_PARTS` in `world/office/furniture-whisky.ts` lists the names and `tests/whisky-model.test.ts` holds the model to them |
+| `scripts/build_toppers.py` | `toppers.glb`: the emblem a worker wears on its antenna for its provider, one root per provider named `topper_<provider id>` plus `topper_default`. Each has its origin at the point that stands on the antenna's tip, is 0.12 to 0.16 m across, and is made of the two materials `Main` and `Accent`, which `world/toppers.ts` paints in each provider's colours. `-- --shots` writes one sheet of them all; `-- --shots=topper_pi,topper_codex` writes a four-view sheet of each named one |
 | `scripts/build_dog.py`, `scripts/dog_breeds.py` | The office dog in every breed (the presets are in `dog_breeds.py`), each exported as `src/client/models/dog-<breed>.glb` with the same bones, sockets, materials and clips |
+| `scripts/build_goat.py` | `goat.glb`: Marc, the office goat. A root `goat` with every part that moves hung under it as an object of its own, its origin at its joint (`goat_neck`, `goat_head`, `goat_bell`, `goat_beard`, `goat_ear_l/_r`, `goat_eye_l/_r`, `goat_leg_fl/fr/bl/br`, each with a `goat_shin_*` under it, and `goat_tail`); no armature, no clips. `GOAT_PARTS` in `features/goat/world.ts` lists the names, and `tests/goat-model.test.ts` holds the model to them. `-- --shots` writes two sheets: standing from eight sides, and grazing, nibbling, lying and mid-stride |
 
 A helper only one model needs lives in that model's script. One that several need can join the kit, as a new
 function: the kit's existing functions are what every script already counts on, so change them only with
@@ -24,7 +32,9 @@ blender --background --factory-startup --python blender/scripts/build_dog.py -- 
 ```
 
 `-- --shots` also writes review renders (Workbench, outlined) to your temp folder's `ao-shots/` and prints
-where. Several scripts can run headless at once; each is its own Blender.
+where. Several scripts can run headless at once; each is its own Blender. The furniture packs built with
+`furnkit.py` also take `-- --shots=<piece>,<piece>` to write only those pieces' review sheets, which is much
+quicker when one piece is being worked on.
 
 Through the Blender MCP bridge instead, a script can be run and looked at live in the open Blender. There is
 one Blender and one scene, and every build script clears it first, so only one session at a time should
@@ -57,7 +67,12 @@ These are what the office's code counts on. A model that breaks one looks wrong 
 8. **Smooth, not faceted.** Shapes that should read as one soft form melt together with `aokit.fuse`
    (a voxel remesh, smoothing, then even quads), and coloured patches on them are cut in with
    `aokit.paint` along smooth edges. Hard-edged things (cabinets, counters, cars' panels) stay as
-   bevelled boxes and outlines, shaded flat or smooth as suits them.
+   bevelled boxes and outlines, shaded flat or smooth as suits them. Hard furniture built with
+   `furnkit.Piece` is shaded smooth with its normals weighted by face area (`finish(weighted=True)`): big
+   flat faces stay flat up to their rounded edges, and the office's outline, which is drawn along the
+   normals, runs unbroken round them. Leaves keep their own shading (`weighted=False`). `Piece.add` finds a
+   shape's new faces by comparing against the faces that were there before, not by index: some bmesh
+   operators delete as they build, so new faces are not always last.
 
 ## Checking it
 

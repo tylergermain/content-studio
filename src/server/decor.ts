@@ -2,13 +2,21 @@ import { randomBytes } from 'node:crypto';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { MAX_DECOR, checkImageUrl, sanitizePlacement, type Decoration } from '../shared/decor.js';
+import type { RoomOptions } from '../shared/floorplan.js';
 
-/** The pictures on the office walls, saved in .agent-office/decor.json. */
+/**
+ * The pictures on the office walls, saved in .agent-office/decor.json. Where one can hang goes by the
+ * floor's room (`room`: its upstairs cuts the walls it meets in two, see zonesFor in shared/decor.ts);
+ * with none given it's the office as it comes.
+ */
 export class Decor {
   private items: Decoration[] = [];
   private file: string;
 
-  constructor(dataDir: string) {
+  constructor(
+    dataDir: string,
+    private readonly room: () => RoomOptions = () => ({}),
+  ) {
     this.file = path.join(dataDir, 'decor.json');
     this.load();
   }
@@ -19,7 +27,7 @@ export class Decor {
 
   add(input: unknown, by: string): Decoration | string {
     if (this.items.length >= MAX_DECOR) return `The walls are full (${MAX_DECOR} pictures). Take one down first.`;
-    const p = sanitizePlacement(input);
+    const p = sanitizePlacement(input, this.room());
     if (typeof p === 'string') return p;
     const d: Decoration = { ...p, id: randomBytes(5).toString('hex'), by, at: Date.now() };
     this.items.push(d);
@@ -32,7 +40,7 @@ export class Decor {
     const i = this.items.findIndex((d) => d.id === id);
     if (i < 0) return 'Someone already took that picture down';
     const { id: _, by, at, ...placement } = this.items[i];
-    const p = sanitizePlacement({ ...placement, ...(patch && typeof patch === 'object' ? patch : {}) });
+    const p = sanitizePlacement({ ...placement, ...(patch && typeof patch === 'object' ? patch : {}) }, this.room());
     if (typeof p === 'string') return p;
     this.items[i] = { ...p, id, by, at };
     this.save();
@@ -47,12 +55,40 @@ export class Decor {
     return d;
   }
 
+  /**
+   * Hangs every picture again on the room as it is now, after the floor's structure changed (a
+   * mezzanine come or gone): one that's across a slab or over a wall that stops lower slides the least
+   * it takes on its own wall, and one too big for anywhere on that wall comes down. Returns whether
+   * anything moved, for whoever tells the floor.
+   */
+  refit(): boolean {
+    const room = this.room();
+    let moved = false;
+    const kept: Decoration[] = [];
+    for (const d of this.items) {
+      const { id, by, at, ...placement } = d;
+      const p = sanitizePlacement(placement, room);
+      if (typeof p === 'string') {
+        moved = true;
+        console.warn(`agent-office: took down ${d.title ? `"${d.title}"` : 'a picture'} (${d.url}, hung by ${by}): the ${d.wall} wall has no room for it now`);
+        continue;
+      }
+      if (p.u !== d.u || p.y !== d.y || p.w !== d.w || p.h !== d.h) moved = true;
+      kept.push({ ...p, id, by, at });
+    }
+    if (!moved) return false;
+    this.items = kept;
+    this.save();
+    return true;
+  }
+
   private load() {
     if (!existsSync(this.file)) return;
     try {
+      const room = this.room();
       const saved = JSON.parse(readFileSync(this.file, 'utf8')) as Partial<Decoration>[];
       for (const s of Array.isArray(saved) ? saved : []) {
-        const p = sanitizePlacement(s);
+        const p = sanitizePlacement(s, room);
         if (typeof p === 'string' || typeof s.id !== 'string') continue;
         this.items.push({ ...p, id: s.id, by: typeof s.by === 'string' ? s.by : '?', at: typeof s.at === 'number' ? s.at : Date.now() });
       }

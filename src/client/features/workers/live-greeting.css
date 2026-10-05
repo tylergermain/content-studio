@@ -1,0 +1,5 @@
+.live-greeting { position:fixed; z-index:40; bottom:92px; left:50%; transform:translateX(-50%); width:min(440px,calc(100vw - 32px)); box-sizing:border-box; padding:16px 20px; border:2px solid #30324a; border-radius:16px; background:rgba(255,243,223,.96); color:#30324a; box-shadow:0 8px 24px #0003; pointer-events:none; }
+.live-greeting p { margin:8px 0; font-size:13px; overflow-wrap:anywhere; }
+.live-greeting .live-greeting-transcript { max-height:100px; overflow:auto; }
+.live-greeting button { pointer-events:auto; float:right; }
+.live-greeting small { display:block; font-size:11px; opacity:.7; margin-top:12px; }

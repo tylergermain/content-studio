@@ -371,7 +371,7 @@ def sockets():
     """Where the office hangs things on the dog: name: (bone, where).
     - socket_head: centred over the head, 15 cm under its crown, as on the old procedural dog,
       so the hat and antlers tuned for it sit on any breed's crown;
-    - socket_back: its torso origin, so the bat wings land just behind its shoulders;
+    - socket_back: its torso origin, just behind its shoulders (nothing hangs there now);
     - socket_nose: the middle of its nose, for Rudolph's;
     - socket_neck: the middle of its collar, for the scarf."""
     hx, hy, hz = B.head

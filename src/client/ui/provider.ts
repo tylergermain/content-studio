@@ -1,7 +1,8 @@
 import './provider.css';
+import { isStudioProvider, studioChoiceError } from '../../shared/studio-policy';
 import type { AgentChoice, AgentEffort, AgentProvider, ProjectInfo, Usage, WorkerInfo } from '../../shared/protocol';
 import { AGENT_EFFORTS, isAgentEffort } from '../../shared/protocol';
-import { AGENT_PROVIDERS, CLAUDE_MODEL_NAMES, PROVIDER_META, claudeModelName, isAgentProvider, isClaudeModel, takesEffort, type ModelOption } from '../../shared/providers';
+import { AGENT_PROVIDERS, CLAUDE_MODEL_NAMES, PROVIDER_META, claudeModelName, isClaudeModel, takesEffort, type ModelOption } from '../../shared/providers';
 import { store } from '../state';
 import { h } from './dom';
 
@@ -43,9 +44,9 @@ export function engineLabel(w: Pick<WorkerInfo, 'provider' | 'model' | 'effort' 
 
 /** Providers the server says this project can start. */
 export function supportedProviders(project: ProjectInfo | null): AgentProvider[] {
-  const values = project?.agentProviders?.filter(isAgentProvider) ?? [];
+  const values = project?.agentProviders?.filter(isStudioProvider) ?? [];
   if (values.length) return [...new Set(values)];
-  return project?.defaultProvider && PROVIDER_LABEL[project.defaultProvider] ? [project.defaultProvider] : ['claude'];
+  return project?.defaultProvider && isStudioProvider(project.defaultProvider) ? [project.defaultProvider] : ['claude'];
 }
 
 /** Resolve old workers/tasks that have no provider metadata to the configured default. */
@@ -95,7 +96,9 @@ export function officeChoice(project: ProjectInfo | null): AgentChoice {
   if (picked && supportedProviders(project).includes(picked.provider)) {
     return { provider: picked.provider, ...(picked.model ? { model: picked.model } : {}), ...(picked.effort ? { effort: picked.effort } : {}) };
   }
-  return { provider: resolvedProvider(project?.defaultProvider, project) };
+  const supported = supportedProviders(project);
+  const configured = project?.defaultProvider;
+  return { provider: configured && supported.includes(configured) ? configured : supported[0] };
 }
 
 /** "Claude Code · Opus · High", "Claude Code", "OpenCode · anthropic/claude-sonnet-4", "Grok · grok-4.6". */
@@ -160,7 +163,7 @@ function loadCatalogue(provider: AgentProvider): Promise<void> | undefined {
  */
 export function agentFields(project: ProjectInfo | null, id: string, initial: AgentChoice, label = 'Provider'): AgentFields {
   const options = supportedProviders(project);
-  const fallback = resolvedProvider(project?.defaultProvider, project);
+  const fallback = options[0];
   const select = h('select.provider-select', { id, 'aria-label': 'Worker provider' }) as HTMLSelectElement;
   for (const provider of options) select.append(h('option', { value: provider }, PROVIDER_LABEL[provider]));
   const note = h('small.provider-note');
@@ -277,7 +280,7 @@ export function agentFields(project: ProjectInfo | null, id: string, initial: Ag
     set,
     choice: () => ({ provider: value(), ...(model() ? { model: model() } : {}), ...(effort() ? { effort: effort() } : {}) }),
     valid: () => {
-      const okay = !chosen || !!meta().validModel?.(chosen);
+      const okay = (!chosen || !!meta().validModel?.(chosen)) && !studioChoiceError(value(), chosen || undefined);
       modelInput.setCustomValidity(okay ? '' : (meta().models?.invalid ?? 'That isn’t a model id this provider takes.'));
       if (!okay) modelInput.reportValidity();
       return okay;

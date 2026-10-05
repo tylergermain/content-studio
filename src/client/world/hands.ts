@@ -5,9 +5,9 @@ import type { Drink } from '../../shared/rooftop';
 import { OpenBook } from '../features/bookshelf/book';
 import { HeldCard } from '../features/carrying/card';
 import { REACH_TIME, SMOKE_CYCLE, cigarette, coffeeMug, dragCurve, drinkGlass, emoteEnvelope, putDownGlass, reachCurve } from './character';
-import { UNDEAD_SKIN, raggedCuff, warlockHand, witchFire } from './costumes';
 import { mesh, toon, toonUnique } from './toon';
 import { ballMesh } from '../features/basketball/world';
+import { heavePose } from './hands-heave';
 
 export interface HandsInput {
   yaw: number;
@@ -21,22 +21,28 @@ export interface HandsInput {
   grip?: 'ladder' | 'pole' | null;
 }
 
+/** Where your hands go in VR (see Hands.mount): an anchor for each arm (on a controller), and one for what's held in both. */
+export interface HandsMount {
+  right: THREE.Object3D;
+  left: THREE.Object3D;
+  /** Where the camera would be: the card, the book and the ball keep their places in front of it. */
+  between: THREE.Object3D;
+}
+
 /** Lifting the mug for a sip and lowering it again, in seconds. */
 const SIP_TIME = 1.1;
+const aimQ = new THREE.Quaternion();
+const aimOff = new THREE.Vector3();
+const aimPos = new THREE.Vector3();
 
 interface Arm {
   group: THREE.Group;
   base: THREE.Vector3;
   baseRot: THREE.Euler;
-  side: 1 | -1;
   /** The white cuff at the wrist. */
   cuff: THREE.Mesh;
-  /** The cartoon hand: palm, thumb, and on the right hand the pointing finger. */
-  mitten: THREE.Mesh[];
+  /** The right hand's pointing finger, which a Christmas mitten has none of (see setCostume). */
   finger: THREE.Mesh | null;
-  /** A holiday hand in place of the mitten (see setCostume), and the witch-fire round it. */
-  dressed: THREE.Group | null;
-  fire: THREE.Points<THREE.BufferGeometry, THREE.PointsMaterial> | null;
 }
 
 /**
@@ -55,6 +61,8 @@ export class Hands {
   private wantsMug = false;
   /** A drink from the rooftop bar, held where the mug goes (and in its place). */
   private glass: { id: string; group: THREE.Group } | null = null;
+  /** Something a feature hands you to hold there instead (a dram from the whisky cabinet, see holdInLeft). */
+  private held: THREE.Object3D | null = null;
   /** An issue card off the board, held low in front of you in both hands. */
   private holder = new THREE.Group();
   private card: HeldCard;
@@ -71,8 +79,15 @@ export class Hands {
   /** How far into winding up a shot (0–1), and seconds into the follow-through after one (or -1). */
   private wind = 0;
   private shootT = -1;
+  /** Winding up a heave (see hands-heave.ts), whether the shot just thrown was one, and how far into its pose the hands are (0 → 1). */
+  private heave = false;
+  private heaved = false;
+  private heaveK = 0;
   /** Seconds into a sip (negative while it waits for the reach to finish), or null. */
   private sipT: number | null = null;
+  /** Where what's in your left hand is held instead (its foot, in the camera's frame), and how far it's gone there: a glass in a toast (see aimHeld). */
+  private aimAt = new THREE.Vector3();
+  private aimK = 0;
   private sway = new THREE.Vector2();
   private last: { yaw: number; pitch: number } | null = null;
   private air = 0;
@@ -93,16 +108,16 @@ export class Hands {
   /** Your shirt and skin, under whatever costume the hands wear. */
   private shirt: string;
   private skinTone: string;
-  /** An undead warlock's hands for Halloween, mittens for Christmas (see setCostume). */
+  /** Mittens for Christmas (see setCostume). */
   private costume: Theme | null = null;
-  private rags = toonUnique('#24123a');
+  /** What each arm hangs from while your hands are on VR controllers (see mount), or null. */
+  private mounts: THREE.Object3D[] | null = null;
 
   constructor(shirt: string, skin: string) {
     this.shirt = shirt;
     this.skinTone = skin;
     this.sleeve = toonUnique(shirt);
     this.skin = toonUnique(skin);
-    this.rags.side = THREE.DoubleSide;
     const sun = new THREE.DirectionalLight('#fff1d6', 2);
     sun.position.set(-0.6, 1.4, 0.9);
     for (const l of [new THREE.HemisphereLight('#fff5e6', '#c9a27a', 1.5), new THREE.AmbientLight('#ffffff', 0.5), sun]) {
@@ -143,6 +158,31 @@ export class Hands {
     this.scene.add(this.ball);
   }
 
+  /**
+   * Puts your hands on a VR headset's controllers (see features/vr/hands.ts), or back in their own
+   * scene (null). Each arm hangs under its anchor with its rest pose taken back off, so at rest it's
+   * right on the anchor and reaching, sipping, smoking and the emotes still move it from there; the
+   * card, the book and the ball go under `between`.
+   */
+  mount(m: HandsMount | null) {
+    for (const o of this.mounts ?? []) o.removeFromParent();
+    this.mounts = null;
+    const held = [this.holder, this.bookHolder, this.ball];
+    if (!m) return void this.scene.add(this.right.group, this.left.group, ...held);
+    const arms = [
+      [this.right, m.right],
+      [this.left, m.left],
+    ] as const;
+    this.mounts = arms.map(([arm, anchor]) => {
+      const off = new THREE.Group();
+      off.matrixAutoUpdate = false;
+      off.matrix.compose(arm.base, new THREE.Quaternion().setFromEuler(arm.baseRot), new THREE.Vector3(1, 1, 1)).invert();
+      anchor.add(off.add(arm.group));
+      return off;
+    });
+    m.between.add(...held);
+  }
+
   /** The basketball in both hands, or not. The mug waits while your hands are full. */
   holdBall(on: boolean) {
     if (on === this.wantsBall) return;
@@ -151,15 +191,17 @@ export class Hands {
     this.holdMug(this.wantsMug);
   }
 
-  /** Winding up a shot, 0 (not yet) to 1 (as hard as you throw): the ball comes down and in, ready to go. */
-  windUp(k: number) {
+  /** Winding up a shot, 0 (not yet) to 1 (as hard as you throw): the ball comes down and in, ready to go; for a heave, back by your ear in your right hand. */
+  windUp(k: number, heave = false) {
     this.wind = k;
+    this.heave = heave;
   }
 
-  /** The shot: both hands up and out after the ball. */
-  shoot() {
+  /** The shot: both hands up and out after the ball; a heave, the right arm over and through. */
+  shoot(heave = false) {
     this.shootT = 0;
     this.wind = 0;
+    this.heaved = heave;
   }
 
   /** Puts a lit cigarette in your right hand, or takes it away. */
@@ -185,43 +227,22 @@ export class Hands {
     this.paint();
   }
 
-  /**
-   * Dresses your hands up for a holiday: an undead warlock's for Halloween (grey-green and bony, with
-   * black claws, ragged purple sleeves and green witch-fire round them), red sleeves and green mittens
-   * for Christmas. Null gives you your own back.
-   */
+  /** Dresses your hands up for a holiday: red sleeves and green mittens for Christmas. Null gives you your own back. */
   setCostume(theme: Theme | null) {
     if (theme === this.costume) return;
     this.costume = theme;
-    const warlock = theme === 'halloween';
     for (const arm of [this.right, this.left]) {
-      if (arm.dressed) {
-        arm.dressed.removeFromParent();
-        arm.dressed.traverse((o) => (o as THREE.Mesh).geometry?.dispose());
-        // The witch-fire's material is its own (its glow texture is shared, see glowTexture).
-        arm.fire?.material.dispose();
-        arm.dressed = arm.fire = null;
-      }
-      for (const m of arm.mitten) m.visible = !warlock && !(theme === 'christmas' && m === arm.finger);
-      arm.cuff.visible = !warlock;
+      if (arm.finger) arm.finger.visible = theme !== 'christmas';
       // A mitten's fluffy cuff.
       arm.cuff.scale.set(theme === 'christmas' ? 1.3 : 1, theme === 'christmas' ? 1.3 : 1, theme === 'christmas' ? 1.9 : 1);
-      if (!warlock) continue;
-      const g = new THREE.Group();
-      g.add(warlockHand(arm.side, this.skin), raggedCuff(this.rags));
-      arm.fire = witchFire(10);
-      g.add(arm.fire);
-      arm.group.add(g);
-      arm.dressed = g;
     }
     this.paint();
   }
 
   private paint() {
     const c = this.costume;
-    this.sleeve.color.set(c === 'halloween' ? '#3b1d5a' : c === 'christmas' ? '#d62828' : this.shirt);
+    this.sleeve.color.set(c === 'christmas' ? '#d62828' : this.shirt);
     this.skin.color.set(c === 'christmas' ? '#2e9e48' : this.skinTone);
-    if (c === 'halloween') this.skin.color.lerp(UNDEAD_SKIN, 0.8);
   }
 
   /** How lit it is where you stand, 0–1 (see Sky.lightAt): your hands go dark out on a night street. */
@@ -246,8 +267,26 @@ export class Hands {
   holdMug(on: boolean) {
     this.wantsMug = on;
     const full = this.card.held || !!this.book || this.wantsBall;
-    this.mug.visible = on && !full && !this.glass;
+    this.mug.visible = on && !full && !this.glass && !this.held;
     if (this.glass) this.glass.group.visible = !full;
+    if (this.held) this.held.visible = !full;
+  }
+
+  /**
+   * Holds `o` in your left hand where the mug goes, upright, standing on y = 0 (a dram from the whisky
+   * cabinet, see features/whisky), or lets go of whatever it held (null). It's the feature's own: it
+   * comes out of your hand, and nothing of it is freed here. The mug waits while you hold it.
+   */
+  holdInLeft(o: THREE.Object3D | null) {
+    if (o === this.held) return;
+    this.held?.removeFromParent();
+    this.held = o;
+    if (o) {
+      o.position.set(0.09, -0.035, -0.03);
+      o.quaternion.setFromEuler(this.left.baseRot).invert();
+      this.left.group.add(o);
+    }
+    this.holdMug(this.wantsMug);
   }
 
   /** A drink from the rooftop bar in the left hand, or none (null). */
@@ -308,6 +347,16 @@ export class Hands {
     this.sipT = -REACH_TIME * 0.6;
   }
 
+  /**
+   * Holds what's in your left hand (a dram, see features/whisky) with its foot at `at` in the camera's
+   * frame instead, upright, `k` of the way there from where it's held (0 to 1): a glass meeting
+   * someone else's in a toast, where theirs comes to it. Null puts it back.
+   */
+  aimHeld(at: THREE.Vector3 | null, k = 1) {
+    this.aimK = at ? Math.min(1, Math.max(0, k)) : 0;
+    if (at) this.aimAt.copy(at);
+  }
+
   private arm(side: 1 | -1): Arm {
     const group = new THREE.Group();
     // Sleeve runs from the wrist back past the camera, so its far end is always off screen.
@@ -328,31 +377,14 @@ export class Hands {
     group.position.copy(base);
     group.rotation.copy(baseRot);
     this.scene.add(group);
-    return { group, base, baseRot, side, cuff, mitten: [palm, thumb, ...(finger ? [finger] : [])], finger, dressed: null, fire: null };
-  }
-
-  /** Witch-fire curling up round your fingers, and flickering. */
-  private burn(t: number) {
-    for (const arm of [this.right, this.left]) {
-      const fire = arm.fire;
-      if (!fire) continue;
-      const pos = fire.geometry.attributes.position as THREE.BufferAttribute;
-      const n = pos.count;
-      for (let i = 0; i < n; i++) {
-        const rise = (t * 0.45 + i / n) % 1;
-        const a = t * 2.4 * arm.side + (i / n) * Math.PI * 2;
-        const r = 0.055 + Math.sin(t * 3 + i * 1.7) * 0.012 - rise * 0.02;
-        pos.setXYZ(i, Math.cos(a) * r, -0.015 + rise * 0.11, -0.05 + Math.sin(a) * r * 1.3);
-      }
-      pos.needsUpdate = true;
-      fire.material.opacity = 0.6 + 0.25 * Math.sin(t * 9 + arm.side) + 0.1 * Math.sin(t * 23);
-      fire.material.size = 0.028 + 0.006 * Math.sin(t * 5 + arm.side);
-    }
+    return { group, base, baseRot, cuff, finger };
   }
 
   update(dt: number, t: number, s: HandsInput) {
+    // On VR controllers (see mount) they're where your own hands are: no lag, bob or breath, and no ladder or pole to go to.
+    const free = this.mounts ? 0 : 1;
     // Hands lag a touch behind quick turns of the head.
-    if (this.last && dt > 0) {
+    if (this.last && dt > 0 && free) {
       const dyaw = Math.atan2(Math.sin(s.yaw - this.last.yaw), Math.cos(s.yaw - this.last.yaw));
       const dpitch = s.pitch - this.last.pitch;
       const tx = THREE.MathUtils.clamp((dyaw / dt) * 0.012, -0.05, 0.05);
@@ -360,13 +392,14 @@ export class Hands {
       this.sway.x += (tx - this.sway.x) * Math.min(1, dt * 10);
       this.sway.y += (ty - this.sway.y) * Math.min(1, dt * 10);
     }
+    if (!free) this.sway.set(0, 0);
     this.last = { yaw: s.yaw, pitch: s.pitch };
-    this.air += ((s.airborne && !s.grip ? 1 : 0) - this.air) * Math.min(1, dt * 8);
-    this.ladderK += ((s.grip === 'ladder' ? 1 : 0) - this.ladderK) * Math.min(1, dt * 10);
-    this.poleK += ((s.grip === 'pole' ? 1 : 0) - this.poleK) * Math.min(1, dt * 10);
-    this.walk += ((s.walking ? 1 : 0) - this.walk) * Math.min(1, dt * 8);
+    this.air += ((free && s.airborne && !s.grip ? 1 : 0) - this.air) * Math.min(1, dt * 8);
+    this.ladderK += ((free && s.grip === 'ladder' ? 1 : 0) - this.ladderK) * Math.min(1, dt * 10);
+    this.poleK += ((free && s.grip === 'pole' ? 1 : 0) - this.poleK) * Math.min(1, dt * 10);
+    this.walk += ((free && s.walking ? 1 : 0) - this.walk) * Math.min(1, dt * 8);
 
-    const breathe = Math.sin(t * 1.7) * 0.004;
+    const breathe = Math.sin(t * 1.7) * 0.004 * free;
     const step = Math.sin(s.walkPhase) * this.walk;
     const bounce = Math.sin(s.walkPhase * 2) * 0.006 * this.walk;
     const k = this.reachT >= 0 ? reachCurve(this.reachT / REACH_TIME) : 0;
@@ -391,6 +424,11 @@ export class Hands {
       throwK = reachCurve(this.shootT / 0.45);
       if (this.shootT >= 0.45) this.shootT = -1;
     }
+    // A heave has the ball up in the right hand, and its throw is that arm's alone.
+    const heaving = (this.heave && this.wantsBall) || (this.heaved && this.shootT >= 0);
+    this.heaveK += ((heaving ? 1 : 0) - this.heaveK) * Math.min(1, dt * 10);
+    const heaveOut = this.heaved ? throwK : 0;
+    if (this.heaved) throwK = 0;
 
     for (const [arm, side] of [
       [this.right, 1],
@@ -444,6 +482,7 @@ export class Hands {
     // The ball rides between them, coming up from below as you pick it up.
     this.ball.visible = this.wantsBall && held > 0.02;
     this.ball.position.set(this.sway.x + step * 0.008, this.sway.y + breathe + bounce + this.air * 0.05 - 0.28 - 0.06 * this.wind - 0.3 * (1 - held), -0.54 + 0.05 * this.wind);
+    heavePose(this.right.group, this.left.group, this.ball, this.heaveK, this.heave ? this.wind : 0, heaveOut);
     // The card rides along with the hands, coming up from below as you take it; so does the book.
     this.holder.position.set(this.sway.x + step * 0.008, this.sway.y + breathe + bounce + this.air * 0.05 - 0.115 - 0.3 * (1 - carry), -0.5);
     if (this.book) {
@@ -466,6 +505,14 @@ export class Hands {
     l.position.y += 0.13 * sip;
     l.position.z += 0.14 * sip;
     l.rotation.x += 0.7 * sip;
+    // In a toast: the glass to where it meets the other, upright (the arm turned as it's held at rest).
+    if (this.aimK > 0 && this.held) {
+      const k = this.aimK;
+      const b = this.left.baseRot;
+      l.rotation.set(l.rotation.x + (b.x - l.rotation.x) * k, l.rotation.y + (b.y - l.rotation.y) * k, l.rotation.z + (b.z - l.rotation.z) * k);
+      aimOff.copy(this.held.position).applyQuaternion(aimQ.setFromEuler(l.rotation));
+      l.position.lerp(aimPos.copy(this.aimAt).sub(aimOff), k);
+    }
     // A drag: the cigarette hand comes up to your mouth, just under the camera, and back down.
     if (this.smokeT >= 0) {
       this.smokeT += dt;
@@ -477,7 +524,6 @@ export class Hands {
       this.ember.emissiveIntensity += ((d > 0.9 ? 1.4 : 0.3) - this.ember.emissiveIntensity) * Math.min(1, dt * 6);
     }
     if (this.emoting) this.emoteStep(dt, l);
-    if (this.costume === 'halloween') this.burn(t);
   }
 
   /** Moves the hands (already placed for this frame) through the emote. */

@@ -11,9 +11,9 @@ import type { Pty, PtyExit, SpawnOpts } from '../src/server/ptys.js';
 
 test('Pi launch uses interactive mode, an isolated session, and safe prompt arguments', () => {
   const args = piArgs(['--provider', 'openai', '--model', 'old', '--thinking', 'low', '--mode', 'rpc', '-p', '--continue', '--session', 'other', '--session-dir', '/shared', '-e', '/user-extension.mjs'], {
-    extension: '/office-extension.mjs', sessionDir: '/worker-session', sessionId: 'worker-session-id', model: 'openai/gpt-4.1', effort: 'high', prompt: '- fix login',
+    extension: '/office-extension.mjs', sessionDir: '/worker-session', sessionId: 'worker-session-id', model: 'studio-local/qwen3.8-flash-next', effort: 'high', prompt: '- fix login',
   });
-  assert.deepEqual(args, ['-e', '/user-extension.mjs', '--session-dir', '/worker-session', '--extension', '/office-extension.mjs', '--session-id', 'worker-session-id', '--model', 'openai/gpt-4.1', '--thinking', 'high', '--', '- fix login']);
+  assert.deepEqual(args, ['-e', '/user-extension.mjs', '--session-dir', '/worker-session', '--extension', '/office-extension.mjs', '--session-id', 'worker-session-id', '--model', 'studio-local/qwen3.8-flash-next', '--thinking', 'high', '--', '- fix login']);
   assert.deepEqual(piArgs(['--model', 'sonnet', '--thinking', 'off', '--no-extensions'], { extension: 'office.mjs', sessionDir: 'worker' }),
     ['--model', 'sonnet', '--thinking', 'off', '--no-extensions', '--session-dir', 'worker', '--extension', 'office.mjs']);
 });
@@ -25,7 +25,7 @@ test('Pi bridge bounds fields and drops assistant text, tool input, and credenti
     assert.equal(normalizePiHook(value), undefined);
   }
   assert.equal(isValidPiModel('sonnet:high'), true);
-  assert.equal(isValidPiModel('openai/gpt-4.1'), true);
+  assert.equal(isValidPiModel('studio-local/qwen3.8-flash-next'), true);
   assert.equal(isValidPiModel('--print'), false);
   assert.equal(isValidPiModel('bad\u200bmodel'), false);
 });
@@ -104,12 +104,12 @@ test('Pi worker launches, authenticates hooks, resumes its own session, and rest
   };
   t.after(() => { managers.forEach((m) => m.shutdown()); rmSync(root, { recursive: true, force: true }); });
   const workers = open();
-  const worker = workers.spawn('desk-1', 'Tester', '- fix login', false, 'agent', 'pi', 'openai/gpt-4.1', 'high');
+  const worker = workers.spawn('desk-1', 'Tester', '- fix login', false, 'agent', 'pi', 'studio-local/qwen3.8-flash-next', 'high');
   assert.ok(typeof worker === 'object');
   const first = launches[0].opts;
   assert.equal(first.file, file);
   assert.ok(first.args.includes(path.join(data, 'pi-sessions', worker.id)));
-  assert.deepEqual(first.args.slice(-6), ['--model', 'openai/gpt-4.1', '--thinking', 'high', '--', '- fix login']);
+  assert.deepEqual(first.args.slice(-6), ['--model', 'studio-local/qwen3.8-flash-next', '--thinking', 'high', '--', '- fix login']);
   assert.match(readFileSync(writePiExtension(data), 'utf8'), /agent_settled/);
   const token = first.env.AGENT_OFFICE_HOOK_TOKEN;
   const piHook = (id: string, key: string, payload: unknown) => workers.handleProviderHook('pi', id, key, '', payload);
@@ -133,5 +133,5 @@ test('Pi worker launches, authenticates hooks, resumes its own session, and rest
   workers.shutdown();
   const restored = open(process.execPath);
   const saved = restored.get(worker.id);
-  assert.deepEqual([saved?.provider, saved?.model, saved?.effort, saved?.sessionId], ['pi', 'openai/gpt-4.1', 'high', 'pi-root']);
+  assert.deepEqual([saved?.provider, saved?.model, saved?.effort, saved?.sessionId], ['pi', 'studio-local/qwen3.8-flash-next', 'high', 'pi-root']);
 });

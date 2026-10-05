@@ -1,11 +1,11 @@
 import * as THREE from 'three';
 import { mesh, roundedBox, toon } from '../toon';
 import { palette, piece } from '../models';
-import { PALETTE } from './materials';
+import { PALETTE, type Looks } from './materials';
 
 // The office's furnishings: the potted plants, the desks' knick-knacks and the lounge's furniture (all
-// modelled in Blender), the pendant lamps and the framed boards on the walls. The lab (lab/props.ts), the
-// holidays and the castle use some of them too.
+// modelled in Blender), the pendant lamps and the framed boards on the walls. The lab (lab/props.ts) and
+// the holidays use some of them too.
 
 // The potted plants are modelled in Blender (blender/scripts/build_plants.py): each plant is a painted
 // copy of one species in plants.glb (see piece()). A species is its pot, named after it, with everything that
@@ -80,31 +80,45 @@ export function deskBooks(i: number): THREE.Object3D {
 // The lounge's furniture is modelled in Blender (blender/scripts/build_lounge.py): the sofa, a throw pillow, a
 // floor pouf and the coffee table, each a piece of lounge.glb placed on its own (see piece()), so they can be
 // moved round one by one. Sofa is the old couch's blue, Wood and Frame the old coffee table's top and pedestal,
-// and WoodDark the sofa's feet (the desk furniture's darker wood). A pillow's or a pouf's Cloth is each copy's
-// own color, so it has none here: a copy that forgets its color comes out magenta.
+// and WoodDark the sofa's feet (the desk furniture's darker wood). A pouf's Cloth is each copy's own color and
+// a pillow's the floor's (see pillowCovers), so it has none here: a copy that forgets its color comes out magenta.
 const LOUNGE_COLORS = { Sofa: '#5b8def', WoodDark: '#8a5a3b', Wood: PALETTE.wood, Frame: PALETTE.deskLeg };
 const paintLounge = palette(LOUNGE_COLORS);
 
-/** A pillow or a pouf, its Cloth in `color`. */
-function upholstered(part: 'pillow' | 'pouf', color: string): THREE.Object3D {
-  const cloth = toon(color);
+/** A pillow or a pouf, its Cloth `cloth`. */
+function upholstered(part: 'pillow' | 'pouf', cloth: THREE.Material): THREE.Object3D {
   return piece('lounge', part, (name) => (name === 'Cloth' ? cloth : paintLounge(name)));
+}
+
+/**
+ * What the couch's two throw pillows are covered in: the floor's trim and its walls, as the Steps' cushions
+ * take turns between. Until the office hands over the floor's own paint (see pillowsIn), the first floor's.
+ */
+const pillowCovers: [THREE.Material, THREE.Material] = [toon(PALETTE.wallTrim), toon(PALETTE.wall)];
+
+/**
+ * From now on the throw pillows are covered in `looks`: the trim and the walls every floor repaints in its
+ * own colors (see Office.setLook), so a couch's pillows are whichever floor you're on's, painted or not.
+ */
+export function pillowsIn(looks: Pick<Looks, 'trim' | 'wall'>) {
+  pillowCovers[0] = looks.trim;
+  pillowCovers[1] = looks.wall;
 }
 
 /**
  * The lounge's couch: the sofa, facing +z like every model, with a throw pillow leaning on its back cushions
  * either side of its middle, halfway between its places (SEATING's couch, 1.2 apart), clear of whoever sits
  * there. Its origin is on the floor under its middle, it's 4.2 long across x and 1.0 deep, and its seat
- * cushions' tops are 0.47 up. The pillows hang under it, so a click on one is a click on the couch.
+ * cushions' tops are 0.47 up. The pillows hang under it, so a click on one is a click on the couch. `color`
+ * is its upholstery, the lounge's blue unless the office builder painted it; the pillows are the floor's
+ * trim and wall paint, whatever it's upholstered in (see pillowCovers).
  */
-export function loungeCouch(): THREE.Group {
+export function loungeCouch(color: string = LOUNGE_COLORS.Sofa): THREE.Group {
   const g = new THREE.Group();
-  g.add(piece('lounge', 'sofa', paintLounge));
-  for (const [x, color] of [
-    [0.6, '#ffd166'],
-    [-0.6, '#ef476f'],
-  ] as const) {
-    const pillow = upholstered('pillow', color);
+  const cloth = toon(color);
+  g.add(piece('lounge', 'sofa', (name) => (name === 'Sofa' ? cloth : paintLounge(name))));
+  for (const [i, x] of [0.6, -0.6].entries()) {
+    const pillow = upholstered('pillow', pillowCovers[i]);
     // Standing on the seat, sunk in a little, its top tipped back onto the back cushions.
     pillow.position.set(x, 0.46, -0.08);
     pillow.rotation.x = -0.15;
@@ -115,20 +129,21 @@ export function loungeCouch(): THREE.Group {
 
 /** A floor pouf in `color`, about 1.05 round and 0.4 tall, its origin on the floor under its middle. */
 export function pouf(color: string): THREE.Object3D {
-  return upholstered('pouf', color);
+  return upholstered('pouf', toon(color));
 }
 
-/** The lounge's round coffee table, 0.9 round, its top 0.46 up (where the holiday pumpkin stands). */
-export function coffeeTable(): THREE.Object3D {
-  return piece('lounge', 'coffee_table', paintLounge);
+/** The lounge's round coffee table, 0.9 round, its top 0.46 up: the top `color`, the old one's wood unless the office builder painted it, on its dark pedestal. */
+export function coffeeTable(color: string = LOUNGE_COLORS.Wood): THREE.Object3D {
+  const top = toon(color);
+  return piece('lounge', 'coffee_table', (name) => (name === 'Wood' ? top : paintLounge(name)));
 }
 
-/** A pendant lamp, its shade at 0, on a cord `cord` meters long. */
-export function pendant(cord = 0.48): THREE.Group {
+/** A pendant lamp, its shade (`shade`, yellow unless it's said) at 0, on a cord `cord` meters long. */
+export function pendant(cord = 0.48, shade: THREE.Material = toon('#ffd166')): THREE.Group {
   const lamp = new THREE.Group();
   const c = cord / 0.8;
   lamp.add(mesh(new THREE.CylinderGeometry(0.01, 0.01, c, 4), toon(PALETTE.ink), 0, c / 2, 0, false));
-  lamp.add(mesh(new THREE.ConeGeometry(0.5, 0.45, 16, 1, true), toon('#ffd166'), 0, 0, 0, false));
+  lamp.add(mesh(new THREE.ConeGeometry(0.5, 0.45, 16, 1, true), shade, 0, 0, 0, false));
   lamp.add(mesh(new THREE.SphereGeometry(0.16, 10, 8), toon('#fff7d6', { emissive: '#ffe08a' }), 0, -0.15, 0, false));
   lamp.scale.setScalar(0.8);
   return lamp;

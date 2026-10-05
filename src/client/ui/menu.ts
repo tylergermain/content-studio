@@ -45,6 +45,20 @@ const PANEL_EL: Record<HudPanel, string> = { workers: 'workers-panel', people: '
 
 const PIN_SVG = '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true"><path d="M16 9V4h1a1 1 0 0 0 0-2H7a1 1 0 0 0 0 2h1v5a3 3 0 0 1-3 3v2h5.97v7l1 1 1-1v-7H19v-2a3 3 0 0 1-3-3z"/></svg>';
 
+/** Actions a feature adds to the menu by itself (the webcam's), after the HUD's own (see addHudAction). */
+const added: HudAction[] = [];
+let redraw = () => {};
+
+/** Adds an action to the ☰ menu (and to the top bar, as its `status` and its pin have it). Hands back what takes it out again. */
+export function addHudAction(a: HudAction): () => void {
+  added.push(a);
+  redraw();
+  return () => {
+    if (added.includes(a)) added.splice(added.indexOf(a), 1);
+    redraw();
+  };
+}
+
 /** The ✕ in a panel's heading, which hides it until you turn it back on from the ☰ menu. */
 export function panelHide(id: HudPanel): HTMLElement {
   return h('button.panel-x', { type: 'button', 'data-hud': id, 'aria-label': 'Hide', title: 'Hide (☰ brings it back)' }, '✕');
@@ -68,6 +82,7 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
   const classOf = (a: HudAction, blocked?: string) => [a.on?.() && 'on', a.tone?.(), blocked && 'dim'].filter(Boolean).join(' ');
   const offered = (a: HudAction) => a.shown?.() ?? true;
   const pinned = (a: HudAction) => settings.pins.includes(a.id);
+  const all = () => [...actions, ...added];
   let menu: Modal | null = null;
 
   const menuBtn = h('button.btn.dock-btn.dock-menu', { type: 'button', 'aria-label': 'Menu', 'aria-haspopup': 'menu', 'aria-expanded': 'false', title: 'Menu: everything else, and what shows on screen (Tab)' }, h('span.burger', { 'aria-hidden': 'true' }, h('i'), h('i'), h('i')));
@@ -125,7 +140,7 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
   }
 
   function render() {
-    const items: HTMLElement[] = actions.filter((a) => offered(a) && (pinned(a) || a.status?.())).map(dockButton);
+    const items: HTMLElement[] = all().filter((a) => offered(a) && (pinned(a) || a.status?.())).map(dockButton);
     const people = store.peers.size;
     if (people > 1 || settings.hud.people) items.push(panelChip('people', '👥', 'People', people, `${people} in the office`));
     const workers = [...store.workers.values()];
@@ -197,7 +212,7 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
       return item;
     };
     const section = (name: string, rows: HTMLElement[]) => (rows.length ? [h('div.menu-sec', {}, name), ...rows] : []);
-    const rows = (s: HudAction['section']) => actions.filter((a) => a.section === s && offered(a)).map(row);
+    const rows = (s: HudAction['section']) => all().filter((a) => a.section === s && offered(a)).map(row);
     const el = h(
       'div.hud-menu',
       { role: 'menu', 'aria-label': 'Menu' },
@@ -281,5 +296,6 @@ export function mountHud(actions: HudAction[], settings: Settings, save: () => v
   for (const t of ['workers', 'peers', 'issues', 'pulls', 'services', 'queue', 'meeting', 'upgrade', 'me', 'floors', 'signins'] as Topic[]) store.on(t, render);
   applyPanels();
   render();
+  redraw = render;
   return { refresh: render, toggleMenu };
 }

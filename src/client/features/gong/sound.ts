@@ -33,8 +33,7 @@ export function gong(a: AudioCore, why: GongWhy) {
   a.count(`gong.${why}`);
   // Someone banging it is the room; a merge is news for the whole floor (and from another tab too,
   // like the dings), so it carries further.
-  const at = a.hall ? (a.hall.gong ?? { x: a.listener.x, y: a.listener.y + 2, z: a.listener.z }) : GONG_AT;
-  const out = why === 'hit' ? a.panner(at, 4, 0.6) : a.panner(at, 8, 0.45);
+  const out = why === 'hit' ? a.panner(GONG_AT, 4, 0.6) : a.panner(GONG_AT, 8, 0.45);
   out.connect(why === 'hit' ? a.ambience : a.alerts);
   const t0 = ctx.currentTime + 0.03;
   if (why === 'queue') [0.7, 0.85, 1.1].forEach((strength, i) => strike(a, out, t0 + i * 0.85, strength));

@@ -1,9 +1,12 @@
+import { scoreLine, type GameFrame, type MinesFrame } from '../../../shared/cabinet';
+import { FONT, H, W, banner, best, holder, placed, setBest, type GameSound, type Press, type ScreenGame } from './game';
+
 /**
- * Minesweeper for the boss's monitor (ui.ts): the rules, and a painter that draws the whole
- * screen in fixed 960×540 units, so the same picture goes on the monitor and on the board you click.
+ * Minesweeper (see game.ts): the rules, what the mouse does on the board, and a painter that draws the
+ * whole screen in fixed 960×540 units, so the same picture goes on the screen in the office and on
+ * the board you click.
  */
-export const W = 960;
-export const H = 540;
+export { H, W };
 
 /** 16 × 9 cells, the shape of the screen, with a mine under about one in seven. */
 const COLS = 16;
@@ -13,7 +16,6 @@ const CELL = 52;
 const X0 = (W - COLS * CELL) / 2;
 const Y0 = 62;
 const FACE = { x: W / 2, y: 31, r: 23 };
-const FONT = "Nunito, ui-rounded, 'SF Pro Rounded', system-ui, sans-serif";
 /** The classic colors for 1 to 8 mines around. */
 const NUMBER = ['', '#1f6feb', '#2a9d4b', '#e63946', '#3a3a9f', '#9d2a2a', '#1a9c9c', '#2b2d42', '#7a6f65'];
 
@@ -25,17 +27,25 @@ interface Cell {
   near: number;
 }
 
-export class Minesweeper {
+export class Minesweeper implements ScreenGame {
+  readonly id = 'minesweeper';
+  office = '';
+  sound?: GameSound;
+  readonly icon = '💣';
+  readonly name = 'Minesweeper';
+  readonly tip = 'Click to dig · right-click to flag';
   private cells: Cell[] = [];
   state: 'ready' | 'playing' | 'won' | 'lost' = 'ready';
   /** The mine that went off. */
   private boom = -1;
-  /** Time played, counted only while someone's at the monitor (see tick). */
+  /** Time played, counted only while someone's at it (see tick). */
   private ms = 0;
   /** The cell under a held-down click, drawn pushed in. */
-  pressed = -1;
+  private pressed = -1;
   /** The cell under the mouse. */
-  hover = -1;
+  private hover = -1;
+  /** The left button is down on the board: it digs where it comes back up. */
+  private holding = false;
 
   constructor() {
     this.reset();
@@ -46,6 +56,62 @@ export class Minesweeper {
     this.state = 'ready';
     this.boom = -1;
     this.ms = 0;
+    this.office = '';
+  }
+
+  get left(): number | null {
+    return this.state === 'playing' ? Math.floor(this.ms / 1000) : null;
+  }
+
+  /** Sitting down to it: a finished game stays as it ended until then. */
+  start() {
+    if (this.over) this.reset();
+  }
+
+  leave() {
+    this.holding = false;
+    this.hover = this.pressed = -1;
+  }
+
+  /** The clock only runs while someone's at it. */
+  update(dt: number): boolean {
+    return this.tick(dt * 1000);
+  }
+
+  pointer(kind: Press, x: number, y: number, e: { button: number; flag: boolean }): boolean {
+    const i = this.cellAt(x, y);
+    if (kind === 'down') {
+      // Right-click flags, and so do Ctrl- and Shift-click for a trackpad. The middle button chords.
+      if (e.flag) this.flag(i);
+      else if (e.button === 1) this.chord(i);
+      else if (e.button === 0 && this.onFace(x, y)) this.reset();
+      else if (e.button === 0) {
+        // It digs when you let go, wherever you let go, like the original.
+        this.holding = true;
+        this.pressed = i;
+      }
+      return true;
+    }
+    if (kind === 'move') {
+      if (i === this.hover) return false;
+      this.hover = i;
+      if (this.holding) this.pressed = i;
+      return true;
+    }
+    if (kind === 'up') {
+      if (e.button !== 0 || !this.holding) return false;
+      this.holding = false;
+      const at = this.pressed;
+      this.pressed = -1;
+      // A click on a number digs around it, once its mines are all flagged.
+      if (this.isOpen(at)) this.chord(at);
+      else this.open(at);
+      return true;
+    }
+    // Off the board with the button still down: it's still held (the board keeps hearing the mouse).
+    if (this.holding) return false;
+    this.hover = -1;
+    return true;
   }
 
   /** The cell at a point on the screen, or -1. */
@@ -71,6 +137,7 @@ export class Minesweeper {
     if (first.mine) {
       this.boom = i;
       this.state = 'lost';
+      this.sound?.('over');
       return;
     }
     // Empty cells open their neighbors too, out to the numbered edge.
@@ -85,6 +152,8 @@ export class Minesweeper {
     if (this.cells.every((c) => c.open || c.mine)) {
       this.state = 'won';
       for (const c of this.cells) if (c.mine) c.flag = true;
+      this.sound?.('clear', 4);
+      setBest(this.id, Math.floor(this.ms / 1000));
     }
   }
 
@@ -110,20 +179,23 @@ export class Minesweeper {
     return Math.floor(this.ms / 1000) !== before;
   }
 
-  /**
-   * Draws the whole screen. `idle` is the monitor with nobody at it, which puts a title over a
-   * game that hasn't started.
-   */
-  paint(g: CanvasRenderingContext2D, idle: boolean) {
+  /** Draws the whole screen. */
+  paint(g: CanvasRenderingContext2D) {
     g.fillStyle = '#1b2433';
     g.fillRect(0, 0, W, H);
     g.textAlign = 'center';
     g.textBaseline = 'middle';
 
-    // The top bar: mines left, the face (a new game), and the clock.
+    // The top bar: mines left, the fastest anyone in the building cleared it, the face (a new game), and the clock.
     const left = MINES - this.cells.filter((c) => c.flag).length;
     readout(g, X0, `💣 ${left}`);
     readout(g, W - X0 - 150, `⏱ ${Math.min(999, Math.floor(this.ms / 1000))}`);
+    const top = best(this.id);
+    if (top) {
+      g.fillStyle = '#8d99ae';
+      g.font = `800 18px ${FONT}`;
+      g.fillText(`🏆 ${scoreLine(this.id, top)}${holder(this.id).slice(0, 15)}`, (X0 + 150 + FACE.x - FACE.r) / 2, 33);
+    }
     g.fillStyle = '#ffd166';
     g.beginPath();
     g.arc(FACE.x, FACE.y, FACE.r, 0, Math.PI * 2);
@@ -134,25 +206,29 @@ export class Minesweeper {
 
     for (let i = 0; i < this.cells.length; i++) this.paintCell(g, i);
 
-    if (idle && this.state === 'ready') {
-      g.fillStyle = 'rgba(11, 19, 32, 0.78)';
-      g.fillRect(0, 150, W, 230);
-      g.fillStyle = '#f1ede4';
-      g.font = `900 92px ${FONT}`;
-      g.fillText('MINESWEEPER', W / 2, 240);
-      g.font = `800 28px ${FONT}`;
-      g.fillText('Sit in the boss’s chair and press E to play', W / 2, 318);
-    } else if (this.over) {
+    if (this.over) {
       const won = this.state === 'won';
-      g.fillStyle = won ? 'rgba(42, 157, 75, 0.92)' : 'rgba(230, 57, 70, 0.92)';
-      roundRect(g, W / 2 - 230, H / 2 - 44, 460, 88, 18);
-      g.fill();
-      g.fillStyle = '#ffffff';
-      g.font = `900 40px ${FONT}`;
-      g.fillText(won ? `Cleared in ${Math.floor(this.ms / 1000)}s!` : 'Boom!', W / 2, H / 2 - 8);
-      g.font = `800 20px ${FONT}`;
-      g.fillText(idle ? 'Sit down and press E to play again' : 'Click the face for a new game', W / 2, H / 2 + 26);
+      const place = placed(this.id, this.office);
+      banner(g, won ? `Cleared in ${Math.floor(this.ms / 1000)}s!` : 'Boom!', place ? `${place}click the face for another` : 'Click the face for a new game', won ? 'rgba(42, 157, 75, 0.92)' : 'rgba(230, 57, 70, 0.92)');
     }
+  }
+
+  /** What shows of each cell, and nothing of what doesn't: where the mines are stays here until it's lost. */
+  frame(): MinesFrame {
+    const lost = this.state === 'lost';
+    const cells = this.cells.map((c, i) => (c.flag ? (lost && !c.mine ? 'x' : 'f') : c.open ? String(c.near) : lost && c.mine ? (i === this.boom ? 'b' : 'm') : 'h'));
+    return { cells: cells.join(''), seconds: Math.floor(this.ms / 1000), state: this.state };
+  }
+
+  show(frame: GameFrame) {
+    const f = frame as MinesFrame;
+    this.cells = [...f.cells].map((ch) => {
+      const open = ch >= '0' && ch <= '8';
+      return { mine: 'fmb'.includes(ch), open, flag: ch === 'f' || ch === 'x', near: open ? Number(ch) : 0 };
+    });
+    this.boom = f.cells.indexOf('b');
+    this.state = f.state;
+    this.ms = f.seconds * 1000;
   }
 
   private get over(): boolean {

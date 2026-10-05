@@ -55,6 +55,7 @@ export interface Settings {
   musicMuted: boolean;
   /** The swish of a page turning as you read at the bookshelf. */
   pageTurns: boolean;
+  footsteps: boolean;
   /** Voice chat starts muted and V is held down to talk, instead of an open mic. */
   pushToTalk: boolean;
   /** Desktop notifications when a worker needs input or finishes while you're in another tab (once the browser allows them). */
@@ -94,10 +95,6 @@ export interface Spot {
   floor: string;
   /** What that floor was called, to say so if it's gone by then. */
   name: string;
-  /** The building's map then (see shared/maps): a spot on another map is nowhere on this one. */
-  map?: string;
-  /** Sitting on its throne. */
-  throne?: boolean;
   x: number;
   y: number;
   z: number;
@@ -109,8 +106,10 @@ export function lastSpot(): Spot | null {
   try {
     const s = JSON.parse(localStorage.getItem(SPOT_KEY) ?? 'null');
     const finite = (v: unknown) => typeof v === 'number' && Number.isFinite(v);
-    if (s && typeof s.floor === 'string' && s.floor && finite(s.x) && finite(s.y) && finite(s.z) && finite(s.facing)) {
-      return { floor: s.floor, name: typeof s.name === 'string' ? s.name : '', ...(typeof s.map === 'string' ? { map: s.map } : {}), ...(s.throne === true ? { throne: true } : {}), x: s.x, y: s.y, z: s.z, facing: s.facing };
+    // One kept while the building was something other than the office (it could be, once) is nowhere in it.
+    const elsewhere = typeof s?.map === 'string' && s.map !== 'office';
+    if (s && !elsewhere && typeof s.floor === 'string' && s.floor && finite(s.x) && finite(s.y) && finite(s.z) && finite(s.facing)) {
+      return { floor: s.floor, name: typeof s.name === 'string' ? s.name : '', x: s.x, y: s.y, z: s.z, facing: s.facing };
     }
   } catch {
     // storage blocked
@@ -127,7 +126,7 @@ export function rememberSpot(s: Spot) {
 }
 
 export function loadSettings(): Settings {
-  const s: Settings = { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, pushToTalk: false, notify: true, needsYouSound: 'once', hud: { ...HUD_DEFAULTS }, pins: [] };
+  const s: Settings = { view: 'first', volume: 0.7, muted: false, music: 0.5, musicMuted: false, pageTurns: true, footsteps: false, pushToTalk: false, notify: true, needsYouSound: 'once', hud: { ...HUD_DEFAULTS }, pins: [] };
   try {
     const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? 'null');
     if (saved?.view === 'first' || saved?.view === 'third') s.view = saved.view;
@@ -135,6 +134,7 @@ export function loadSettings(): Settings {
     if (typeof saved?.muted === 'boolean') s.muted = saved.muted;
     if (typeof saved?.music === 'number' && Number.isFinite(saved.music)) s.music = Math.max(0, Math.min(1, saved.music));
     if (typeof saved?.musicMuted === 'boolean') s.musicMuted = saved.musicMuted;
+    if (typeof saved?.footsteps === 'boolean') s.footsteps = saved.footsteps;
     if (typeof saved?.pageTurns === 'boolean') s.pageTurns = saved.pageTurns;
     if (typeof saved?.pushToTalk === 'boolean') s.pushToTalk = saved.pushToTalk;
     if (typeof saved?.notify === 'boolean') s.notify = saved.notify;

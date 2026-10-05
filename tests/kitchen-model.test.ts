@@ -5,7 +5,7 @@ import { openModel } from './glb';
 
 // kitchen.glb (exported by blender/scripts/build_kitchen.py) against what world/kitchen.ts counts on: the
 // three parts it's made of, by name, the materials it paints, and the old code-built kitchen's footprint,
-// which the office's colliders, sounds and holiday pumpkins are placed by.
+// which the office's colliders and sounds are placed by.
 //
 // The model faces +z like every other; kitchen.ts stands it at x -14.5, z 12.2 turned round to face into
 // the room, so what's at +x here ends up on the west side. That's why the machine is at +1.2 and the
@@ -51,7 +51,7 @@ test('its materials are the ones kitchen.ts paints, and only those', () => {
   assert.deepEqual(glowing, ['coffee_machine']);
 });
 
-test('the counter is the old one\'s size, its wooden top at 1.03 m where the collider and the pumpkins are', () => {
+test('the counter is the old one\'s size, its wooden top at 1.03 m where the collider is', () => {
   const top = boundsOf('counter', 'Wood');
   assert.ok(near(top.max.y, 1.03), `the top is at ${top.max.y.toFixed(3)}`);
   assert.ok(near(top.min.x, -2.55) && near(top.max.x, 2.55), `the top runs ${top.min.x.toFixed(3)} to ${top.max.x.toFixed(3)} across`);
@@ -73,8 +73,6 @@ test('the machine sits on the counter where the old one did, and its front faces
   // The portafilter and the drip tray stick out the front; the back is flat and near the wall.
   assert.ok(box.max.z > 0.45 && box.max.z < 0.55, `reaches ${box.max.z.toFixed(3)} forward`);
   assert.ok(-box.min.z < 0.3, `reaches ${(-box.min.z).toFixed(3)} back`);
-  // Clear of the holiday pumpkins' spots on the counter (see holiday.ts): x -1.5 and 2.15 here.
-  assert.ok(box.min.x > -1.5 + 0.14 && box.max.x < 2.15 - 0.11, `runs ${box.min.x.toFixed(3)} to ${box.max.x.toFixed(3)} across`);
 });
 
 test('the fridge stands where the old one did, inside its collider, handles out the front', () => {

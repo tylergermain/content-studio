@@ -13,6 +13,9 @@ import type { Parts } from './parts';
 import type { Frame } from './registry';
 import { FOV } from './scene';
 
+// The loop itself (and how a VR session borrows it) is in frame-loop.ts, which loads nothing of the office.
+export { frameLoop, type FrameLoop } from './frame-loop';
+
 /** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is 4.6. */
 const QUIET_FEET = 1.2;
 
@@ -142,14 +145,11 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
   function updateWorld({ dt, t }: Frame) {
     const { player, office, camera, sound } = ctx;
     const { remotes } = parts.peers;
-    const { departures, sendoffs, arrivals } = parts.views;
-    const court = parts.worlds.court();
+    const { departures, arrivals } = parts.views;
     if (!core.upTop) {
-      ctx.world().update(t, dt, [player.pos, ...[...remotes.values()].map((r) => r.person.root.position), ...departures.positions(), ...sendoffs.positions(), ...arrivals.positions(), ...(court?.positions() ?? [])]);
-      if (ctx.inOffice()) {
-        office.stack.update(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, grip: ctx.view.grip() }, ...[...remotes.values()].map((r) => ({ x: r.person.root.position.x, y: r.person.root.position.y, z: r.person.root.position.z, grip: r.grip }))], camera.position);
-        office.jukebox.update(t, dt, sound.beat());
-      }
+      ctx.world().update(t, dt, [player.pos, ...[...remotes.values()].map((r) => r.person.root.position), ...departures.positions(), ...arrivals.positions()]);
+      office.stack.update(dt, [{ x: player.pos.x, y: player.pos.y, z: player.pos.z, grip: ctx.view.grip() }, ...[...remotes.values()].map((r) => ({ x: r.person.root.position.x, y: r.person.root.position.y, z: r.person.root.position.z, grip: r.grip }))], camera.position);
+      office.jukebox.update(t, dt, sound.beat());
     }
     ctx.smoke.update(dt, camera);
     ctx.confetti.update(dt);
@@ -158,19 +158,17 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
   /** The sky, the weather and the light. */
   function updateSky({ dt, t }: Frame) {
     const { player, camera, sky, office, sound } = ctx;
-    const { sun, hemi, ambient, scene, holiday } = parts.stage;
+    const { sun, scene, holiday } = parts.stage;
     // Out along the scenic loop, the haze thins (there's more out there to see), and the sun's shadows
     // come with you: otherwise they're only cast round the office.
-    const away = !core.upTop && ctx.inOffice() ? Math.hypot(player.pos.x, player.pos.z) : 0;
+    const away = !core.upTop ? Math.hypot(player.pos.x, player.pos.z) : 0;
     sky.open = THREE.MathUtils.smoothstep(away, 70, 160);
     if (away > 40) sun.target.position.set(Math.round(player.pos.x / 4) * 4, player.pos.y, Math.round(player.pos.z / 4) * 4);
     else sun.target.position.set(0, 0, 0);
     sun.target.updateMatrixWorld();
     sky.update(dt, t, camera);
-    if (!core.upTop && ctx.inOffice()) office.scenic.cull(camera.position, office.night.street, (scene.fog as THREE.Fog).far);
-    // A map of its own lights itself its own way (the castle's torchlit hall), after the sky's had its say.
-    if (!core.upTop) ctx.world().mood?.({ sun, hemi, ambient, scene }, sky.daylight, t, camera.position);
-    if (!core.upTop && ctx.inOffice()) holiday.update(t, sky.lampsOn, camera);
+    if (!core.upTop) office.scenic.cull(camera.position, office.night.street, (scene.fog as THREE.Fog).far);
+    if (!core.upTop) holiday.update(t, sky.lampsOn);
     sound.setWeather(sky.rain, 1 - sky.daylight);
   }
 
@@ -196,20 +194,4 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
       sky.shading(true);
     }
   }
-}
-
-/**
- * The frame loop: each frame, every phase's ticks, in order (see TICK_PHASES, and installLoop). Its
- * clock starts now; hand what it returns to requestAnimationFrame to start it.
- */
-export function frameLoop(ctx: Ctx, loading: { drew(): void }): (ts?: number) => void {
-  const timer = new THREE.Timer();
-  function frame(ts?: number) {
-    timer.update(ts);
-    const delta = timer.getDelta();
-    ctx.ticks.run({ delta, dt: Math.min(delta, 0.1), t: timer.getElapsed(), now: performance.now() });
-    loading.drew();
-    requestAnimationFrame(frame);
-  }
-  return frame;
 }

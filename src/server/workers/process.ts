@@ -80,14 +80,14 @@ export function shq(s: string) {
 }
 
 /**
- * Writes the office-queue and office-workers commands into the data dir's bin/, each running its
+ * Writes the office-queue, office-workers and office-board commands into the data dir's bin/, each running its
  * script in bin/ with the office's own node, and returns that directory. Rewritten on every start,
  * so after an upgrade they run the new install's scripts.
  */
 export function writeOfficeCommands(dataDir: string): string | undefined {
   const dir = path.join(dataDir, 'bin');
   let wrote = false;
-  for (const [name, what] of [['office-queue', "Agent Office's task queue, for the board agents"], ['office-workers', "Agent Office's workers, for every worker"]]) {
+  for (const [name, what] of [['office-queue', "Agent Office's task queue, for the board agents"], ['office-workers', "Agent Office's workers, for every worker"], ['office-board', "A floor's own bulletin boards, for every worker"]]) {
     const script = binScript(`${name}.js`);
     if (!script) continue;
     mkdirSync(dir, { recursive: true, mode: 0o700 });

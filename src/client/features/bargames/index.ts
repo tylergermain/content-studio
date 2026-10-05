@@ -66,9 +66,9 @@ export function installBarGames(ctx: Ctx, deps: BarGamesDeps) {
   ctx.activities.add({
     id: 'thrower',
     active: () => thrower.active,
-    // Back from the line for anything but the office moving you off your floor or the map changing (neither ever put the dart down).
+    // Back from the line for anything but the office moving you off your floor (that never put the dart down).
     stop: (why) => {
-      if (why !== 'taken' && why !== 'map') thrower.stop();
+      if (why !== 'taken') thrower.stop();
     },
     // At the dart board or the axe lane, E steps back (Space throws, see Thrower); nothing else is in reach, and no emotes mid-throw.
     key: (e) => {

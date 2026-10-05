@@ -185,7 +185,7 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
     } else laps.reset();
     // A car coming at you where you stand: out of its way, with a thump if it was going.
     const player = ctx.player;
-    if (ctx.inOffice() && !driver.active && !ctx.upTop() && !ctx.trip()) {
+    if (!driver.active && !ctx.upTop() && !ctx.trip()) {
       const hit = office.cars.shove(player.pos, null);
       if (hit > 1.5 && now - shovedAt > 600) {
         shovedAt = now;
@@ -197,7 +197,7 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
   ctx.ticks.add('others', () => {
     // The engines of the cars being driven on this floor, yours (by how hard you're on the gas) and theirs.
     const engines: Parameters<typeof ctx.sound.setEngines>[0] = [];
-    if (!ctx.upTop() && ctx.inOffice()) {
+    if (!ctx.upTop()) {
       for (const [i, c] of store.cars.entries()) {
         const mine = driver.car === i && driver.driving;
         if (!c.driver && !mine) continue;

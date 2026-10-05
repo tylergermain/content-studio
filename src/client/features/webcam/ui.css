@@ -1,0 +1,40 @@
+/* Your own webcam in the bottom-right corner while it's on: round like the face it's on, a mirror's
+   (as a selfie is), with a red light saying so. Clicking it turns the webcam off. */
+#hud > .cam-self { position: absolute; right: 12px; bottom: 12px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 6px 7px; border-radius: var(--r-xl); box-shadow: var(--shadow-3); color: var(--ink); font: inherit; cursor: pointer; pointer-events: auto; transition: background-color .15s var(--ease), transform .12s var(--ease); }
+#hud > .cam-self:hover { background-color: var(--glass-hover); }
+#hud > .cam-self:active { transform: scale(.97); }
+#hud > .cam-self:focus-visible { outline: 3px solid var(--accent-ring); outline-offset: 1px; }
+/* Out of the way of the jukebox's player while it's docked in the same corner. */
+#hud:has(> .jb-corner > *) > .cam-self { right: calc(clamp(200px, 22vw, 280px) + 36px); }
+.cam-self video { width: 96px; height: 96px; border-radius: 50%; object-fit: cover; transform: scaleX(-1); background: #1f2937; display: block; box-shadow: 0 0 0 2px var(--bad); }
+.cam-self.starting video { box-shadow: 0 0 0 2px var(--hairline-2); }
+.cam-live { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: var(--bad-ink); white-space: nowrap; }
+.cam-live i { width: 7px; height: 7px; border-radius: 50%; background: var(--bad); }
+.cam-self.starting .cam-live { color: var(--muted); }
+.cam-self.starting .cam-live i { background: var(--hairline-2); }
+@media (prefers-reduced-motion: no-preference) {
+  .cam-self:not(.starting) .cam-live i { animation: cam-live 1.6s ease-in-out infinite; }
+}
+@keyframes cam-live { 50% { opacity: .35; } }
+/* Which camera, in Settings: a drop-down like the hire window's. */
+.modal .cam-pick { display: block; margin-top: 10px; min-width: 220px; max-width: 100%; padding: 7px 26px 7px 10px; border: 1px solid var(--hairline-2); border-radius: var(--r-sm); background-color: var(--control); color: var(--ink); font: inherit; font-size: 13px; font-weight: 500; }
+/* Looking through the telescope, or building, the rest of the HUD is away, but never what says your
+   webcam is on: while it's on, your picture in the corner and the red button on the top bar stay, over
+   the telescope's dark ring (z-index 40) and the builder's window (50) too. Off, a pinned button goes
+   with the rest. */
+body:is(.telescope-active, .building) #hud > .cam-self,
+body:is(.telescope-active, .building) #dock > [data-action='webcam'].on { visibility: visible !important; z-index: 51; }
+/* In the builder they keep clear of its panels and what's on them (see office-builder/ui.css): the
+   button in the middle, below the bar and below the Ground/Upstairs picker under that (74px down, 44px
+   tall), and your picture left of the panel down the right (252px wide, 12px in) and above the bar
+   along the bottom (12px up, about 55px tall), where it would cover the end of Discard changes. */
+body.building #dock > [data-action='webcam'].on { position: fixed; top: 128px; left: 50%; transform: translateX(-50%); }
+body.building #hud > .cam-self { right: 276px; bottom: 74px; }
+/* In a narrower window those wrap: the bar along the bottom, held to the room between the side panels,
+   grows to as much as 132px tall, and the picker, at 900px and under, to a second row. */
+@media (max-width: 1100px) {
+  body.building #hud > .cam-self { bottom: 152px; }
+}
+@media (max-width: 900px) {
+  body.building #dock > [data-action='webcam'].on { top: 168px; }
+}

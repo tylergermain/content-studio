@@ -10,6 +10,7 @@ import { builtFloors } from '../../core/floors';
 import type { Parts } from '../../core/parts';
 import { waitingInOrder, waitingLabel } from '../../nextup';
 import { saveSettings, store } from '../../state';
+import { openOrgChart } from '../../ui/org-chart/ui';
 import { openAccounts } from '../../ui/accounts';
 import { openBoard } from '../../ui/boards';
 import { openCharacter } from '../../ui/character';
@@ -22,15 +23,15 @@ import { openSettings, type SettingsPane } from '../../ui/settings';
 import { needsSigningIn, openSignIns } from '../../ui/signins';
 import { openTeam } from '../../ui/team';
 import { openUpgrade } from '../../ui/upgrade';
+import { openOfficeBuilder } from '../office-builder';
 import { openWhiteboard } from '../whiteboard/ui';
 import { describeSky } from '../../world/sky';
 
-export type HudParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'you' | 'actions' | 'waiting' | 'meeting' | 'bookshelf' | 'hanging' | 'talk' | 'notifier'>;
+export type HudParts = Pick<Parts, 'worlds' | 'place' | 'travel' | 'you' | 'actions' | 'waiting' | 'meeting' | 'hanging' | 'talk' | 'notifier'>;
 
 /** Listens for clicks on the HUD and the project, registers what the HUD follows (see mountHud), and binds Tab, H and F. */
 export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
   const { net, voice, settings, player, sound } = ctx;
-  const { inOffice } = parts.worlds;
   const { travel, waiting, actions, hanging, talk } = parts;
 
   // Buttons must not keep focus, or Space (jump) would click them again.
@@ -41,7 +42,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
   // The project in the corner is the floor you're on; click it for the list of floors to go to.
   $('project').addEventListener('click', () => {
     if (!store.floor) return travel.showElevator();
-    toggleFloorMenu($('project'), { go: travel.switchFloor, indoors: () => (!inOffice() && !core.upTop) || parts.place.indoors(), elevator: travel.showElevator, roof: inOffice() ? () => travel.ride(ROOF) : null });
+    toggleFloorMenu($('project'), { go: travel.switchFloor, indoors: () => parts.place.indoors(), elevator: travel.showElevator, roof: () => travel.ride(ROOF) });
   });
 
   // ---- The HUD: a few buttons on the top bar, everything else in the ☰ menu ----------------------------
@@ -66,10 +67,8 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         run: () => parts.meeting.showMeeting(),
       },
       { id: 'search', icon: '🔎', label: 'Search', section: 'Open', key: '/', title: () => 'Search the chat and every terminal', run: waiting.showSearch },
-      // The office has its bookshelf for them; a map of its own may not.
-      { id: 'docs', icon: '📚', label: 'Docs', section: 'Open', shown: () => !inOffice(), title: () => 'Read the project’s docs', run: parts.bookshelf.showBookshelf },
-      { id: 'elevator', icon: '🛗', label: () => (inOffice() ? 'Elevator' : 'Floors'), section: 'Open', count: () => store.floors.reduce((n, f) => n + (f.id === store.floor ? 0 : f.waiting), 0), title: () => (inOffice() ? 'Ride to another project' : 'Go to another project, or add one'), run: travel.showElevator },
-      { id: 'roof', icon: '🍸', label: 'Rooftop bar', section: 'Open', shown: () => !core.upTop && inOffice() && builtFloors().length > 0, title: () => 'Ride the elevator up to the roof: a DJ, drinks and the city', run: () => travel.ride(ROOF) },
+      { id: 'elevator', icon: '🛗', label: 'Elevator', section: 'Open', count: () => store.floors.reduce((n, f) => n + (f.id === store.floor ? 0 : f.waiting), 0), title: () => 'Ride to another project', run: travel.showElevator },
+      { id: 'roof', icon: '🍸', label: 'Rooftop bar', section: 'Open', shown: () => !core.upTop && builtFloors().length > 0, title: () => 'Ride the elevator up to the roof: a DJ, drinks and the city', run: () => travel.ride(ROOF) },
       // In voice, V is push to talk, so leaving is only from here.
       { id: 'voice', icon: '🎙️', label: () => (voice.inVoice ? 'Leave voice' : 'Join voice'), section: 'Together', key: () => (voice.inVoice ? undefined : 'V'), on: () => voice.inVoice, blocked: noMedia, run: () => void talk.toggleVoice() },
       // While you're in voice, the top bar keeps the mute button handy. Muted is the usual with push to talk, so it doesn't stand out then.
@@ -87,10 +86,12 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         run: () => voice.toggleMute(),
       },
       { id: 'share', icon: '🖥️', label: () => (voice.sharing ? 'Stop sharing' : 'Share screen'), section: 'Together', on: () => voice.sharing, status: () => voice.sharing, chip: () => 'Sharing', blocked: noMedia, run: () => void talk.toggleShare() },
-      { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Together', key: 'F', shown: () => inOffice(), on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
+      { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Together', key: 'F', on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
       { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Together', shown: () => store.invites, run: () => openTeam(net) },
+      { id: 'org-chart', icon: '🏢', label: 'Org chart', section: 'Together', shown: () => !!store.floor, run: () => openOrgChart() },
       { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Together', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
+      { id: 'office-builder', icon: '📐', label: 'Office builder', section: 'Office', key: 'U', shown: () => store.me.admin && !!store.floor, run: openOfficeBuilder },
       { id: 'settings', icon: '⚙️', label: 'Settings', section: 'Office', run: showSettings },
       { id: 'help', icon: '❓', label: 'Controls', section: 'Office', key: 'H', run: openHelp },
       { id: 'lite', icon: '📱', label: '2D view', section: 'Office', title: () => 'The workers, their terminals and the boards without the 3D: for a phone or a slow computer', run: () => location.assign('/lite') },

@@ -128,7 +128,9 @@ declare module '../../world/types' {
 }
 
 /** The whiteboard, out on the floor between the desks and the lounge. */
-export const whiteboard: Fixture<'whiteboard'> = () => {
+export const whiteboard: Fixture<'whiteboard'> = (site) => {
   const built = buildWhiteboard();
+  // It's on wheels: the office builder rolls it wherever the floor wants it.
+  site.get('furniture').adopt('whiteboard', { group: built.group, collider: built.colliders[0], use: built.interactable });
   return { group: built.group, colliders: built.colliders, interactables: [built.interactable], handle: { whiteboard: built } };
 };

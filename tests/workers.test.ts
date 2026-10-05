@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { accessSync, appendFileSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { accessSync, appendFileSync, chmodSync, constants, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -482,7 +482,7 @@ test('an explicit Claude model/effort overrides --agent-args and persists across
   const first = await waitFor(() => f.read(), (records) => records.some((r) => r.kind === 'claude' && !r.args.includes('--output-format')));
   const firstInvocation = first.find((r) => r.kind === 'claude' && !r.args.includes('--output-format'))!;
   // The per-worker choice is appended after --agent-args, so it wins even though "opus" also appears.
-  assert.deepEqual(firstInvocation.args.slice(firstInvocation.args.indexOf('--model')), ['--model', 'opus', '--model', 'haiku', '--effort', 'high', '--', 'haiku task']);
+  assert.deepEqual(firstInvocation.args.slice(firstInvocation.args.indexOf('--model')), ['--model', 'opus', '--dangerously-skip-permissions', '--model', 'haiku', '--effort', 'high', '--', 'haiku task']);
 
   assert.equal(workers.handleHook(worker.id, firstInvocation.env.hookToken!, 'SessionStart', { session_id: 'claude-model-1' }), true);
   await waitFor(() => workers.get(worker.id)?.status, (status) => status === 'exited');
@@ -522,7 +522,7 @@ test('a worker hired on Fable launches with --model fable and keeps it across a 
   if (typeof worker === 'string') return;
   const records = await waitFor(() => f.read(), (rs) => rs.some((r) => r.kind === 'claude' && !r.args.includes('--output-format')));
   const launch = records.find((r) => r.kind === 'claude' && !r.args.includes('--output-format'))!;
-  assert.deepEqual(launch.args.slice(launch.args.indexOf('--model')), ['--model', 'opus', '--model', 'fable', '--', 'fable task']);
+  assert.deepEqual(launch.args.slice(launch.args.indexOf('--model')), ['--model', 'opus', '--dangerously-skip-permissions', '--model', 'fable', '--', 'fable task']);
 
   workers.shutdown();
   const restored = manager(f, f.claude, [], ['--model', 'opus']);
@@ -616,7 +616,7 @@ test('OpenCode usage snapshots replace totals, persist across restart, and never
 });
 
 
-test('Codex workers preserve native approvals, follow authenticated root hooks, and resume their provider session', async (t) => {
+test('Codex workers bypass approvals, follow authenticated root hooks, and resume their provider session', async (t) => {
   const f = fixture();
   isolateProviderEnvironment(f, t);
   const oldLog = process.env.FAKE_AGENT_LOG;
@@ -636,7 +636,9 @@ test('Codex workers preserve native approvals, follow authenticated root hooks, 
   assert.ok(first.args.some((a) => a.startsWith('mcp_servers.agent-office.args=') && a.includes('office-workers.js')));
   assert.ok(first.args.includes('mcp_servers.agent-office.env_vars=["AGENT_OFFICE_HOOK_URL","AGENT_OFFICE_WORKER_ID","AGENT_OFFICE_HOOK_TOKEN"]'));
   assert.deepEqual(first.args.slice(-2), ['--', '- fix the login']);
-  assert.equal(first.args.some(a => /bypass|--yolo|--claude-only|--settings/.test(a)), false);
+  assert.ok(first.args.includes('--dangerously-bypass-approvals-and-sandbox'));
+  assert.ok(first.args.includes('--dangerously-bypass-hook-trust'));
+  assert.equal(first.args.some(a => /--yolo|--claude-only|--settings/.test(a)), false);
   assert.equal(first.args.filter(a => a.startsWith('hooks.')).length, 7);
   assert.equal(calls.some(r => r.kind === 'claude'), false);
   const hook = (event: string, extra = {}) => workers.handleCodexHook(worker.id, token, event, { session_id: 'codex-root', ...extra });
@@ -1671,4 +1673,28 @@ test("a worker whose worktree was deleted outside the office waits, marked lost,
   assert.equal(git(path.join(f.root, gone.worktree!.path), 'rev-parse', 'HEAD'), gone.worktree!.base);
   assert.equal(after.get(gone.id)?.lost, undefined);
   assert.deepEqual(toasts, []);
+});
+
+test('specialist hires launch in their own folder and preserve their role on restart', async t => {
+  const f=fixture();const previous=process.env.FAKE_AGENT_LOG;process.env.FAKE_AGENT_LOG=f.log;
+  t.after(()=>{if(previous===undefined) delete process.env.FAKE_AGENT_LOG;else process.env.FAKE_AGENT_LOG=previous;f.close();});
+  const workers=manager(f,f.claude,[]);t.after(()=>workers.shutdown());
+  const hired=workers.spawn('desk-1','test','Edit the footage',false,'agent','claude',undefined,undefined,undefined,undefined,[],'video-editor');
+  assert.equal(typeof hired,'object');if(typeof hired==='string')return;
+  assert.equal(hired.name,'Video Editor');assert.equal(hired.specialist,'video-editor');
+  assert.equal(workers.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
+  await waitFor(()=>f.read(),rows=>rows.some(r=>r.kind==='claude'));
+  workers.shutdown();
+  const restored=manager(f,f.claude,[]);t.after(()=>restored.shutdown());
+  assert.equal(restored.get(hired.id)?.specialist,'video-editor');
+  assert.equal(restored.owners().find(w=>w.workerId===hired.id)?.cwd,path.join(realpathSync(f.root),'agents','video-editor'));
+});
+
+test('the central hiring policy blocks shells, stations and direct hires before starting a process', t=>{
+ const f=fixture();t.after(()=>f.close());const workers=manager(f,f.claude,[]);t.after(()=>workers.shutdown());
+ workers.hiringPolicy=()=> 'Only approved specialists';
+ assert.equal(workers.spawn('desk-1','employee',undefined,false,'shell'),'Only approved specialists');
+ assert.equal(workers.spawn('desk-1','employee','General task'),'Only approved specialists');
+ assert.equal(workers.station('station-issues','employee','Find issues'),'Only approved specialists');
+ assert.equal(f.read().length,0);assert.equal(workers.list().length,0);
 });

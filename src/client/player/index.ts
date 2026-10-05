@@ -42,12 +42,8 @@ export class PlayerController extends PlayerInput {
   readonly effects = new Effects();
   /** How far below the floor you're on the street is: further down the higher your floor (see streetBelow). */
   street = STREET_Y;
-  /**
-   * The room the camera stays in while you're in it, and how thick its outside walls are: the
-   * office's, unless the building's on a map of its own. `enclosed`: walled and roofed all round,
-   * with no street or garage under it to see from.
-   */
-  room: Room = { ...FLOOR, wall: WALL_T, enclosed: false };
+  /** The room the camera stays in while you're in it, and how thick its outside walls are: the office's. */
+  room: Room = { ...FLOOR, wall: WALL_T };
   /** How many rows the floor's back office is built out (see WING): the camera keeps inside it too. */
   wing = 0;
   private jitterT = 0;
@@ -68,6 +64,11 @@ export class PlayerController extends PlayerInput {
   rig: ((dt: number) => void) | null = null;
   /** The rig is a car (see features/cars/controller.ts): out on the street or in the garage, not up a shaft indoors. */
   riding = false;
+  /**
+   * A thumbstick (a VR controller's, see features/vr/locomotion.ts): sideways (`x`, + right) and back
+   * (`z`, + back) like the keys, how far it's pushed is how fast you walk, and `run` at a run.
+   */
+  readonly stick = { x: 0, z: 0, run: false };
 
   constructor(
     private camera: THREE.PerspectiveCamera,
@@ -164,7 +165,7 @@ export class PlayerController extends PlayerInput {
       return;
     }
     if (this.seat) {
-      if (!this.enabled || !GET_UP.some((c) => k.has(c))) {
+      if (!this.enabled || !(GET_UP.some((c) => k.has(c)) || Math.hypot(this.stick.x, this.stick.z) > 0.5)) {
         this.moving = false;
         this.facing = this.seat.rotY;
         this.jitterT += dt;
@@ -181,10 +182,12 @@ export class PlayerController extends PlayerInput {
       if (k.has('KeyS') || k.has('ArrowDown')) iz += 1;
       if (k.has('KeyA') || k.has('ArrowLeft')) ix -= 1;
       if (k.has('KeyD') || k.has('ArrowRight')) ix += 1;
+      ix += this.stick.x;
+      iz += this.stick.z;
     }
     const steering = ix !== 0 || iz !== 0;
     this.moving = steering;
-    this.running = steering && (k.has('ShiftLeft') || k.has('ShiftRight'));
+    this.running = steering && (k.has('ShiftLeft') || k.has('ShiftRight') || this.stick.run);
     if (this.path && (steering || (this.enabled && k.has('Space')))) {
       this.path = null;
       this.onPathEnd?.('cancelled');
@@ -192,9 +195,12 @@ export class PlayerController extends PlayerInput {
     if (this.path && this.enabled) this.followPath(dt);
     if (this.view === 'first') this.facing = Math.atan2(Math.sin(this.camYaw + Math.PI), Math.cos(this.camYaw + Math.PI));
     if (steering) {
+      // Two keys at once are no faster than one; a stick pushed part way is slower.
       const len = Math.hypot(ix, iz);
-      ix /= len;
-      iz /= len;
+      if (len > 1) {
+        ix /= len;
+        iz /= len;
+      }
       // Camera-relative: "forward" is where the camera looks.
       // Drunk, your feet wander off to one side and then the other.
       const t = this.jitterT;

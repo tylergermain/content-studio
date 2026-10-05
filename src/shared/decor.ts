@@ -1,7 +1,9 @@
 // Pictures people hang on the office walls. The server keeps the list; every browser draws them
 // in frames, loading each image through the office (GET /api/image), so any image host works.
 
-import { FLOOR, LOFT, WALL_HEIGHT } from './layout.js';
+import type { RoomOptions } from './floorplan.js';
+import { FLOOR, WALL_HEIGHT } from './layout.js';
+import { DECK_Y, HEADROOM, deckOf, mezzanineOf, type Deck, type MezzanineKind } from './mezzanine.js';
 
 export type WallId = 'north' | 'south' | 'east' | 'west';
 
@@ -36,7 +38,22 @@ export const FRAMES = [
   { name: 'Gold', color: '#e9b949' },
   { name: 'Coral', color: '#ff8a5b' },
   { name: 'Teal', color: '#2a9d8f' },
+  // No frame at all: the picture straight on the wall, see-through where it is (a logo, a sign).
+  { name: 'None', color: '' },
 ] as const;
+
+/** The picture with no frame round it (see FRAMES). */
+export const NO_FRAME = FRAMES.length - 1;
+
+/**
+ * A picture of a floor's own (see server/media.ts), as its link: `media:<floor>/<file name>`. The office
+ * serves those itself, from the floor's .agent-office/media folder.
+ */
+const MEDIA = /^media:([a-z0-9-]{1,40})\/([\w][\w.\- ()]{0,120})$/;
+export function mediaLink(url: string): { floor: string; name: string } | undefined {
+  const m = MEDIA.exec(url);
+  return m && !m[2].includes('..') ? { floor: m[1], name: m[2] } : undefined;
+}
 
 /** How wide the frame is around the picture. */
 export const FRAME_BORDER = 0.07;
@@ -49,7 +66,7 @@ const CEILING_GAP = 0.05;
 /** Keeps a frame clear of the frames on the wall around the corner. */
 const CORNER_GAP = 0.15;
 
-/** Each wall's inside face: the way it faces and how far it runs along u. (ZONES say where it's tall enough.) */
+/** Each wall's inside face: the way it faces and how far it runs along u. (zonesFor says where it's tall enough.) */
 export const WALLS: Record<WallId, { rotY: number; min: number; max: number }> = {
   north: { rotY: 0, min: FLOOR.minX, max: FLOOR.maxX },
   south: { rotY: Math.PI, min: FLOOR.minX, max: FLOOR.maxX },
@@ -58,40 +75,74 @@ export const WALLS: Record<WallId, { rotY: number; min: number; max: number }> =
 };
 
 /** A stretch of wall a picture can hang on: [u0, u1] along it, [y0, y1] up it. */
-interface Zone {
+export interface Zone {
   u0: number;
   u1: number;
   y0: number;
   y1: number;
 }
 
-/** Underside of the loft's floor slab (see buildLoft in world/office/loft.ts). */
-const LOFT_UNDERSIDE = LOFT.y - 0.25;
+/** The stretch of a wall a deck's slab runs along, when it reaches that wall. */
+function slabAlong(wall: WallId, deck: Deck): [from: number, to: number] | undefined {
+  const s = deck.slab;
+  switch (wall) {
+    case 'north':
+      return s.minZ <= FLOOR.minZ ? [s.minX, s.maxX] : undefined;
+    case 'south':
+      return s.maxZ >= FLOOR.maxZ ? [s.minX, s.maxX] : undefined;
+    case 'west':
+      return s.minX <= FLOOR.minX ? [s.minZ, s.maxZ] : undefined;
+    case 'east':
+      return s.maxX >= FLOOR.maxX ? [s.minZ, s.maxZ] : undefined;
+  }
+}
 
 /**
- * Where pictures can hang; each one fits inside one of its wall's zones. The loft fills the
- * south-east corner, so the south and east walls run on under its floor and again up inside it.
+ * One wall's zones. A wall the upstairs doesn't reach is one zone, floor to ceiling. One it does runs
+ * on under the slab its whole length, stands full height either side of it, and starts again from the
+ * upstairs floor: up to the loft's roof, or to the ceiling over the big mezzanine.
  */
-const ZONES: Record<WallId, Zone[]> = {
-  north: [{ u0: FLOOR.minX, u1: FLOOR.maxX, y0: 0, y1: WALL_HEIGHT }],
-  west: [{ u0: FLOOR.minZ, u1: FLOOR.maxZ, y0: 0, y1: WALL_HEIGHT }],
-  south: [
-    { u0: FLOOR.minX, u1: FLOOR.maxX, y0: 0, y1: LOFT_UNDERSIDE },
-    { u0: FLOOR.minX, u1: LOFT.minX, y0: 0, y1: WALL_HEIGHT },
-    { u0: LOFT.minX, u1: LOFT.maxX, y0: LOFT.y, y1: LOFT.y + LOFT.height },
-  ],
-  east: [
-    { u0: FLOOR.minZ, u1: FLOOR.maxZ, y0: 0, y1: LOFT_UNDERSIDE },
-    { u0: FLOOR.minZ, u1: LOFT.minZ, y0: 0, y1: WALL_HEIGHT },
-    { u0: LOFT.minZ, u1: LOFT.maxZ, y0: LOFT.y, y1: LOFT.y + LOFT.height },
-  ],
-};
+function wallZones(wall: WallId, deck: Deck | undefined): Zone[] {
+  const whole: Zone = { u0: WALLS[wall].min, u1: WALLS[wall].max, y0: 0, y1: WALL_HEIGHT };
+  const met = deck && slabAlong(wall, deck);
+  if (!deck || !met) return [whole];
+  const [from, to] = met;
+  const zones: Zone[] = [{ ...whole, y1: HEADROOM }];
+  if (from > whole.u0) zones.push({ ...whole, u1: from });
+  if (to < whole.u1) zones.push({ ...whole, u0: to });
+  zones.push({ u0: from, u1: to, y0: DECK_Y, y1: Math.min(WALL_HEIGHT, DECK_Y + deck.height) });
+  return zones;
+}
 
-/** How high the wall goes at u (inside the loft it goes past the ceiling downstairs). */
-export function wallTop(wall: WallId, u: number): number {
+const ZONES = new Map<MezzanineKind, Record<WallId, Zone[]>>();
+
+/**
+ * Where pictures can hang on a floor with this room; each one fits inside one of its wall's zones.
+ * It goes by the floor's upstairs (see deckOf in mezzanine.ts): the loft fills the south-east corner,
+ * the big mezzanine the whole south side, and a floor that's all one level has every wall to the
+ * ceiling. With no room said it's the office as it comes, with the loft.
+ */
+export function zonesFor(room: RoomOptions = {}): Record<WallId, Zone[]> {
+  const kind = mezzanineOf(room);
+  let zones = ZONES.get(kind);
+  if (!zones) {
+    const deck = deckOf(room);
+    zones = { north: wallZones('north', deck), south: wallZones('south', deck), east: wallZones('east', deck), west: wallZones('west', deck) };
+    ZONES.set(kind, zones);
+  }
+  return zones;
+}
+
+/** How high the wall goes at u (over an upstairs it goes past the ceiling downstairs). */
+export function wallTop(wall: WallId, u: number, room: RoomOptions = {}): number {
   let top = 0;
-  for (const z of ZONES[wall]) if (u >= z.u0 && u <= z.u1) top = Math.max(top, z.y1);
+  for (const z of zonesFor(room)[wall]) if (u >= z.u0 && u <= z.u1) top = Math.max(top, z.y1);
   return top;
+}
+
+/** The floor you stand on to look at (u, y) on a wall: the upstairs one's height for what hangs up there, else 0. */
+export function wallFloor(wall: WallId, u: number, y: number, room: RoomOptions = {}): number {
+  return zonesFor(room)[wall].some((z) => z.y0 > 0 && u >= z.u0 && u <= z.u1 && y >= z.y0) ? DECK_Y : 0;
 }
 
 /** The world point `out` meters in front of (u, y) on a wall, and the way the wall faces. */
@@ -141,14 +192,14 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v
 
 /**
  * Slides a w×h picture the least it takes for its whole frame to be on one stretch of wall, or
- * null if it's too big for any.
+ * null if it's too big for any. The stretches are the room's (see zonesFor).
  */
-export function clampToWall(wall: WallId, u: number, y: number, w: number, h: number): { u: number; y: number } | null {
+export function clampToWall(wall: WallId, u: number, y: number, w: number, h: number, room: RoomOptions = {}): { u: number; y: number } | null {
   const hw = w / 2 + FRAME_BORDER;
   const hh = h / 2 + FRAME_BORDER;
   let best: { u: number; y: number } | null = null;
   let bestD = Infinity;
-  for (const z of ZONES[wall]) {
+  for (const z of zonesFor(room)[wall]) {
     const u0 = z.u0 + CORNER_GAP + hw;
     const u1 = z.u1 - CORNER_GAP - hw;
     const y0 = z.y0 + FLOOR_GAP + hh;
@@ -184,6 +235,7 @@ export function checkImageUrl(raw: unknown): { url: string } | { error: string }
   const s = typeof raw === 'string' ? raw.trim() : '';
   if (!s) return { error: 'Paste a link to an image' };
   if (s.length > 2048) return { error: 'That link is too long' };
+  if (mediaLink(s)) return { url: s };
   let u: URL;
   try {
     u = new URL(s);
@@ -196,8 +248,8 @@ export function checkImageUrl(raw: unknown): { url: string } | { error: string }
 
 const WALL_IDS = new Set<string>(Object.keys(WALLS));
 
-/** Checks and tidies a placement from a client: moves it onto its wall, or says why it can't hang. */
-export function sanitizePlacement(x: unknown): DecorPlacement | string {
+/** Checks and tidies a placement from a client: moves it onto its wall as the floor's room has it, or says why it can't hang. */
+export function sanitizePlacement(x: unknown, room: RoomOptions = {}): DecorPlacement | string {
   const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
   const url = checkImageUrl(o.url);
   if ('error' in url) return url.error;
@@ -210,7 +262,7 @@ export function sanitizePlacement(x: unknown): DecorPlacement | string {
   const y = n(o.y);
   if ([w, h, u, y].some(Number.isNaN) || w <= 0 || h <= 0) return 'That picture has no size';
   ({ w, h } = pictureSize(Math.max(w, h), w / h));
-  const at = clampToWall(wall, u, y, w, h);
+  const at = clampToWall(wall, u, y, w, h, room);
   if (!at) return "That picture is too big for the wall";
   const title = typeof o.title === 'string' ? o.title.replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, 80) : '';
   const frame = Number.isInteger(o.frame) && (o.frame as number) >= 0 && (o.frame as number) < FRAMES.length ? (o.frame as number) : 0;

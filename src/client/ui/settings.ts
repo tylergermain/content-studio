@@ -5,19 +5,18 @@ import { store, type NeedsYouSound, type Settings, type ViewMode } from '../stat
 import { askNotifyPermission, notifyPermission, type DesktopNotifier } from '../notify';
 import type { ThemePick, WebhookKind } from '../../shared/protocol';
 import { THEME_PICKS } from '../../shared/theme';
-import { mapChoices } from '../../shared/maps';
 import { DOG_NAME_MAX, cleanDogName } from '../../shared/dog';
 import { h, openModal, timeAgo } from './dom';
 import { agentFields, choiceLabel, officeChoice } from './provider';
 import { openPromptEditor, rewrittenPrompts } from './prompts';
-import { choiceRow } from './settings-rows';
+import { addedSettings, choiceRow, type Scope } from './settings-rows';
 
 const VIEWS: [ViewMode, string, string][] = [
   ['first', '👀 First person', 'See through your own eyes. Click the office to look around with the mouse and click things to use them. Esc frees the mouse.'],
   ['third', '🎥 Third person', 'Follow your character from behind. Drag to orbit the camera, scroll to zoom, and click things to use them.'],
 ];
 
-const THEME_LABEL: Record<ThemePick, string> = { auto: '📅 By the calendar', halloween: '🎃 Halloween', christmas: '🎄 Christmas', off: 'Off' };
+const THEME_LABEL: Record<ThemePick, string> = { auto: '📅 By the calendar', christmas: '🎄 Christmas', off: 'Off' };
 
 const WEBHOOK_NAME: Record<WebhookKind, string> = { slack: 'Slack', discord: 'Discord', other: 'a webhook' };
 
@@ -26,14 +25,12 @@ export type SettingsPane = 'you' | 'sound' | 'notify' | 'building' | 'workers';
 
 const PANES: { id: SettingsPane; icon: string; label: string; blurb: string }[] = [
   { id: 'you', icon: '🧍', label: 'You', blurb: 'How you look, how you see the office, and how you’re signed in.' },
-  { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, and how voice chat works.' },
+  { id: 'sound', icon: '🔊', label: 'Sound & voice', blurb: 'How loud the office is for you, how voice chat works, and your webcam.' },
   { id: 'notify', icon: '🔔', label: 'Notifications', blurb: 'Hear about a worker that needs someone, or finished, while you’re somewhere else.' },
-  { id: 'building', icon: '🏢', label: 'Building', blurb: 'The map, the decorations, the sky, the dog, and where new floors are cloned.' },
+  { id: 'building', icon: '🏢', label: 'Building', blurb: 'The decorations, the sky, the dog, and where new floors are cloned.' },
   { id: 'workers', icon: '🤖', label: 'Workers', blurb: 'What workers start on, how many run at once, when they go home and what the office tells them.' },
 ];
 
-/** Who a setting is for, shown by its name: some are yours alone, some the whole office's. */
-type Scope = 'you' | 'floor' | 'office';
 const SCOPE: Record<Scope, [label: string, title: string]> = {
   you: ['Just you', 'Only for you, kept in this browser'],
   floor: ['This floor', 'The same for everyone on this floor'],
@@ -119,6 +116,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const musicRow = volumeRow('Jukebox volume', 'music', 'musicMuted');
 
   // The swish of the book's pages at the bookshelf, on or off.
+  const footstepsRow = choiceRow('Footsteps', [[true, 'On'], [false, 'Muted']], () => settings.footsteps, (footsteps) => change({ footsteps }));
   const pagesRow = choiceRow('Page turns at the bookshelf', [[true, '📖 On'], [false, 'Off']], () => settings.pageTurns, (pageTurns) => change({ pageTurns }));
   // The alarm when a worker stops to ask you something; picking one plays it.
   const alarmRow = choiceRow<NeedsYouSound>('When a worker needs you', [['once', '🔔 Ring once'], ['remind', '🔁 Keep reminding me'], ['off', '🔕 Off']], () => settings.needsYouSound, (needsYouSound) => {
@@ -148,52 +146,11 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
         ),
       ),
     );
-    const now =
-      active === 'halloween'
-        ? 'Halloween: the workers are zombies, your hands are an undead warlock’s, the dog’s in costume, the sky’s gone creepy and there are jack-o’-lanterns everywhere.'
-        : active === 'christmas'
-          ? 'Christmas: the workers are elves, your hands are in mittens, the dog’s Rudolph, and it’s snowing outside.'
-          : 'No decorations up right now.';
-    const how = pick === 'auto' ? ' By the calendar it’s Halloween through October and Christmas through December.' : '';
+    const now = active === 'christmas' ? 'Christmas: the workers are elves, your hands are in mittens, the dog’s Rudolph, and it’s snowing outside.' : 'No decorations up right now.';
+    const how = pick === 'auto' ? ' By the calendar it’s Christmas through December.' : '';
     themeNote.textContent = `${now}${how} It’s the same for everyone in the building${by ? `, set by ${by}${at ? ` ${timeAgo(at)}` : ''}` : ''}.`;
   };
   paintTheme();
-
-  // The building's map, for everyone: the office, the castle, or one of your own. Opening Settings
-  // has the office read its folder of maps again, so one you just added or fixed shows up.
-  net.send({ t: 'map.set' });
-  const mapRow = h('div.seg', { role: 'radiogroup', 'aria-label': 'Map' });
-  const mapNote = h('p.setting-note');
-  const mapBad = h('p.setting-note.bad', { style: 'white-space: pre-line' });
-  const paintMap = () => {
-    const { pick, by, at, custom } = store.map;
-    const choices = mapChoices(custom);
-    mapRow.replaceChildren(
-      ...choices.map((m) =>
-        h(
-          'button.btn',
-          {
-            type: 'button',
-            role: 'radio',
-            'aria-checked': String(pick === m.id),
-            class: pick === m.id ? 'on' : '',
-            disabled: !!m.error,
-            title: m.error ? `${m.id} won't load: ${m.error}` : m.description,
-            onclick: () => {
-              if (!m.error && store.map.pick !== m.id) net.send({ t: 'map.set', map: m.id });
-            },
-          },
-          `${m.icon} ${m.name}`,
-        ),
-      ),
-    );
-    const now = choices.find((m) => m.id === pick) ?? choices[0];
-    mapNote.textContent = `${now.description} It’s the same on every floor, for everyone in the building${by ? `, picked by ${by}${at ? ` ${timeAgo(at)}` : ''}` : ''}. Maps of your own go in the office’s .agent-office/maps/ folder as JSON (see docs/maps.md).`;
-    const broken = choices.filter((m) => m.error);
-    mapBad.textContent = broken.map((m) => `⚠️ ${m.id} won't load: ${m.error}`).join('\n');
-    mapBad.hidden = !broken.length;
-  };
-  paintMap();
 
   // Desktop notifications: this browser's permission, then your own on/off.
   const notifyRow = h('div.seg');
@@ -469,6 +426,7 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
     sound: [
       setting('Office sounds', 'you', soundRow, h('p.setting-note', {}, 'Workers typing, footsteps, the coffee machine, birds and rain outside, the dog, the ding when a worker is done and the alarm when one needs you. Voice chat isn’t affected.')),
       setting('When a worker needs you', 'you', alarmRow, h('p.setting-note', {}, 'An alarm the moment a worker stops to ask you something or wants a permission. Keep reminding me rings it again, softly, every 30 seconds until someone opens that worker’s terminal. It’s as loud as the office sounds are.')),
+      setting('Footsteps', 'you', footstepsRow, h('p.setting-note', {}, 'Footsteps and jump landings start muted. Turn them on here for yourself and everyone walking nearby.')),
       setting('Page turns at the bookshelf', 'you', pagesRow, h('p.setting-note', {}, 'A soft swish each time the book in your hands turns a page, as you open a doc or scroll through one. The 🔈 at the top of the bookshelf turns it off too.')),
       setting('Jukebox', 'you', musicRow, h('p.setting-note', {}, 'The jukebox in the lounge. Everyone on the floor hears the same song, louder the closer they are to it; this is how loud it is for you alone.')),
       setting('Voice chat', 'you', talkRow, h('p.setting-note', {}, 'Either way, V joins voice, holding V talks and you’re muted once you let go, and M mutes or unmutes. With push to talk you join muted. Leave voice from the ☰ menu.')),
@@ -478,7 +436,6 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       setting('Team notifications (Slack / Discord)', 'office', h('div.webhook', {}, hookInput, hookSave), hookActions, hookStatus),
     ],
     building: [
-      setting('Map', 'office', mapRow, mapNote, mapBad),
       setting('Holiday theme', 'office', themeRow, themeNote),
       ...(outside
         ? [
@@ -500,6 +457,14 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       setting('Prompts', 'office', promptsOpen, promptsNote),
     ],
   };
+
+  // The ones features added (see addSetting), after each pane's own.
+  const closers: (() => void)[] = [];
+  for (const s of addedSettings()) {
+    const { body, close } = s.make();
+    panes[s.pane].push(setting(s.title, s.scope, ...body));
+    if (close) closers.push(close);
+  }
 
   // The categories down the side, the one picked on the right.
   const nav = h('nav.settings-nav', { role: 'tablist', 'aria-orientation': 'vertical', 'aria-label': 'Settings' });
@@ -538,7 +503,6 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
   const offNotify = store.on('notify', paintHook);
   const offDog = store.on('dog', paintDog);
   const offTheme = store.on('theme', paintTheme);
-  const offMap = store.on('map', paintMap);
   const offLeave = store.on('leaveOnMerge', paintLeave);
   const offLimit = [store.on('machine', paintLimit), store.on('me', paintLimit)];
   const offDir = [store.on('projectsDir', paintDir), store.on('me', paintDir)];
@@ -549,11 +513,11 @@ export function openSettings(net: Net, settings: Settings, onChange: (s: Setting
       offNotify();
       offDog();
       offTheme();
-      offMap();
       offLeave();
       offLimit.forEach((off) => off());
       offDir.forEach((off) => off());
       offPrompts.forEach((off) => off());
+      closers.forEach((off) => off());
     },
   });
   show(first ?? lastPane);

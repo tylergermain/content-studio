@@ -3,13 +3,17 @@
  * and letting it fly, baskets and streaks, and the ball in everyone's hands.
  */
 import * as THREE from 'three';
-import { HOOP, SWEET, idealSpeed, lookAtRim, meter, shotSpeed, throwPitch, tossSpeed, underCeiling } from '../../../shared/hoop';
+import { HOOP, SWEET, idealSpeed, lookAtRim, shotSpeed, throwPitch, tossSpeed, underCeiling, type Solid } from '../../../shared/hoop';
+import { RANGE, clearWay, farAim, farRelease, heaveThrow, windMeter, windPace, type FarAim, type WindClock } from '../../../shared/hoop-range';
+import type { RoomOptions } from '../../../shared/floorplan';
+import { onDeck } from '../../../shared/mezzanine';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
 import { $, clip, h, modalOpen, toast } from '../../ui/dom';
 import type { Person } from '../../world/character';
-import { Basketball, IN_HANDS } from './world';
+import { Basketball, IN_HANDS, ballSolids } from './world';
+import { LongShot } from './long-shot';
 import type { Interactable } from '../../world/types';
 import { disposeSprite, textSprite } from '../../world/toon';
 
@@ -19,6 +23,9 @@ declare module '../../world/types' {
     ball: true;
   }
 }
+
+/** A floor that says nothing of its fittings has the office's. */
+const AS_IT_COMES: RoomOptions = {};
 
 export interface BasketballDeps {
   /** Everyone else on your floor, as you see them, by peer id. */
@@ -50,10 +57,20 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
   /** Baskets of yours in a row, and whether your last throw was a shot at the hoop (a miss of a pass or a drop doesn't count). */
   let streak = 0;
   let shooting = false;
-  /** When you started winding up a shot (performance.now()), or 0. */
+  /** When you started winding up a shot (performance.now()), or 0; and the meter's clock, which runs faster for a heave. */
   let windFrom = 0;
+  let wind: WindClock = { at: 0, runs: 0, heave: false };
+  /**
+   * A long shot as you wind it up, written over every frame; what of the room might be in its way (see
+   * clearWay), taken as you start to wind up and again as you let go, which its throw flies past; and
+   * what drops in from there, worked out over the wind-up (see LongShot), WORK_MS a frame at most.
+   */
+  const longAim: FarAim = { heading: 0, pitch: 0, dist: 0, width: 0, heave: false };
+  let inTheWay: Solid[] = [];
+  const longShot = new LongShot();
+  const WORK_MS = 2;
   // The ball's there to use (and to aim at: it's on the building); a window opening lets go of a wind-up.
-  ctx.usables.add({ usable: () => ball.interactables });
+  ctx.usables.add({ usable: () => (office.hoop.away ? [] : ball.interactables) });
   ctx.windowOpened.add(() => void (windFrom = 0));
 
   // With the ball in your hands, E winds up a shot (let go to shoot) and Q drops it.
@@ -65,10 +82,13 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     return true;
   });
 
+  /** Whose the ball is to pick up, when it isn't anyone's (a game of PIG: see BallState.for), or undefined. */
+  const notYours = () => (store.ball.for !== undefined && store.ball.for !== store.you ? store.ball.for : undefined);
+
   /** E at the ball: it's yours, if nobody beats you to it. */
   function takeBall() {
     if (ctx.carrying()) return toast('🗂️ Your hands are full: put the card back first (Q)', 'warn');
-    if (ball.holder) return;
+    if (ball.holder || notYours() !== undefined) return;
     deps.reach();
     ctx.sound.ball('bounce', ball.at, 1.5);
     ball.takeNow(store.you);
@@ -79,12 +99,21 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
 
   ctx.interactions.define('ball', {
     reach: 3.2,
-    hint: () => ({ k: String(ball.still), parts: [hintTitle('🏀 Basketball'), ball.still ? aside('shoot some hoops') : '', key('E', ball.still ? 'Pick it up' : 'Catch it!')] }),
+    hint: () => {
+      // In a game of PIG, it's whoever's turn it is (nobody's, mid-shot).
+      const theirs = notYours();
+      if (theirs !== undefined) return { k: `pig|${theirs}`, parts: [hintTitle('🐷 PIG'), aside(theirs ? `${clip(store.peers.get(theirs)?.name ?? 'Someone', 16)}'s shot` : 'the shot is in the air')] };
+      return { k: String(ball.still), parts: [hintTitle('🏀 Basketball'), ball.still ? aside('shoot some hoops') : '', key('E', ball.still ? 'Pick it up' : 'Catch it!')] };
+    },
     use: onE(() => takeBall()),
   });
 
-  /** How a shot of yours goes from where you are: out of your hands, which way (a heading), how steep, and how hard it takes to sink it (null: you're not shooting at the hoop). */
-  function shotAim(): { from: THREE.Vector3; heading: number; pitch: number; ideal: number | null } {
+  /**
+   * How a shot of yours goes from where you are: out of your hands, which way (a heading), how steep,
+   * and how hard it takes to sink it (null: you're not shooting at the hoop). From out past RANGE it's
+   * `far` instead (see shared/hoop-range.ts): squared up to the ring, a heave from further out still.
+   */
+  function shotAim(): { from: THREE.Vector3; heading: number; pitch: number; ideal: number | null; far: FarAim | null } {
     const player = ctx.player;
     const rim = HOOP.rim;
     const first = player.view === 'first';
@@ -96,35 +125,53 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     const toRim = Math.atan2(rim.x - from.x, rim.z - from.z);
     const off = Math.abs(Math.atan2(Math.sin(toRim - facing), Math.cos(toRim - facing)));
     const far = Math.hypot(rim.x - from.x, rim.z - from.z);
-    const atHoop = off < (first ? 0.35 : 0.6) && far < 16 && far > 0.4;
+    const aimed = off < (first ? 0.35 : 0.6);
+    // A long shot only where the ball has a clear way to the ring, and never from up in the loft or under it.
+    const loft = onDeck(store.floorPlan.room ?? AS_IT_COMES, from.x, from.z);
+    const long = aimed && far >= RANGE && !loft ? farAim(from, throwPitch(first ? player.lookPitch : lookAtRim(from)), far, longAim) : null;
+    if (long && clearWay(from, long, inTheWay)) return { from, heading: long.heading, pitch: long.pitch, ideal: null, far: long };
+    const atHoop = aimed && far < RANGE && far > 0.4;
     if (first) {
       const look = throwPitch(player.lookPitch);
       const pitch = atHoop ? underCeiling(from, look) : look;
-      return { from, heading: facing, pitch, ideal: atHoop ? idealSpeed(from, pitch) : null };
+      return { from, heading: facing, pitch, ideal: atHoop ? idealSpeed(from, pitch) : null, far: null };
     }
     // Facing about the right way, your character squares up to the hoop.
-    if (!atHoop) return { from, heading: facing, pitch: throwPitch(0.15), ideal: null };
+    if (!atHoop) return { from, heading: facing, pitch: throwPitch(0.15), ideal: null, far: null };
     const pitch = underCeiling(from, throwPitch(lookAtRim(from)));
-    return { from, heading: toRim, pitch, ideal: idealSpeed(from, pitch) };
+    return { from, heading: toRim, pitch, ideal: idealSpeed(from, pitch), far: null };
   }
 
   /** Hold E (or the mouse) with the ball: the meter goes up and down until you let go. */
   function windUp() {
     if (!holdingBall() || windFrom) return;
     windFrom = performance.now();
+    inTheWay = ballSolids(office.colliders);
+    longShot.clear();
+    wind = { at: windFrom, runs: 0, heave: !!shotAim().far?.heave };
   }
 
   /** Let go: it flies as hard as the meter says (right in the green, it drops in). */
   function letFly() {
     if (!windFrom) return;
-    const power = meter((performance.now() - windFrom) / 1000);
+    const now = performance.now();
     windFrom = 0;
     if (!holdingBall()) return;
+    inTheWay = ballSolids(office.colliders);
     const a = shotAim();
-    shooting = a.ideal !== null;
-    release(a.from, a.heading, a.pitch, shooting ? shotSpeed(a.ideal!, power) : tossSpeed(power));
-    if (ctx.player.view === 'first') ctx.hands.shoot();
-    else ctx.me.shoot();
+    const heave = !!a.far?.heave;
+    wind = windPace(wind, now, heave);
+    const power = windMeter(wind, now);
+    shooting = a.ideal !== null || a.far !== null;
+    if (a.far) {
+      // What drops in from here (the middle of the green is that, thrown from just where it was worked
+      // out), and nothing from outside the green.
+      const far = longShot.take(a.from, a.far, inTheWay);
+      const out = farRelease(far.from, far.heading, far.shot, power, inTheWay);
+      release(far.from, far.heading, out.pitch, out.speed);
+    } else release(a.from, a.heading, a.pitch, shooting ? shotSpeed(a.ideal!, power) : tossSpeed(power));
+    if (ctx.player.view === 'first') ctx.hands.shoot(heave);
+    else ctx.me.shoot(heave);
   }
 
   /** Q with the ball: it drops out of your hands in front of you. */
@@ -138,7 +185,7 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     release(from, f, 0, 0.25);
   }
 
-  function release(from: THREE.Vector3, heading: number, pitch: number, speed: number) {
+  function release(from: { x: number; y: number; z: number }, heading: number, pitch: number, speed: number) {
     const c = Math.cos(pitch);
     const s = { x: from.x, y: from.y, z: from.z, vx: Math.sin(heading) * c * speed, vy: Math.sin(pitch) * speed, vz: Math.cos(heading) * c * speed };
     ball.throwNow({ ...s, by: store.you }, performance.now());
@@ -161,7 +208,8 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
       ctx.sound.ball('score', HOOP.rim, hit.speed);
     } else if (hit.speed > 0.6) ctx.sound.ball(hit.kind, at, hit.speed);
   };
-  ball.onThrow = (by) => deps.remotes.get(by)?.person.shoot();
+  // A heave, they see thrown one-armed: it's told from the throw itself (from way out, straight at the ring).
+  ball.onThrow = (by, shot) => deps.remotes.get(by)?.person.shoot(heaveThrow(shot));
   ball.onMiss = (by) => {
     if (by === store.you && shooting) streak = 0;
   };
@@ -206,44 +254,61 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     const mine = holdingBall();
     if (!mine) windFrom = 0;
     ctx.me.holdBall(mine);
+    // Out past HEAVE_FROM the meter runs faster, from whenever you get there mid wind-up.
+    const aim = windFrom ? shotAim() : null;
+    if (aim) wind = windPace(wind, now, !!aim.far?.heave);
+    if (aim?.far) longShot.work(aim.from, aim.far, inTheWay, WORK_MS);
     const hands = ctx.hands;
     hands.holdBall(mine);
-    hands.windUp(windFrom ? meter((now - windFrom) / 1000) : 0);
+    hands.windUp(windFrom ? windMeter(wind, now) : 0, !!aim?.far?.heave);
     for (const [id, r] of deps.remotes) r.person.holdBall(ball.holder === id);
     updateScorePops(dt);
-    renderShotMeter(now);
+    renderShotMeter(now, aim);
   }
   ctx.ticks.add('others', ({ dt, now }) => {
-    if (!ctx.upTop() && ctx.inOffice()) updateBall(now, dt);
+    // A floor without the hoop has no ball either.
+    ball.group.visible = !office.hoop.away;
+    if (!ctx.upTop() && !office.hoop.away) updateBall(now, dt);
   });
 
-  /** The wind-up meter over the hint, while you hold E: a green band where the shot drops in, when you're shooting at the hoop. */
+  /**
+   * The wind-up meter over the hint, while you hold E: a green band where the shot drops in, when you're
+   * shooting at the hoop (smaller the further out you are), and HEAVE on it from way out.
+   */
   let meterKey = '';
-  function renderShotMeter(now: number) {
+  function renderShotMeter(now: number, aim: ReturnType<typeof shotAim> | null) {
     const on = windFrom > 0 && !modalOpen();
-    const at = on ? meter((now - windFrom) / 1000) : 0;
-    const sweet = on && shotAim().ideal !== null;
-    const k = `${on}|${sweet}|${at.toFixed(3)}`;
+    const at = on ? windMeter(wind, now) : 0;
+    const sweet = on && !!aim && (aim.ideal !== null || aim.far !== null);
+    const width = aim?.far?.width ?? SWEET.width;
+    const heave = on && !!aim?.far?.heave;
+    const k = `${on}|${sweet}|${heave}|${width.toFixed(4)}|${at.toFixed(3)}`;
     if (k === meterKey) return;
     meterKey = k;
     const el = $('shot-meter');
     el.classList.toggle('hidden', !on);
     el.classList.toggle('aimed', sweet);
+    el.classList.toggle('heave', heave);
     el.style.setProperty('--at', String(at));
     el.style.setProperty('--sweet', String(SWEET.at));
-    el.style.setProperty('--width', String(SWEET.width));
+    el.style.setProperty('--width', String(width));
   }
+
+  /** What else the hint says while the ball's in your hands (a game of PIG's, say): see addBallHint. */
+  const ballHints: (() => Hint | null)[] = [];
 
   /** With the ball in your hands: how to shoot, and how to put it down. */
   function ballHint(): Hint {
     const first = ctx.player.view === 'first';
+    const more = ballHints.map((fn) => fn()).filter((m): m is Hint => !!m);
     return {
-      k: `${streak}|${first}|${!!windFrom}`,
+      k: `${streak}|${first}|${!!windFrom}|${wind.heave}|${more.map((m) => m.k).join('|')}`,
       parts: [
         h('span.title', {}, '🏀 Ball in hand'),
         streak > 1 ? aside(`🔥 ${streak} in a row`) : '',
-        windFrom ? aside('let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
+        windFrom ? aside(wind.heave ? 'one-handed heave: let go in the green!' : 'let go in the green!') : key(first ? 'E / Click' : 'E', 'Hold to shoot'),
         key('Q', 'Drop it'),
+        ...more.flatMap((m) => m.parts),
       ],
     };
   }
@@ -270,6 +335,8 @@ export function installBasketball(ctx: Ctx, deps: BasketballDeps) {
     /** No shot after all (a window opened, the page lost focus): the wind-up's let go of. */
     stopWinding: () => void (windFrom = 0),
     ballHint,
+    /** Adds to what the hint says while the ball's in your hands (after how to shoot and drop it). */
+    addBallHint: (fn: () => Hint | null) => void ballHints.push(fn),
     ballAtFeet,
   };
 }

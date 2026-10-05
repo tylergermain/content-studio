@@ -1,11 +1,15 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
-import { canLabel, cleanLabel, cleanPlan, rowDesks, signColor, type DeskLabel, type FloorPlan } from '../shared/floorplan.js';
-import { DESK_BY_ID, WING } from '../shared/layout.js';
+import { floorSeat, type Piece } from '../shared/furniture.js';
+import { layoutFurniture, structureProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
+import { structureKey } from '../shared/mezzanine.js';
+import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type FloorRoom } from '../shared/floorplan.js';
+import { DESK_BY_ID, MEETING_SEATS, WING, type SeatDef } from '../shared/layout.js';
+import { meetingOf } from '../shared/meeting-place.js';
 
 /**
- * A floor's own layout: the signs over its desks, and how far its back office is built out. Saved in
- * .agent-office/floorplan.json.
+ * A floor's own layout: the signs over its desks, how far its back office is built out, and where its
+ * desks and furniture stand once the office builder's rearranged them. Saved in .agent-office/floorplan.json.
  */
 export class FloorPlanStore {
   private plan: FloorPlan;
@@ -17,11 +21,26 @@ export class FloorPlanStore {
   }
 
   state(): FloorPlan {
-    return { wing: this.plan.wing, labels: { ...this.plan.labels } };
+    return structuredClone(this.plan);
   }
 
   get wing(): number {
     return this.plan.wing;
+  }
+
+  /** The paint the office builder gave the floor over its own (one of FLOOR_PALETTES), if it did. */
+  get look(): number | undefined {
+    return this.plan.look;
+  }
+
+  /** How the floor's arranged now, and the room it's in, for whoever gets round it (the dog): not copies, so not to be changed. */
+  layoutNow(): { desks: DeskLayout; furniture: readonly Piece[]; room: FloorRoom; revision: number } {
+    return { desks: this.plan.desks ?? {}, furniture: layoutFurniture(this.plan), room: roomOf(this.plan), revision: this.plan.layoutRevision ?? 0 };
+  }
+
+  /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without the boss's office. */
+  seat(id: string): SeatDef | undefined {
+    return floorSeat(layoutFurniture(this.plan), this.plan.wing, id, roomOf(this.plan));
   }
 
   /** Hangs a sign over a desk, or takes it down (no text). What it did, for the toast, or why it couldn't. */
@@ -58,6 +77,46 @@ export class FloorPlanStore {
     this.plan.wing--;
     this.save();
     return desks.map((d) => d.id);
+  }
+
+  /**
+   * Saves the floor as the office builder arranged it: its desks, its furniture, its paint and its room
+   * (the layout's checked against the room it's saved with: furniture can stand where the stairs were
+   * on a floor that's all one level, and has to be off them before the mezzanine comes back; what's
+   * upstairs has to come down before its deck goes). `revision`
+   * is the layout it was arranged from, so one saved meanwhile isn't lost. A desk with a worker at it
+   * (`taken`) stays where it is, and so does the meeting place while anyone's sat at it for a meeting.
+   * Why it couldn't, or nothing.
+   */
+  layout(raw: { desks?: unknown; furniture?: unknown; look?: unknown; room?: unknown }, revision: number, taken: (id: string) => boolean): string | undefined {
+    if (revision !== (this.plan.layoutRevision ?? 0)) return 'The layout changed while you were editing. Reload it in the builder';
+    const room = cleanRoom(raw.room);
+    const layout = validateLayout(raw.desks, raw.furniture, room);
+    if (typeof layout === 'string') {
+      // The room itself is changing (a mezzanine coming or going, the kitchen back) and the layout was
+      // fine in the one it has: what's in the new one's way says which, and what to clear first.
+      const had = this.plan.room ?? {};
+      if (structureKey(room) !== structureKey(had)) {
+        const under = validateLayout(raw.desks, raw.furniture, had);
+        if (typeof under === 'object') return structureProblem(under, had, room) ?? layout;
+      }
+      return layout;
+    }
+    const before = this.plan.desks ?? {};
+    const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
+    for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
+    // The meeting's seats are the meeting place's: it doesn't move out from under whoever's in one.
+    if (meetingOf(room) !== meetingOf(this.plan.room) && MEETING_SEATS.some((d) => taken(d.id))) return 'Clear the meeting room before moving the meeting place';
+    const look = cleanLook(raw.look);
+    const { look: _was, room: _had, ...rest } = this.plan;
+    const next: FloorPlan = { ...rest, ...(look !== undefined ? { look } : {}), ...(Object.keys(room).length ? { room } : {}), desks: layout.desks, furniture: layout.furniture, layoutRevision: revision + 1 };
+    try {
+      writeFileSync(this.file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 });
+      renameSync(this.file + '.tmp', this.file);
+      this.plan = next;
+    } catch {
+      return 'The layout could not be saved to disk. Your current office is unchanged';
+    }
   }
 
   private load(): FloorPlan {

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { FLOOR, WALL_T, type Side } from '../../../shared/layout';
 import { FLOOR_PALETTES, type FloorPalette } from '../../../shared/floors';
+import { FACADE } from '../facade';
 import { mesh } from '../toon';
 
 // What the office is painted and glazed with, the planks of its floors, and where on an outside wall a
@@ -16,13 +17,12 @@ export const PALETTE = {
   wood: '#c98b5a',
   cork: '#d8a86a',
   chairs: ['#ff8a5b', '#5bc0eb', '#9bc53d', '#b388eb', '#ffb400', '#f7aef8'],
-  rugs: ['#bde0fe', '#ffd6a5', '#caffbf', '#ffc6ff'],
   plant: '#5fb760',
   plantDark: '#3f8f45',
   pot: '#e76f51',
   ink: '#2b2d42',
-  /** The building's outside paint. */
-  exterior: '#e07a5f',
+  /** The building's outside paint (see facade.ts). */
+  exterior: FACADE.skin,
 };
 
 /** Window glass: faintly blue and see-through. */

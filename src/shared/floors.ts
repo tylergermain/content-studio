@@ -17,7 +17,10 @@ export interface FloorPalette {
   seam: string;
 }
 
-/** The first is the office as it always looked; every new floor takes the next one nobody has. */
+/**
+ * The first is the office as it always looked; every new floor takes the next of the first
+ * STOCK_PALETTES nobody has. The ones after those are a floor's own brand, picked in the office builder.
+ */
 export const FLOOR_PALETTES: FloorPalette[] = [
   { name: 'Maple', wall: '#fff6ea', trim: '#e8a87c', floor: '#f2d7b0', floorAlt: '#e9c89a', seam: '#d9b88c' },
   { name: 'Mint', wall: '#e3f6ec', trim: '#40a878', floor: '#cfe6d9', floorAlt: '#bcdcc9', seam: '#9fc6b0' },
@@ -29,7 +32,15 @@ export const FLOOR_PALETTES: FloorPalette[] = [
   { name: 'Slate', wall: '#edf1f5', trim: '#3d5a80', floor: '#b9c3cd', floorAlt: '#aab5c0', seam: '#8d99a6' },
   { name: 'Rose', wall: '#ffeaf0', trim: '#e0567f', floor: '#eed3da', floorAlt: '#e4c1cb', seam: '#cea5b2' },
   { name: 'Teal', wall: '#e1f7f6', trim: '#1a9a9a', floor: '#c3e2de', floorAlt: '#b0d7d2', seam: '#92c3bd' },
+  // Friday Labs: warm paper walls, the signal green, a walnut floor.
+  { name: 'Friday', wall: '#f5f6f2', trim: '#09ca59', floor: '#9b6a45', floorAlt: '#8d5f3d', seam: '#6f4a30' },
+  // AI Innovators: the same paper, their blue, pale ash boards.
+  { name: 'Innovators', wall: '#f5f6f2', trim: '#0080fe', floor: '#e6dcc8', floorAlt: '#dccfb6', seam: '#c2b497' },
+  // The content studio: charcoal walls, with oak underfoot.
+  { name: 'Studio', wall: '#1c1c1e', trim: '#218cff', floor: '#c9a36b', floorAlt: '#bd9560', seam: '#9c7a4c' },
 ];
+/** How many of FLOOR_PALETTES a new floor is handed one of: the rest are only ever picked. */
+export const STOCK_PALETTES = 10;
 
 export function floorPalette(i: number): FloorPalette {
   return FLOOR_PALETTES[((i % FLOOR_PALETTES.length) + FLOOR_PALETTES.length) % FLOOR_PALETTES.length];

@@ -1,17 +1,24 @@
 import * as THREE from 'three';
 import { LOFT, STAIRS, WALL_T } from '../../../shared/layout';
-import { mesh, roundedBox, textPlane, toon } from '../toon';
-import type { Collider, Interactable } from '../types';
-import type { Fixture } from './fixture';
+import { mesh, toon } from '../toon';
+import type { Collider } from '../types';
+import { keep, type Fixture } from './fixture';
 import { PALETTE, box, floorTexture, glassPane, type Looks } from './materials';
-import { floorPlant, pendant, plant } from './props';
-import { chair, seatable } from './seats';
+
+/** The loft as it's built: all of it in a group of its own, with what's in the way of it. */
+interface Loft {
+  group: THREE.Group;
+  colliders: Collider[];
+}
 
 /**
- * The upstairs office: a loft on posts in the south-east corner, with glass on the two sides that
- * face the desks, reached by stairs along the south wall.
+ * The upstairs room: a loft on posts in the south-east corner, with glass on the two sides that
+ * face the desks, reached by stairs along the south wall. It's built empty: its floor, its posts, its
+ * roof, its glass and the stairs.
  */
-export function buildLoft(group: THREE.Group, colliders: Collider[], interactables: Interactable[], looks: Looks): THREE.Mesh {
+export function buildLoft(looks: Looks): Loft {
+  const group = new THREE.Group();
+  const colliders: Collider[] = [];
   const { minX, maxX, minZ, maxZ, y: floorY, height } = LOFT;
   const w = maxX - minX;
   const d = maxZ - minZ;
@@ -25,8 +32,16 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   const frameMat = toon('#ffffff');
   const woodMat = toon(PALETTE.wood);
 
-  // Floor slab, planked like downstairs, with a trim fascia you see from below.
-  group.add(mesh(box(w, SLAB, d), trimMat, cx, floorY - SLAB / 2, cz));
+  // Floor slab, planked like downstairs. Its underside is the meeting room's ceiling and its edges are
+  // what the hall sees of the loft, so it's the walls' paint, with the trim only a thin line along the
+  // foot of the two open edges (west only as far as the stairs, which run up against the rest).
+  group.add(mesh(box(w, SLAB, d), wallMat, cx, floorY - SLAB / 2, cz));
+  // The line stands proud of the slab's face (as far as the glass's sill does), touching it nowhere it'd flicker.
+  const LINE = { h: 0.06, proud: 0.03 };
+  const lineY = floorY - SLAB + LINE.h / 2;
+  const westRun = STAIRS.minZ - minZ;
+  group.add(mesh(box(w + LINE.proud, LINE.h, LINE.proud), trimMat, cx - LINE.proud / 2, lineY, minZ - LINE.proud / 2, false));
+  group.add(mesh(box(LINE.proud, LINE.h, westRun), trimMat, minX - LINE.proud / 2, lineY, minZ + westRun / 2, false));
   const planks = floorTexture(w, d);
   looks.planks.push(planks);
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(w, d), new THREE.MeshToonMaterial({ map: planks, gradientMap: (toon('#fff') as THREE.MeshToonMaterial).gradientMap }));
@@ -36,9 +51,9 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   group.add(floor);
   colliders.push({ minX, maxX, minZ, maxZ, bottom: floorY - SLAB, top: floorY });
 
-  // Posts holding up the open corner.
+  // Posts holding up the open corner, in the walls' paint like the slab.
   for (const x of [minX + 0.15, cx]) {
-    group.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, floorY - SLAB, 12), trimMat, x, (floorY - SLAB) / 2, minZ + 0.15));
+    group.add(mesh(new THREE.CylinderGeometry(0.12, 0.12, floorY - SLAB, 12), wallMat, x, (floorY - SLAB) / 2, minZ + 0.15));
     colliders.push({ minX: x - 0.14, maxX: x + 0.14, minZ: minZ + 0.01, maxZ: minZ + 0.29, top: floorY - SLAB });
   }
 
@@ -47,8 +62,14 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   const into = WALL_T - 0.03;
   const roof = mesh(box(w + into, 0.2, d + into), wallMat, cx + into / 2, roofY + 0.1, cz + into / 2, false);
   group.add(roof);
-  group.add(mesh(box(w + 0.02 + into, 0.24, 0.04), trimMat, cx + (into - 0.02) / 2, roofY + 0.1, minZ - 0.02, false));
-  group.add(mesh(box(0.04, 0.24, d + 0.02 + into), trimMat, minX - 0.02, roofY + 0.1, cz + (into - 0.02) / 2, false));
+  // A band round its open edges, the walls' paint with the trim's thin line along its top, as at the slab's foot.
+  for (const [mat, y0, y1] of [
+    [wallMat, roofY - 0.02, roofY + 0.22 - LINE.h],
+    [trimMat, roofY + 0.22 - LINE.h, roofY + 0.22],
+  ] as const) {
+    group.add(mesh(box(w + 0.02 + into, y1 - y0, 0.04), mat, cx + (into - 0.02) / 2, (y0 + y1) / 2, minZ - 0.02, false));
+    group.add(mesh(box(0.04, y1 - y0, d + 0.02 + into), mat, minX - 0.02, (y0 + y1) / 2, cz + (into - 0.02) / 2, false));
+  }
   colliders.push({ minX, maxX, minZ, maxZ, bottom: roofY, top: roofY + 0.2 });
   group.add(mesh(box(w, 0.25, 0.04), trimMat, cx, floorY + 0.125, maxZ - 0.02, false));
   group.add(mesh(box(0.04, 0.25, d), trimMat, maxX - 0.02, floorY + 0.125, cz, false));
@@ -112,109 +133,27 @@ export function buildLoft(group: THREE.Group, colliders: Collider[], interactabl
   group.add(handrail);
   // You can't step off the side of the stairs, or climb on from it.
   colliders.push({ minX: fromX, maxX: toX, minZ: STAIRS.minZ - 0.1, maxZ: STAIRS.minZ, top: 99 });
-
-  // Inside: the big desk facing the glass, a comfy couch, a telescope aimed at the desks.
-  const deskX = cx + 0.5;
-  const deskZ = cz - 0.3;
-  const desk = new THREE.Group();
-  desk.add(mesh(roundedBox(2.6, 0.1, 1.2, 0.1), woodMat, 0, 0.78, 0));
-  desk.add(mesh(box(2.4, 0.66, 0.08), toon('#8a5a3b'), 0, 0.4, -0.5));
-  for (const sx of [-1, 1]) desk.add(mesh(box(0.1, 0.72, 1.0), toon('#8a5a3b'), sx * 1.15, 0.37, 0));
-  desk.add(mesh(roundedBox(0.9, 0.55, 0.06, 0.03), toon(PALETTE.ink), 0, 1.18, -0.2));
-  desk.add(mesh(box(0.08, 0.2, 0.08), toon(PALETTE.ink), 0, 0.93, -0.2));
-  // Minesweeper plays on it (features/arcade/ui.ts).
-  const screen = mesh(new THREE.PlaneGeometry(0.8, 0.45), new THREE.MeshBasicMaterial({ color: '#4cc9f0' }), 0, 1.18, -0.165, false);
-  desk.add(screen);
-  desk.add(mesh(new THREE.CylinderGeometry(0.06, 0.05, 0.12, 10), toon('#ffd166'), 0.9, 0.89, 0.15));
-  const plate = textPlane('👑 BOSS', { bg: '#ffd166', size: 48 });
-  plate.scale.multiplyScalar(0.55);
-  plate.position.set(0, 0.5, -0.55);
-  plate.rotation.y = Math.PI;
-  desk.add(plate);
-  const bossChair = chair('#2b2d42');
-  bossChair.scale.setScalar(1.2);
-  bossChair.position.set(0, 0, 1.0);
-  desk.add(bossChair);
-  seatable(bossChair, 'boss-chair', 1.2, interactables);
-  // Clicking the screen is using the chair: sit down, then play.
-  screen.userData.interact = bossChair.userData.interact;
-  desk.position.set(deskX, floorY, deskZ);
-  group.add(desk);
-  colliders.push({ minX: deskX - 1.3, maxX: deskX + 1.3, minZ: deskZ - 0.6, maxZ: deskZ + 0.6, bottom: floorY, top: floorY + 0.8 });
-
-  const couch = new THREE.Group();
-  const couchMat = toon('#ef476f');
-  couch.add(mesh(roundedBox(1, 0.45, 2.4, 0.2), couchMat, 0, 0.3, 0));
-  couch.add(mesh(roundedBox(0.35, 0.9, 2.4, 0.15), couchMat, 0.45, 0.55, 0));
-  for (const sz of [-1, 1]) couch.add(mesh(roundedBox(1, 0.7, 0.3, 0.15), couchMat, 0, 0.45, sz * 1.1));
-  couch.add(mesh(roundedBox(0.2, 0.45, 0.5, 0.1), toon('#ffd166'), 0.2, 0.75, 0.4));
-  couch.position.set(maxX - 0.65, floorY, cz);
-  group.add(couch);
-  colliders.push({ minX: maxX - 1.15, maxX, minZ: cz - 1.2, maxZ: cz + 1.2, bottom: floorY, top: floorY + 0.55 });
-  seatable(couch, 'loft-couch', 1.8, interactables);
-
-  const rug = mesh(roundedBox(4.6, 0.02, 3.2, 0.6), toon('#caffbf'), deskX - 0.3, floorY + 0.015, cz + 0.1, false);
-  group.add(rug);
-
-  const scope = new THREE.Group();
-  for (let i = 0; i < 3; i++) {
-    const a = (i / 3) * Math.PI * 2;
-    const leg = mesh(new THREE.CylinderGeometry(0.025, 0.025, 1.1, 6), inkMat, Math.sin(a) * 0.2, 0.52, Math.cos(a) * 0.2);
-    leg.rotation.set(Math.cos(a) * -0.35, 0, Math.sin(a) * 0.35);
-    scope.add(leg);
-  }
-  const tube = new THREE.Group();
-  const tubeGeo = new THREE.CylinderGeometry(0.1, 0.06, 0.9, 14);
-  tubeGeo.rotateX(Math.PI / 2);
-  tube.add(mesh(tubeGeo, toon('#ffd166'), 0, 0, 0.1));
-  tube.add(mesh(new THREE.CylinderGeometry(0.11, 0.11, 0.08, 14).rotateX(Math.PI / 2), toon(PALETTE.ink), 0, 0, 0.55));
-  tube.position.y = 1.08;
-  scope.add(tube);
-  scope.position.set(minX + 0.9, floorY, minZ + 0.9);
-  group.add(scope);
-  tube.lookAt(-6, 0.8, 0);
-  const telescope: Interactable = { kind: 'telescope', x: scope.position.x, y: floorY, z: scope.position.z, radius: 1.65 };
-  scope.userData.interact = telescope;
-  interactables.push(telescope);
-  colliders.push({ minX: minX + 0.65, maxX: minX + 1.15, minZ: minZ + 0.65, maxZ: minZ + 1.15, bottom: floorY, top: floorY + 1.3 });
-
-  for (const [i, [px, pz, s]] of [
-    [maxX - 0.6, minZ + 0.6, 1],
-    [maxX - 0.6, maxZ - 0.6, 1.2],
-  ].entries()) {
-    // Starting past the monstera, which spreads too wide for a corner this tight.
-    const p = plant(floorPlant(i + 1), s);
-    p.position.set(px, floorY, pz);
-    group.add(p);
-    const r = 0.3 * s;
-    colliders.push({ minX: px - r, maxX: px + r, minZ: pz - r, maxZ: pz + r, bottom: floorY, top: floorY + 0.5 * s });
-  }
-
-  const lamp = pendant();
-  lamp.position.set(deskX, roofY - 0.4, cz);
-  group.add(lamp);
-
-  // Signs: one on the back wall inside, one over the glass for everyone downstairs.
-  const inside = textPlane('👑 Boss Office', { bg: '#fffaf3', size: 64 });
-  inside.scale.multiplyScalar(0.8);
-  inside.position.set(maxX - 3, floorY + 1.9, maxZ - 0.04);
-  inside.rotation.y = Math.PI;
-  group.add(inside);
-  const outside = textPlane('👑 Boss Office', { bg: '#2b2d42', color: '#fffaf3', size: 64, border: '#fffaf3' });
-  outside.scale.multiplyScalar(1.4);
-  // In front of the roof's trim (minZ - 0.04 to minZ), or the trim hides the sign's lower half.
-  outside.position.set(cx, roofY + 0.2, minZ - 0.07);
-  outside.rotation.y = Math.PI;
-  group.add(outside);
-  return screen;
+  return { group, colliders };
 }
 
-declare module '../types' {
-  interface OfficeHandles {
-    /** The monitor on the boss's desk upstairs, where Minesweeper plays (features/arcade/ui.ts). */
-    bossScreen: THREE.Mesh;
-  }
-}
-
-/** The loft up the stairs, over the meeting room: the boss's office. */
-export const loft: Fixture<'bossScreen'> = (site) => ({ handle: { bossScreen: buildLoft(site.group, site.colliders, site.interactables, site.looks) } });
+/**
+ * The corner loft, up the stairs and over the meeting room. It's the floor's choice (see
+ * RoomOptions.mezzanine): on one that hasn't it the lot is put away, the loft and its posts and the
+ * stairs, with what you'd bump into of them, so the floor where the stairs stood is floor like any
+ * other. What's in it is another fixture's: the boss's office (boss-office.ts), or on a floor that keeps
+ * the room empty, the floor's own furniture. The meeting room under it stays (see meeting-room.ts,
+ * which caps its glass where the loft's floor was).
+ */
+export const loft: Fixture = (site) => {
+  const built = buildLoft(site.looks);
+  let there = false;
+  built.group.visible = false;
+  site.get('room').on((room) => {
+    const corner = room.mezzanine === 'corner';
+    if (corner === there) return;
+    there = corner;
+    built.group.visible = there;
+    keep(site.colliders, built.colliders, there);
+  });
+  return { group: built.group };
+};

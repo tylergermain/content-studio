@@ -1,6 +1,11 @@
+import { spotifyRoutes } from './spotify.js';
 // Every HTTP route the office answers, in the order they're tried: a new route goes where it has to
 // come in that order (see http/router.ts). The public ones are tried first, then the sign-in check,
 // then the rest; the last one answers every path left with the client bundle, or a 404.
+import { orgChartRoute } from './org-chart.js';
+import { specialistRoute } from './specialists.js';
+import { workerChatRoutes } from './worker-chat.js';
+import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
 import { authRoutes } from './auth.js';
@@ -12,6 +17,7 @@ import { serviceRoutes } from './services.js';
 
 export const routes: readonly Route[] = [
   // Anyone.
+  spotifyRoutes.callback,
   authRoutes.login,
   authRoutes.loginOptions,
   authRoutes.join,
@@ -26,9 +32,15 @@ export const routes: readonly Route[] = [
   pageRoutes.join,
   pageRoutes.favicon,
   // Signed in.
+  spotifyRoutes.account,
   authRoutes.whoami,
   agentRoutes.models,
+  workerChatRoutes.chat,
+  sharesRoute,
+  specialistRoute,
+  orgChartRoute,
   fileRoutes.image,
+  fileRoutes.media,
   fileRoutes.whiteboardFile,
   fileRoutes.termDrop,
   fileRoutes.changedFile,

@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import { FLOOR } from '../../../shared/layout';
-import { BALL, HOOP, RETURN_AFTER, THREE_POINT, backboard, launch, nearSolids, outOfReach, simulate, type BallHit, type BallShot, type BallSim, type BallState, type Solid } from '../../../shared/hoop';
+import { rimDistance } from '../../../shared/longshots';
+import { BALL, HOOP, RETURN_AFTER, THREE_POINT, backboard, hoopArms, launch, nearSolids, outOfReach, simulate, type BallHit, type BallShot, type BallSim, type BallState, type Solid } from '../../../shared/hoop';
 import type { Collider, Interactable } from '../../world/types';
-import type { Fixture } from '../../world/office/fixture';
+import { keep, type Fixture } from '../../world/office/fixture';
 import { mergeByMaterial, mesh, toon, toonUnique } from '../../world/toon';
 
 const ORANGE = '#ff6b1a';
@@ -12,6 +13,8 @@ export interface HoopView {
   group: THREE.Group;
   /** The backboard and the arms holding it up, to walk (and jump) into. */
   colliders: Collider[];
+  /** Taken down on this floor (see the office builder): no hoop, and no ball. */
+  away: boolean;
   /** The net swings as a ball drops through it. */
   swish(): void;
   update(dt: number): void;
@@ -101,7 +104,7 @@ export function buildHoop(): HoopView {
   const arc = paint(new THREE.RingGeometry(keyW / 2 - w, keyW / 2, 40, 1, -Math.PI / 2, Math.PI), '#ffffff', 0.015);
   arc.position.set(lineX, arc.position.y, z);
 
-  const colliders: Collider[] = [backboard(), { minX: FLOOR.minX, maxX: back, minZ: z - 0.45, maxZ: z + 0.45, bottom: midY - 0.8, top: midY + 0.3 }];
+  const colliders: Collider[] = [backboard(), hoopArms()];
 
   // The net's swing: stretched down as the ball goes through, springing back.
   let stretch = 0;
@@ -109,6 +112,7 @@ export function buildHoop(): HoopView {
   return {
     group,
     colliders,
+    away: false,
     swish() {
       speed -= 5;
     },
@@ -131,8 +135,19 @@ declare module '../../world/types' {
 /** The basketball hoop, on the west wall between the exit door and the kitchen. */
 export const hoop: Fixture<'hoop'> = (site) => {
   const built = buildHoop();
-  site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
-  return { group: built.group, colliders: built.colliders, update: (_t, dt) => built.update(dt), handle: { hoop: built } };
+  const mark = site.wall('west', HOOP.z, (HOOP.board.bottom - 0.6 + HOOP.board.top + 0.1) / 2, HOOP.board.width + 0.2, HOOP.board.top - HOOP.board.bottom + 0.7);
+  // A floor has the hoop or it doesn't (the office builder takes it down and puts it back): with it go what you bump into
+  // of it, the ball, and its stretch of wall, which pictures can hang on while it's down.
+  site.get('furniture').adopt('hoop', {
+    group: built.group,
+    moved: (p) => {
+      built.away = !p;
+      mark.off = !p;
+      keep(site.colliders, built.colliders, !!p);
+    },
+  });
+  // Not its colliders: they're on the office's list already, while the hoop's up (see keep).
+  return { group: built.group, update: (_t, dt) => built.update(dt), handle: { hoop: built } };
 };
 
 // ---- The ball ------------------------------------------------------------------------------------------
@@ -197,6 +212,15 @@ export interface Basket {
   three: boolean;
 }
 
+/**
+ * What a throw flies past on this page: what's near enough the floor to reach (see nearSolids), each
+ * once. Some of the office's own furniture is on its list twice (see stand in world/office/furnish.ts),
+ * and pushed out of one twice a ball goes another way than it does in the office's flight of the throw.
+ */
+export function ballSolids(colliders: readonly Solid[]): Solid[] {
+  return [...new Set(nearSolids(colliders))];
+}
+
 /** Where the ball sits between someone's hands, in their character's own space (forward is +z). */
 export const IN_HANDS = new THREE.Vector3(0, 0.95, 0.42);
 
@@ -228,8 +252,8 @@ export class Basketball {
   private last = new THREE.Vector3(BALL.home.x, BALL.r, BALL.home.z);
   /** It bounced off something (for the sounds). */
   onHit: ((hit: BallHit, at: THREE.Vector3) => void) | null = null;
-  /** Someone threw it (not you: yours you know about): their character's arms go up. */
-  onThrow: ((by: string) => void) | null = null;
+  /** Someone threw it (not you: yours you know about), the throw as the office passed it on: their character's arms go up. */
+  onThrow: ((by: string, shot: BallShot) => void) | null = null;
   onBasket: ((b: Basket) => void) | null = null;
   /** A throw of `by`'s came to nothing: it stopped, or somebody took it, without going in. */
   onMiss: ((by: string) => void) | null = null;
@@ -276,7 +300,7 @@ export class Basketball {
     this.start(s, now - s.elapsed);
     // Catch up with it quietly: what it hit before you saw it is over and done with.
     simulate(this.sim!, (now - this.t0) / 1000, this.solids);
-    if (this.sim!.t < 0.3) this.onThrow?.(s.by);
+    if (this.sim!.t < 0.3) this.onThrow?.(s.by, s);
     this.settled = this.sim!.scored || this.sim!.still || this.sim!.lost;
   }
 
@@ -297,7 +321,7 @@ export class Basketball {
   private start(s: BallShot, t0: number) {
     this.shot = s;
     this.t0 = t0;
-    this.solids = nearSolids(this.colliders());
+    this.solids = ballSolids(this.colliders());
     this.sim = launch(s);
     this.settled = false;
   }
@@ -334,7 +358,7 @@ export class Basketball {
       for (const h of hits) this.onHit?.(h, pos);
       if (s.scored && !was && this.shot) {
         this.settled = true;
-        const distance = Math.hypot(this.shot.x - HOOP.rim.x, this.shot.z - HOOP.rim.z);
+        const distance = rimDistance(this.shot);
         this.onBasket?.({ by: this.shot.by, distance, swish: !s.touched.rim && !s.touched.board, bank: s.touched.board, three: distance > THREE_POINT });
       }
       const gone = s.lost || (s.still && outOfReach(s));

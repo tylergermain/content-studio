@@ -8,8 +8,8 @@ import { mesh, textPlane, toon } from './toon';
 // the ladder up the west wall, and the fire poles. Every floor is built from the same office, so
 // what's here depends on which floor of the building you're on (see Stack.set).
 
-/** The top of the windows either side of the ladder, where the sign to the floor above hangs over. */
-const LADDER_WINDOW_HEAD = Math.max(...WINDOWS.filter((w) => w.wall === 'west').map((w) => w.y1));
+/** The top of the low windows either side of the ladder, where the sign to the floor above hangs over (not the upper ones over them). */
+const LADDER_WINDOW_HEAD = Math.max(...WINDOWS.filter((w) => w.wall === 'west' && w.y0 < 2).map((w) => w.y1));
 
 interface Rect {
   minX: number;
@@ -236,14 +236,13 @@ export interface Stack {
 }
 
 /**
- * The floor you walk on (planks from `planks`), the slab under it, the ceiling over it, the ladder
- * and the fire poles. Their colliders go in `colliders` and change as floors come and go.
+ * The floor you walk on (planks from `planks`), the slab under it (its edges, outside, in `band`), the
+ * ceiling over it, the ladder and the fire poles. Their colliders go in `colliders` and change as floors come and go.
  */
-export function buildStack(colliders: Collider[], planks: THREE.Material): Stack {
+export function buildStack(colliders: Collider[], planks: THREE.Material, band: THREE.Material): Stack {
   const group = new THREE.Group();
   const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T };
   const concrete = toon('#d3d6dd');
-  const band = toon('#e8a87c');
   // Big flat surfaces get no cartoon outline, as the floor never has.
   planks.userData.outlineParameters = { visible: false };
   const tiles = toon('#ffffff').clone();
@@ -424,8 +423,8 @@ export function buildStack(colliders: Collider[], planks: THREE.Material): Stack
     const floor = take(new THREE.Mesh(surface(rectOutline(FLOOR), floorHoles, -1, FLOOR), planks));
     floor.receiveShadow = true;
 
-    // The slab under it (the garage's ceiling): concrete underneath, a peach band between the floors
-    // outside. Where a hole goes through, the garage sees a lid of concrete, not up into the office.
+    // The slab under it (the garage's ceiling): concrete underneath, a band in the floor's trim between
+    // the floors outside. Where a hole goes through, the garage sees a lid of concrete, not up into the office.
     const slabHoles: Hole[] = [...(below ? [LADDER.hatch] : []), ...holes.map((p) => ({ x: p.x, z: p.z, r: POLE.hole + 0.02 }))];
     const slabShape = new THREE.Shape(rectOutline(B).map(([x, z]) => new THREE.Vector2(x, -z)));
     slabShape.holes = slabHoles.map((h) => holePath(h, -1));
@@ -587,7 +586,7 @@ declare module './types' {
 
 /** The office floor's floor and ceiling, with the ways up and down to the other floors through them. */
 export const stack: Fixture<'stack'> = (site) => {
-  const built = buildStack(site.colliders, site.planks);
+  const built = buildStack(site.colliders, site.planks, site.looks.trim);
   built.set({ index: 0, count: 1 });
   // The ladder and its sign, up the west wall.
   site.wall('west', LADDER.z + 0.6, WALL_HEIGHT / 2, LADDER.width + 2.4, WALL_HEIGHT);
