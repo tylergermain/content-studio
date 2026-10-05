@@ -1,0 +1,5 @@
+/* The 🥽 Enter VR button: bottom right of the office, glass like the dock's, there only where a VR headset is. */
+.vr-btn { position: absolute; right: 12px; bottom: 12px; height: 44px; padding: 0 14px; font-size: 17px; gap: 7px; border-radius: 13px; border-color: var(--glass-border); background-color: var(--glass); -webkit-backdrop-filter: var(--glass-filter); backdrop-filter: var(--glass-filter); box-shadow: var(--shadow-2); }
+.vr-btn:hover { background-color: var(--glass-hover); }
+.vr-btn .lbl { font-size: 14px; font-weight: 600; }
+.vr-btn[aria-busy=true] { opacity: .6; cursor: progress; }

@@ -2,7 +2,7 @@ import './windows.css';
 import type { GhIssue, GhLabel, GhPull } from '../../../shared/protocol';
 import type { Net } from '../../net';
 import { h, openModal } from '../dom';
-import { repoUrlOf } from '../markdown';
+import { repoUrlOf } from '../repo-url';
 import { getJson, labelWaiters } from './api';
 import { errorBox, spinnerRow } from './pieces';
 

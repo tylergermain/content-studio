@@ -7,6 +7,9 @@ import type { Piece } from '../furniture.js';
 import type { DeskLayout } from '../office-builder.js';
 import type { FloorPlan, RoomOptions } from '../floorplan.js';
 import type { GoatState } from './goat.js';
+import type { HeliState } from './heli.js';
+import type { PuttView } from './minigolf.js';
+import type { StreetView } from './street.js';
 import type { CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { HoopView } from './hoop.js';
@@ -142,6 +145,12 @@ export interface FloorView {
   watch: WatchState;
   /** Who on this floor has a dram from a whisky cabinet in their hand, by peer id (see shared/whisky.ts). */
   whisky: string[];
+  /** Main Street's businesses: who has claimed which plot (see shared/mainstreet.ts). The building's, the same on every floor. */
+  street: StreetView;
+  /** Putt Street, the mini golf course on Main Street: the rounds being played and its records. The building's, the same on every floor. */
+  putt: PuttView;
+  /** Friday One, the helicopter: where it is and who's aboard. The building's, the same on every floor. */
+  heli: HeliState;
 }
 
 export type FloorClientMsg =

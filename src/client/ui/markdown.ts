@@ -2,6 +2,7 @@ import './markdown.css';
 import { Marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { h } from './dom';
+import { repoUrlOf } from './repo-url';
 
 // GitHub-flavored markdown for issue and PR text: rendered by marked, then sanitized by DOMPurify
 // before it touches the page, since anyone who can open an issue writes it.
@@ -117,7 +118,4 @@ export function markdownFile(src: string): HTMLElement {
   return el;
 }
 
-/** https://github.com/owner/repo from an issue or PR URL. */
-export function repoUrlOf(itemUrl: string): string {
-  return itemUrl.replace(/\/(pull|issues)\/\d+.*$/, '');
-}
+export { repoUrlOf };

@@ -1,7 +1,5 @@
-import type { GhComment } from '../../../shared/protocol';
 import { AVATAR_COLORS } from '../../state';
 import { h, timeAgo } from '../dom';
-import { markdown } from '../markdown';
 
 // ---- Small pieces ---------------------------------------------------------------------------------
 
@@ -22,15 +20,6 @@ export const REVIEW_BADGE: Record<string, [string, string]> = {
   COMMENTED: ['💬 reviewed', ''],
   DISMISSED: ['review dismissed', 'muted'],
 };
-
-export function commentCard(c: GhComment, itemUrl: string, verb: string, badge?: [string, string]) {
-  return h(
-    'article.gh-card',
-    { class: badge?.[1] ? `is-${badge[1]}` : '' },
-    h('header', {}, avatar(c.author), h('b', {}, c.author), h('span', {}, verb), when(c.createdAt, c.url), badge ? h('span.gh-badge', { class: badge[1] }, badge[0]) : null),
-    c.body.trim() || !badge ? markdown(c.body, itemUrl) : null,
-  );
-}
 
 /** Drops the nulls of optional pieces, for replaceChildren. */
 export function nodes(...xs: (Node | string | null | undefined)[]): (Node | string)[] {

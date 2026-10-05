@@ -11,17 +11,21 @@ import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { goatHandlers, goatView } from './goat.js';
+import { heliHandlers, heliHooks, heliView } from './heli.js';
 import { hoopHandlers, hoopHooks, hoopView } from './hoop.js';
 import { jukeboxHandlers, jukeboxView } from './jukebox.js';
 import { meetingHandlers, meetingView } from './meetings.js';
+import { puttHandlers, puttHooks, puttView } from './minigolf.js';
 import { officeBuilderHandlers } from './office-builder.js';
 import { planHandlers, planView } from './plan.js';
 import { studioHandlers, studioView, tickerView, watchView } from './studio.js';
 import { presenceHandlers } from './presence.js';
+import { vrHandlers } from './vr.js';
 import { queueHandlers, queueView } from './queue.js';
 import { rooftopHandlers } from './rooftop.js';
 import { servicesView, settingsHandlers } from './settings.js';
 import { signinsHandlers } from './signins.js';
+import { streetHandlers, streetView } from './street.js';
 import { teamHandlers } from './team.js';
 import { usageHandlers } from './usage.js';
 import { webcamHandlers } from './webcam.js';
@@ -42,17 +46,21 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...floorHandlers,
   ...githubHandlers,
   ...goatHandlers,
+  ...heliHandlers,
   ...hoopHandlers,
   ...jukeboxHandlers,
   ...meetingHandlers,
+  ...puttHandlers,
   ...planHandlers,
   ...officeBuilderHandlers,
   ...studioHandlers,
   ...presenceHandlers,
+  ...vrHandlers,
   ...queueHandlers,
   ...rooftopHandlers,
   ...settingsHandlers,
   ...signinsHandlers,
+  ...streetHandlers,
   ...teamHandlers,
   ...usageHandlers,
   ...webcamHandlers,
@@ -65,7 +73,7 @@ export const handlers: HandlerMap<ClientMsg> = {
  * The features that keep something per person on a floor, in the order they let go of it when
  * someone leaves the floor or the office (see FeatureHooks): the order the office has always done it in.
  */
-export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, hoopHooks, whiskyHooks];
+export const features: readonly FeatureHooks[] = [workerHooks, changesHooks, whiteboardHooks, ballHooks, carHooks, cabinetHooks, hoopHooks, whiskyHooks, puttHooks, heliHooks];
 
 /** What someone arriving on a floor is sent (see office/views.ts): a piece from each feature, in the order it has always gone out. */
 export const views: ViewPieces = {
@@ -90,4 +98,7 @@ export const views: ViewPieces = {
   ticker: tickerView,
   watch: watchView,
   whisky: whiskyView,
+  street: streetView,
+  putt: puttView,
+  heli: heliView,
 };

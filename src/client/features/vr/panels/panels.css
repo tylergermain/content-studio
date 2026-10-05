@@ -1,0 +1,26 @@
+/* VR's panels (features/vr/panels): only while a session is on (html.vr-panels), and the list of
+   links held for after it. A window's, a toast's and the HUD's entry animations are left out in VR,
+   so a panel is painted as the window settles rather than mid-pop, and the offer of the 2D view waits
+   for the screen; nothing else on the page changes. */
+
+html.vr-panels .backdrop,
+html.vr-panels .backdrop > *,
+html.vr-panels .modal,
+html.vr-panels .toast { animation: none; }
+
+/* The 2D view offered for slow frames (ui/litesuggest.ts) would leave VR: it waits for you on the screen. */
+html.vr-panels .lite-offer { display: none; }
+
+/* The links you followed in VR, to open now you're out (see capture.ts's HeldLinks). */
+.vr-links {
+  position: absolute; right: 16px; bottom: 84px; z-index: 30; width: min(360px, calc(100vw - 32px)); max-height: 50vh; overflow: auto;
+  padding: 12px 14px; font-size: 14px;
+}
+.vr-links-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.vr-links-head .close { padding: 4px 9px; }
+.vr-links ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.vr-links li a {
+  display: block; padding: 6px 10px; border-radius: var(--r-sm); background: var(--surface); border: 1px solid var(--hairline);
+  color: var(--accent-text); text-decoration: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.vr-links li a:hover { background: var(--glass-hover); }

@@ -1,0 +1,111 @@
+/* The Main Street window: the street from above beside the plot picked on it, and a street admin's form. */
+.modal.ms-window { width: min(920px, 100%); }
+.ms-body { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(290px, 1fr); gap: 18px; align-items: start; }
+.ms-map { position: sticky; top: 0; padding: 8px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); }
+.ms-pane { min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.ms-side { display: flex; flex-direction: column; gap: 12px; }
+@media (max-width: 760px) {
+  .ms-body { grid-template-columns: 1fr; }
+  .ms-map { position: static; }
+}
+
+/* The plan, drawn in meters: sizes here are the street's, not the screen's. */
+.ms-plan { display: block; width: 100%; height: auto; border-radius: var(--r-md); font-family: var(--font); user-select: none; }
+.ms-plan .ms-grass { fill: #d6e9c9; }
+.ms-plan .ms-sidewalk { fill: #ebe5da; }
+.ms-plan .ms-road { fill: #575d6b; }
+.ms-plan .ms-centre { stroke: #f6f3ea; stroke-width: .35; stroke-dasharray: 3 2.4; }
+.ms-plan .ms-road-name { fill: #f6f3ea; font-size: 2.3px; font-weight: 700; letter-spacing: .6px; }
+.ms-plan .ms-lot { cursor: pointer; outline: none; }
+.ms-plan .ms-ground { fill: #c6dfb5; stroke: rgba(60, 80, 50, .2); stroke-width: .3; transition: fill .15s var(--ease); }
+.ms-plan .ms-lot:hover .ms-ground { fill: #b9d8a5; }
+.ms-plan .ms-lot:focus-visible .ms-ground { stroke: var(--accent); stroke-width: .7; }
+.ms-plan .ms-lot-name { fill: rgba(29, 29, 31, .6); font-size: 2.4px; font-weight: 700; letter-spacing: .35px; pointer-events: none; }
+.ms-plan .ms-ring { fill: none; stroke: var(--accent); stroke-width: .9; pointer-events: none; }
+.ms-plan .ms-lot.draft .ms-ring { stroke-dasharray: 2.2 1.4; }
+.ms-plan text { pointer-events: none; }
+
+.ms-plan .ms-tower { fill: #2b2d42; }
+.ms-plan .ms-tower-name { fill: #fff; font-size: 3.1px; font-weight: 700; letter-spacing: .45px; }
+.ms-plan .ms-tower-sub { fill: #2fbf71; font-size: 2.4px; font-weight: 600; }
+
+.ms-plan .ms-path { stroke: #e9dcc9; }
+.ms-plan .ms-green { fill: #a2d889; }
+.ms-plan .ms-flag { fill: #e63946; }
+.ms-plan .ms-bench { fill: #9c6a3a; }
+.ms-plan .ms-board { fill: #2b2d42; }
+.ms-plan .ms-pad { fill: #d0d4da; stroke: #2fbf71; stroke-width: .7; }
+.ms-plan .ms-pad-h { fill: #fff; font-size: 5px; font-weight: 800; }
+
+.ms-plan .ms-fence { fill: none; stroke: #fff; stroke-width: .45; }
+.ms-plan .ms-felt { fill: #3fa34d; }
+.ms-plan .ms-hole { fill: #fff; font-size: 3.6px; font-weight: 700; }
+.ms-plan .ms-kiosk { fill: #f4efe6; stroke: #2b2d42; stroke-width: .3; }
+
+.ms-plan .ms-staked { fill: rgba(255, 255, 255, .3); stroke: #7d8c77; stroke-width: .35; stroke-dasharray: 1.4 1.1; }
+.ms-plan .ms-stake { fill: #ff7a1a; }
+.ms-plan .ms-lease { fill: #5c6b57; font-size: 3.1px; font-weight: 800; letter-spacing: .6px; }
+.ms-plan .ms-dirt { fill: #dacdb5; }
+.ms-plan .ms-hoarding { fill: none; stroke-width: 1.3; }
+.ms-plan .ms-jib { stroke: #f2b705; stroke-width: .9; stroke-linecap: round; }
+.ms-plan .ms-mast { fill: #f2b705; stroke: #2b2d42; stroke-width: .3; }
+.ms-plan .ms-biz { fill: #1d1d1f; font-size: 3.5px; font-weight: 700; }
+.ms-plan .ms-biz-sub { fill: #3a3a3c; font-size: 2.3px; font-weight: 600; }
+.ms-plan .ms-shell { stroke: rgba(0, 0, 0, .25); stroke-width: .3; }
+.ms-plan .ms-door { fill: rgba(255, 255, 255, .72); }
+
+.ms-plan .ms-person { stroke: #fff; stroke-width: .45; pointer-events: none; }
+.ms-plan .ms-heli { pointer-events: none; }
+.ms-plan .ms-heli-disc { fill: rgba(43, 45, 66, .12); stroke: #2b2d42; stroke-width: .25; stroke-dasharray: .8 .6; }
+.ms-plan .ms-heli-body { fill: #2b2d42; }
+.ms-plan .ms-heli-tail { stroke: #2b2d42; stroke-width: .6; stroke-linecap: round; }
+.ms-plan .ms-you { pointer-events: none; }
+.ms-plan .ms-you circle { fill: var(--accent); stroke: #fff; stroke-width: .6; }
+.ms-plan .ms-you text { fill: var(--accent-text); font-size: 2.6px; font-weight: 700; }
+
+/* What the plan's marks mean, under it. */
+.ms-legend { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 8px 4px 2px; font-size: 12px; color: var(--muted); }
+.ms-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.ms-legend i { width: 14px; height: 10px; flex: none; border-radius: 2px; }
+.ms-key-lease { border: 1.5px dashed #7d8c77; background: rgba(255, 255, 255, .5); }
+.ms-key-site { border: 2px solid #ff7a45; background: #dacdb5; }
+.ms-key-shell { background: #ff7a45; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .2); }
+.ms-legend .ms-key-heli { width: 12px; height: 12px; border-radius: 50%; border: 1.5px dashed #2b2d42; background: rgba(43, 45, 66, .12); }
+.ms-legend .ms-key-you { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 1.5px #fff, 0 0 0 2px rgba(0, 0, 0, .12); }
+
+/* The plot picked: what it is, what stands on it, and the form. */
+.ms-head { display: flex; align-items: center; gap: 10px; }
+.ms-head h3 { margin: 0; flex: 1; font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+.ms-pill { background: var(--surface); box-shadow: inset 0 0 0 1px var(--hairline); }
+.ms-about { margin: 0; font-size: 14px; line-height: 1.45; }
+.ms-quiet { color: var(--muted); font-size: 13px; }
+.ms-card { display: flex; align-items: center; gap: 12px; padding: 12px 14px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r-lg); }
+.ms-dot { width: 22px; height: 22px; flex: none; border-radius: 7px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14); }
+.ms-card-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.ms-card-text b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ms-card-text span { font-size: 13px; color: var(--muted); }
+
+.ms-form { display: flex; flex-direction: column; gap: 12px; }
+.ms-field { display: flex; flex-direction: column; gap: 6px; }
+.ms-label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.ms-note { margin: 0; font-size: 12px; color: var(--muted); }
+.ms-swatches { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.ms-swatch, .ms-custom { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .14), 0 1px 2px rgba(0, 0, 0, .12); transition: transform .12s var(--ease); }
+.ms-swatch:hover, .ms-custom:hover { transform: scale(1.08); }
+.ms-swatch.on { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ms-custom { background: conic-gradient(#ef476f, #ffd166, #06d6a0, #5bc0eb, #b388eb, #ef476f); }
+.ms-custom::-webkit-color-swatch-wrapper { padding: 0; }
+.ms-custom::-webkit-color-swatch { border: 0; opacity: 0; }
+.ms-custom::-moz-color-swatch { border: 0; opacity: 0; }
+.ms-form .seg { gap: 6px; }
+.ms-form .seg .btn { padding: 6px 10px; font-size: 13px; }
+.ms-chip { width: 14px; height: 14px; flex: none; border-radius: 4px; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .18); }
+.ms-form .ms-storeys .btn { min-width: 32px; justify-content: center; padding: 6px 0; font-variant-numeric: tabular-nums; }
+.ms-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.ms-release { margin-right: auto; color: var(--bad-ink); }
+.ms-confirm { display: flex; flex-direction: column; gap: 10px; padding: 12px 14px; border: 1px solid var(--bad); border-radius: var(--r-lg); background-color: var(--surface); background-image: linear-gradient(var(--bad-tint), var(--bad-tint)); }
+.ms-confirm p { margin: 0; font-size: 13px; line-height: 1.45; }
+.ms-status { margin: 0; font-size: 13px; font-weight: 500; line-height: 1.4; }
+.ms-status:empty { display: none; }
+.ms-status.good { color: var(--good-ink); }
+.ms-status.bad { color: var(--bad-ink); }

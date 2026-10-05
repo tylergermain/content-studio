@@ -1,0 +1,14 @@
+/* Friday One's chip, while you're aboard (features/heli/ui.ts): how high, how fast and which way, whether
+   it's down, hovering or can't land here, and who's aboard. Top centre, like golf's meter, and it takes
+   no clicks: the mouse looks round. */
+
+.heli-hud { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); min-width: 250px; max-width: calc(100vw - 32px); padding: 8px 16px 9px; display: grid; gap: 3px; justify-items: center; font-size: 13px; text-align: center; pointer-events: none !important; }
+.heli-title { font-weight: 600; }
+.heli-title small { font-weight: 500; color: var(--muted); }
+.heli-stats { font-size: 16px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: .01em; white-space: nowrap; }
+.heli-stats .unit { font-size: 12px; font-weight: 500; color: var(--muted); }
+.heli-status { padding: 1px 9px; border-radius: 999px; background: var(--good-tint); color: var(--good-ink); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.heli-status.calm { background: var(--wash); color: var(--muted); }
+.heli-status.warn { background: var(--warn-tint); color: var(--warn-ink); }
+.heli-crew { color: var(--muted); font-size: 12px; max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#hud:has(.heli-hud:not(.hidden)) #toasts { translate: 0 70px; }

@@ -9,7 +9,8 @@ import { getJson } from './api';
 import { openClose } from './close';
 import { commentBox } from './comment-box';
 import { labelButton, labelChip } from './labels';
-import { avatar, commentCard, errorBox, nodes, spinnerRow } from './pieces';
+import { commentCard } from './comment-card';
+import { avatar, errorBox, nodes, spinnerRow } from './pieces';
 import { issueContext, issuePrompt, type BoardActions } from './prompts';
 
 // ---- The issue window -----------------------------------------------------------------------------
