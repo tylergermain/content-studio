@@ -72,6 +72,7 @@ import { installWhisky } from './features/whisky';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
+import { installVr } from './features/vr';
 
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
 const loading = loadingScreen(onModelsProgress);
@@ -197,6 +198,8 @@ parts.hud = installHud(ctx, core, parts);
 // ---- Main loop ---------------------------------------------------------------------------------------
 fitWindow(ctx);
 const frame = frameLoop(ctx, loading);
+// A VR headset borrows the loop while you're in it (see features/vr).
+installVr(ctx, parts, { loop: frame });
 
 // ---- Boot ------------------------------------------------------------------------------------------
 function boot() {

@@ -17,6 +17,15 @@ import type { Interactable } from '../world/types';
 
 export type PointerParts = Pick<Parts, 'worlds' | 'rooftop' | 'place' | 'you' | 'boards' | 'cards' | 'seating' | 'hoops' | 'emotes' | 'hanging' | 'telescope' | 'hintbar'>;
 
+/**
+ * Something to aim with instead of the camera's crosshair: its ray this frame (null while it points at
+ * nothing in the world, at a panel say), and the eye that each kind's reach is measured from.
+ */
+export interface Aim {
+  ray(): THREE.Ray | null;
+  eye(): THREE.Vector3;
+}
+
 /** Listens for the mouse over the canvas, registers the aim tick ('aim'), and takes the player's clicks. */
 export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   const { player, camera, canvas, office } = ctx;
@@ -82,11 +91,24 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   const raycaster = new THREE.Raycaster();
   const CROSSHAIR = new THREE.Vector2(0, 0);
   const eye = new THREE.Vector3();
+  /** What aims instead of the crosshair, if anything: a VR controller's ray (see features/vr/interact.ts). */
+  let aim: Aim | null = null;
 
-  /** What the ray through `ndc` lands on first, whether it is within reach (plus `slack` meters), and where it hit. */
+  /**
+   * What the ray through `ndc` lands on first (or the one `aim` gives, measuring reach from its eye),
+   * whether it is within reach (plus `slack` meters), and where it hit.
+   */
   function aimedAt(ndc: THREE.Vector2, slack = 0): { it: Interactable; near: boolean; hit: THREE.Intersection } | null {
-    raycaster.setFromCamera(ndc, camera);
-    eye.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
+    if (aim) {
+      const ray = aim.ray();
+      if (!ray) return null;
+      raycaster.set(ray.origin, ray.direction);
+      raycaster.camera = camera;
+      eye.copy(aim.eye());
+    } else {
+      raycaster.setFromCamera(ndc, camera);
+      eye.set(player.pos.x, player.pos.y + EYE_HEIGHT, player.pos.z);
+    }
     const roof = parts.rooftop.roof();
     for (const hit of raycaster.intersectObjects(core.upTop && roof ? roof.pickables : [office.group, ...ctx.usables.pickables()], true)) {
       let it: Interactable | undefined;
@@ -179,5 +201,7 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
     aimedNote: () => aimedNote,
     usable,
     use,
+    /** Aims with `a` instead of the crosshair (a VR controller), or with the crosshair again (null). */
+    setAim: (a: Aim | null) => void (aim = a),
   };
 }
