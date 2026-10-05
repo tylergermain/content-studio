@@ -87,7 +87,7 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
       },
       { id: 'share', icon: '🖥️', label: () => (voice.sharing ? 'Stop sharing' : 'Share screen'), section: 'Together', on: () => voice.sharing, status: () => voice.sharing, chip: () => 'Sharing', blocked: noMedia, run: () => void talk.toggleShare() },
       { id: 'decor', icon: '🖼️', label: () => (hanging.hanger.active ? 'Stop hanging the picture' : 'Hang a picture'), section: 'Together', key: 'F', on: () => hanging.hanger.active, status: () => hanging.hanger.active, run: () => (hanging.hanger.active ? hanging.hanger.cancel() : hanging.startHanging()) },
-      { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Together', shown: () => store.invites, run: () => openTeam(net) },
+      { id: 'team', icon: '👥', label: 'Invite teammates', section: 'Together', shown: () => store.invites && store.me.admin, run: () => openTeam(net) },
       { id: 'org-chart', icon: '🏢', label: 'Org chart', section: 'Together', shown: () => !!store.floor, run: () => openOrgChart() },
       { id: 'accounts', icon: '🔑', label: 'Accounts', section: 'Together', shown: () => store.me.admin, title: () => 'Invite people, see who has an account, revoke them', run: () => openAccounts(net) },
       { id: 'signins', icon: '🔐', label: 'Your sign-ins', section: 'Together', shown: () => !!store.me.account, tone: () => (needsSigningIn() ? 'danger' : undefined), status: needsSigningIn, chip: () => 'Sign in to Claude', title: () => 'The Claude plan and GitHub account your workers run on: your own', run: () => openSignIns(net) },
@@ -101,10 +101,10 @@ export function installHud(ctx: Ctx, core: CoreState, parts: HudParts) {
         label: () => (store.upgrade.phase === 'building' ? 'Upgrading…' : store.upgrade.latest ? 'Update the office' : 'Upgrade the office'),
         section: 'Office',
         shown: () => store.upgrade.available,
-        // A new version, or one being built, gets a place on the top bar until it's in.
-        status: () => !!store.upgrade.latest || store.upgrade.phase === 'building',
+        // A new version (for the admins, who upgrade) or one being built (for everyone) gets a place on the top bar until it's in.
+        status: () => (store.me.admin && !!store.upgrade.latest) || store.upgrade.phase === 'building',
         chip: () => (store.upgrade.phase === 'building' ? 'Upgrading…' : 'Update'),
-        tone: () => (store.upgrade.latest && store.upgrade.phase !== 'building' ? 'primary' : undefined),
+        tone: () => (store.me.admin && store.upgrade.latest && store.upgrade.phase !== 'building' ? 'primary' : undefined),
         title: () => (store.upgrade.latest ? `New version: ${store.upgrade.latest.subject}` : 'Upgrade the office'),
         run: () => openUpgrade(net),
       },

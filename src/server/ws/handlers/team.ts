@@ -1,4 +1,5 @@
-// Who may SSH-tunnel into an office deployed with deploy/aws.sh or deploy/azure.sh.
+// Who may SSH-tunnel into an office deployed with deploy/aws.sh or deploy/azure.sh. Anyone may look;
+// inviting someone or taking their access away is the admins'.
 import type { TeamClientMsg } from '../../../shared/protocol.js';
 import type { Ctx } from '../../office/context.js';
 import { str } from '../../office/input.js';
@@ -14,6 +15,8 @@ export const teamHandlers = {
   'team.invite'(ctx, c, msg) {
     const who = c.peer.name;
     const user = str(msg.github, 64);
+    // Their keys open a tunnel to the office's machine: admins hand those out.
+    if (!ctx.meOf(c.accountId).admin) return ctx.sendTo(c, { t: 'team.invited', github: user, error: 'Only admins can invite teammates' });
     void ctx.team.invite(user).then(async (r) => {
       ctx.sendTo(c, { t: 'team.invited', github: user, ...r });
       if ('error' in r) return;
@@ -24,6 +27,7 @@ export const teamHandlers = {
   'team.remove'(ctx, c, msg) {
     const who = c.peer.name;
     const name = str(msg.name, 64);
+    if (!ctx.meOf(c.accountId).admin) return ctx.warn(c, 'Only admins can remove a teammate’s access');
     void ctx.team.remove(name).then(async (err) => {
       if (err) return ctx.warn(c, err);
       ctx.toastAll(`${who} removed ${name}'s access`);
