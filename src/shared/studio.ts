@@ -7,6 +7,7 @@
 
 import type { StationKind } from './layout.js';
 import { CHANNEL_ID, channelLink } from './youtube.js';
+import { cleanApps, type AppsSetup } from './apps.js';
 
 /** The wall boards a floor can make its own: the ones that hang where Issues and Pull Requests do. */
 export const STUDIO_BOARDS = ['issues', 'pulls'] as const;
@@ -63,6 +64,8 @@ export interface WatchSetup {
 }
 
 export interface StudioSetup {
+  /** The apps this floor has turned off (see shared/apps.ts); none when all are on. */
+  apps?: AppsSetup;
   boards: Partial<Record<StudioBoard, BoardSetup>>;
   agents: Partial<Record<StationKind, AgentSetup>>;
   ticker?: TickerSetup;
@@ -204,6 +207,8 @@ export function cleanSetup(raw: unknown): StudioSetup {
   if (symbols.length) setup.ticker = { symbols };
   const channels = cleanChannels(r.watch && typeof r.watch === 'object' ? (r.watch as Record<string, unknown>).channels : undefined);
   if (channels.length) setup.watch = { channels };
+  const apps = cleanApps(r.apps);
+  if (apps) setup.apps = apps;
   return setup;
 }
 

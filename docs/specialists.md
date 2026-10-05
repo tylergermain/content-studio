@@ -20,6 +20,8 @@ These are persistent local processes with shared floor access. A role folder doe
 
 ## Interfaces
 
+Each tab is an **app**, and an admin turns a floor's apps on and off with a checkmark under **☰ › 🧩 Apps**: the Design canvas, the Image board, the Screening room, Reports, and Files, which is always on. Nothing is installed. A worker's window shows the floor's apps that are on: its role's own first (the interface below), then any other with something to show, Files last. A role whose own app a floor turned off opens on the next one that's on. The choice is kept in the floor's setup (`studio.json`, as `apps.off`); saving the floor setup keeps it as it is.
+
 Each role opens with an interface made for what it hands back. Press **E** at the worker's desk: the chat window opens with the conversation on the left and the role's workspace beside it. The desk hint says which one you'll get.
 
 | Interface | Role | What it is for |

@@ -171,7 +171,8 @@ export function openStudioSetup(net: Net) {
   save.addEventListener('click', () => {
     const channels = watch.value();
     if ('bad' in channels) return toast(`Not a YouTube channel or video link: ${channels.bad[0]}`, 'warn');
-    const setup: StudioSetup = { boards: {}, agents: {} };
+    // The floor's apps are set in their own window (☰ › Apps): saving this one keeps them as they are.
+    const setup: StudioSetup = { boards: {}, agents: {}, ...(store.studio.setup.apps ? { apps: store.studio.setup.apps } : {}) };
     for (const b of boards) {
       const v = b.value();
       if (v) setup.boards[b.key] = v;
