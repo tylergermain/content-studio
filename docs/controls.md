@@ -49,3 +49,19 @@ The prompt edits the way it does in your own terminal (iTerm2's *Natural Text Ed
 | ⌘ + ⌫ | Delete to the start of the line (Mac) |
 | ⌘ + ⌦ | Delete to the end of the line (Mac) |
 | ⌘ + ← / → | Jump to the start / end of the line (Mac) |
+
+## In VR
+
+In a Meta Quest's browser, **🥽 Enter VR** (bottom right) puts you in the office with the controllers in your hands (see [VR](vr.md)):
+
+| Control | Action |
+| --- | --- |
+| Left stick | Walk where you look; click it to run. On the ladder, a pole or in a car it's W A S D |
+| Right stick ← / → | Turn 30° (45° in the VR prefs) per flick |
+| Right stick ↑ / ↓ | Scroll the panel you point at |
+| Trigger | Click the panel you point at; anywhere else, E at what you point at (held as long as you hold it) |
+| Grip | Jump, or get up from a seat; on a panel, take hold of it and move it |
+| B / Y | Close the top window (as Esc does), else the keyboard, else the HUD sheet |
+| X | The HUD sheet: the ☰ menu, people, workers and chat |
+| A | The keyboard; held in a field with a 🎤, push to talk |
+| Both sticks clicked | The perf overlay and Leave VR |

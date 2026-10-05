@@ -52,4 +52,5 @@ export const HELP_ROWS: readonly (readonly [string, string])[] = [
   ['Esc', 'Close any window and get back to looking around'],
   ['Ctrl + [', 'Send Esc to a terminal instead, to close a menu like Claude’s /skills or interrupt Claude. ⎋ Esc in the terminal’s header does the same'],
   ['⚙️', 'Settings (in the ☰ menu): switch between first and third person'],
+  ['🥽', 'VR, in a Meta Quest’s browser: 🥽 Enter VR (bottom right) and you’re in the office at your real height. Left stick walks (click it to run), right stick turns, the trigger does what E does (or clicks the window it points at), grip jumps or gets you up, B or Y closes a window, X brings up the ☰ menu, people and chat, A the keyboard, both sticks clicked the perf overlay and Leave VR. Everyone else sees your head turn and your hands move'],
 ];
