@@ -47,6 +47,22 @@ Don't use Tailscale Funnel for this: it puts the office, and its agents with she
 | A | The keyboard. Held in a field that has a 🎤: push to talk |
 | Both sticks clicked | The perf overlay: the numbers, a button for each quality knob, and Leave VR |
 
+### With one controller
+
+If only one controller is there (a flat battery, a broken one, one put down for a while), after a second and a half its jobs move over to the one you have, and the hint strip says so:
+
+| Control | Does |
+| --- | --- |
+| Stick ↑ / ↓ | Walk forward or back the way you look (no sidestep); click it in to run. On a panel its ray points at, it scrolls the panel instead |
+| Stick flicked ← / → | Turn 30° (45° in the prefs), once per flick |
+| Trigger, grip | As with two |
+| B (Y on a left one), tapped | Back, as **Esc** does |
+| B (Y), held half a second | The HUD sheet: the ☰ menu, people, workers, chat and the floor menu |
+| A (X) | The keyboard; held in a field with a 🎤, push to talk |
+| Stick clicked in and held | The perf overlay and Leave VR |
+
+When the other controller comes back, both work as above again.
+
 Walking about the room for real moves you in the office too; a wall stops you, and if you lean through it the view is pushed back out. The golf tee, the darts, the axe lane and the telescope fly the camera about, so in VR they say *Not in VR yet*.
 
 ## Windows
