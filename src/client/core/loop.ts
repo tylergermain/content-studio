@@ -13,6 +13,9 @@ import type { Parts } from './parts';
 import type { Frame } from './registry';
 import { FOV } from './scene';
 
+// The loop itself (and how a VR session borrows it) is in frame-loop.ts, which loads nothing of the office.
+export { frameLoop, type FrameLoop } from './frame-loop';
+
 /** Covering less ground than this (m/s) since your last footstep, your feet make no sound: a walk is 4.6. */
 const QUIET_FEET = 1.2;
 
@@ -191,20 +194,4 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
       sky.shading(true);
     }
   }
-}
-
-/**
- * The frame loop: each frame, every phase's ticks, in order (see TICK_PHASES, and installLoop). Its
- * clock starts now; hand what it returns to requestAnimationFrame to start it.
- */
-export function frameLoop(ctx: Ctx, loading: { drew(): void }): (ts?: number) => void {
-  const timer = new THREE.Timer();
-  function frame(ts?: number) {
-    timer.update(ts);
-    const delta = timer.getDelta();
-    ctx.ticks.run({ delta, dt: Math.min(delta, 0.1), t: timer.getElapsed(), now: performance.now() });
-    loading.drew();
-    requestAnimationFrame(frame);
-  }
-  return frame;
 }

@@ -14,6 +14,8 @@ The catalog also has what a studio needs: walls, glass and wood slat panels to d
 
 Outside, the building is a 15-storey Friday Labs tower. The real floors are its bottom storeys, in graphite with warm-paper window frames and a second row of windows high up every wall; each one's slab band and its name, lit along its south wall, are in its floor's color, the trim of the paint it's given in the office builder. Above them three glass bars stacked and shifted like the Friday Labs mark run up to the rooftop bar, with a green light line in the dark seam at the foot of each, the lit lockup near the top and the red beacon on a mast. A lit marquee hangs over the garage, where a green lane leads to the lift and a board lists the floors. See [Features](docs/features.md).
 
+In a Meta Quest's browser the office is VR too: **🥽 Enter VR** and you walk it at your real height, with your hands on the controllers, every window floating in front of you as a panel you point at and click, and everyone else seeing your head turn and your hands move. A computer without a headset gets none of it, not even the button. The headset's browser gets a lighter office outside VR too (no outline, a pixel per pixel, the still office merged into a few hundred draw calls), so the page in its floating window runs smoothly as well. Getting the Quest onto the tailnet, the controls and the headset's quality profiles are in [VR](docs/vr.md).
+
 The building has one goat, Marc, on its bottom floor beside that floor's dog: he grazes on the plants, nibbles the rugs and gets the zoomies, and **E** pets him, after which he follows you about for a minute. The lounge's arcade cabinet and the boss's monitor play the same four games (Minesweeper, Blockfall, 2048 and Snake) against one high-score table per game for the whole building. The scoreboard beside the basketball hoop keeps the building's longest shots, and two people at the court can play PIG (**P** asks). See [Features](docs/features.md).
 
 Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, the back office, and which floor Marc lives on (he follows only an admin into the elevator). Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
@@ -416,6 +418,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Azure reference](docs/azure.md): picking a VM size, pausing, and everything `deploy/azure.sh` does
 - [How it works](docs/how-it-works.md): the architecture, and security notes
 - [Code layout](docs/code-layout.md): where the code lives, adding a feature or an agent provider, and the size guard
+- [VR](docs/vr.md): the office in a Meta Quest, getting the headset onto the tailnet, its controls, and measuring how hard it works the headset
 
 The lounge jukebox is audible across most of the floor, with a gentle fade at distant desks. Adjust your personal jukebox volume in Settings → Sound & voice.
 

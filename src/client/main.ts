@@ -15,7 +15,7 @@ import { loadingScreen } from './ui/loading';
 import { offerLite, touchOnly } from './ui/litesuggest';
 import { createCtx } from './core/ctx';
 import type { Parts } from './core/parts';
-import { createScene, fitWindow, installSky, makeRenderer, noWebGL } from './core/scene';
+import { createScene, fitWindow, installSky, makeRenderer, noWebGL, warmingSteps } from './core/scene';
 import { createWorlds } from './core/worlds';
 import { frameLoop, installLoop } from './core/loop';
 import { installPlace } from './core/place';
@@ -72,6 +72,7 @@ import { installWhisky } from './features/whisky';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
+import { installVr } from './features/vr';
 
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
 const loading = loadingScreen(onModelsProgress);
@@ -197,6 +198,8 @@ parts.hud = installHud(ctx, core, parts);
 // ---- Main loop ---------------------------------------------------------------------------------------
 fitWindow(ctx);
 const frame = frameLoop(ctx, loading);
+// A VR headset borrows the loop while you're in it (see features/vr).
+installVr(ctx, parts, { loop: frame });
 
 // ---- Boot ------------------------------------------------------------------------------------------
 function boot() {
@@ -235,6 +238,8 @@ void whoami().then(() => {
     loading.until([
       { say: 'Knocking on the door', done: welcomed },
       { say: 'Fetching the dog', done: parts.dog.firstReady },
+      // In a headset's browser, the floor's shaders once it's here (see warmShaders).
+      ...warmingSteps(ctx, welcomed),
     ]);
   } else {
     // Pick a character first (people from before there was a choice keep their name and color).
