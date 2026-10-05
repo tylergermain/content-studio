@@ -8,6 +8,8 @@ const RADIUS = 0.32;
 export const HEIGHT = 1.7;
 /** The tallest ledge you walk up (or down) without jumping, like a stair. */
 export const STEP = 0.3;
+/** In the air, a ledge whose top is this close above your feet you pull yourself up onto: a railing, a table, however your frames fall. */
+export const MANTLE = 0.4;
 
 /** You, as what bumps into things: where your feet are, among what, and whether they're on the ground. */
 export interface Body {
@@ -42,9 +44,9 @@ export function stepTo(b: Body, x: number, z: number) {
     b.pos.z = z;
     return;
   }
-  // A stair: step up onto it if there's room there.
+  // A stair: step up onto it if there's room there. In the air, a ledge near enough your feet you pull yourself up onto.
   const up = hit.top - b.pos.y;
-  if (b.grounded && up <= STEP && !blockerAt(b, x, z, hit.top) && b.pos.y + HEIGHT + up <= ceilingAt(b.colliders, x, z, b.pos.y)) {
+  if (up <= (b.grounded ? STEP : MANTLE) && !blockerAt(b, x, z, hit.top) && b.pos.y + HEIGHT + up <= ceilingAt(b.colliders, x, z, b.pos.y)) {
     b.pos.set(x, hit.top, z);
     b.stepOffset -= up;
     return;

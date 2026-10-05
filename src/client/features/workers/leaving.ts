@@ -5,7 +5,7 @@ import type { Worker } from '../../world/character';
 import type { Laptop } from './laptop';
 import type { DeskView } from '../../world/types';
 import type { Ways } from '../../world/world';
-import { mesh, toonUnique } from '../../world/toon';
+import { CANOPIES, parachute } from '../../world/parachute';
 
 /** Walking pace on the way out, in m/s: no hurry any more. */
 const PACE = 2.3;
@@ -38,54 +38,6 @@ const TURN = 1.2;
 const POP = 0.45;
 const CRUMPLE = 1.3;
 const JUMPS = ['🪂 geronimo!', '🪂 see ya!', '🪂 wheee!', '🪂 bye bye!', '🪂 I quit!'];
-const CANOPIES = ['#ef476f', '#ffd166', '#06d6a0', '#118ab2', '#8338ec', '#ff8a5b'];
-
-/** Seen from below too, so both sides of the fabric. */
-const fabric = new Map<string, THREE.MeshToonMaterial>();
-function cloth(color: string): THREE.MeshToonMaterial {
-  let m = fabric.get(color);
-  if (!m) {
-    m = toonUnique(color);
-    m.side = THREE.DoubleSide;
-    fabric.set(color, m);
-  }
-  return m;
-}
-const CORD = new THREE.LineBasicMaterial({ color: '#2b2d42' });
-
-/**
- * A parachute, to hang from a worker's shoulders: striped gores in a dome over its head, and the
- * cords down to it. Its origin is where it's strapped on, so it pops open (and crumples) from there.
- */
-function parachute(color: string): { group: THREE.Group; dome: THREE.Group } {
-  const group = new THREE.Group();
-  group.position.y = 0.88;
-  const dome = new THREE.Group();
-  const R = 1.35;
-  const rim = 1.15;
-  const gores = 10;
-  for (let i = 0; i < gores; i++) {
-    const geo = new THREE.SphereGeometry(R, 3, 5, (i / gores) * Math.PI * 2, (Math.PI * 2) / gores, 0, rim);
-    dome.add(mesh(geo, cloth(i % 2 ? '#fffaf3' : color), 0, 0, 0, false));
-  }
-  dome.scale.y = 0.62;
-  dome.position.y = 1.25;
-  group.add(dome);
-  // A cord from each seam at the rim down to a shoulder.
-  const ends: number[] = [];
-  const rimY = 1.25 + R * Math.cos(rim) * 0.62;
-  for (let i = 0; i < gores; i++) {
-    const a = (i / gores) * Math.PI * 2;
-    const x = Math.sin(a) * R * Math.sin(rim);
-    const z = Math.cos(a) * R * Math.sin(rim);
-    ends.push(x, rimY, z, x < 0 ? -0.24 : 0.24, 0, 0.02);
-  }
-  const cords = new THREE.BufferGeometry();
-  cords.setAttribute('position', new THREE.Float32BufferAttribute(ends, 3));
-  group.add(new THREE.LineSegments(cords, CORD));
-  return { group, dome };
-}
-
 /** How it gets down from a floor with no exit door, and how far along it is. */
 interface Chute {
   /** Walking out to the railing, up on it, over it, under the open chute, down on the ground, then off. */

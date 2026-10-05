@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ASHTRAY, BALCONY, EXIT_STAIRS, SLAB, STREET_Y } from '../../../shared/layout';
+import { ASHTRAY, BALCONY, BALCONY_RAIL, EXIT_STAIRS, SLAB, STREET_Y } from '../../../shared/layout';
 import { teeBays } from '../../../shared/tees';
 import { FACADE } from '../facade';
 import { bulb, type NightParts } from '../outside';
@@ -9,6 +9,7 @@ import type { Fixture } from './fixture';
 import { PALETTE, box, floorTexture, glassPane } from './materials';
 import { floorPlant, plant } from './props';
 import { seatable } from './seats';
+
 
 // Outside the office's walls: the smoking balcony off the south wall, the posts under the bottom
 // floor's, and the steps from the exit door down to the street.
@@ -60,7 +61,7 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
   colliders.push({ minX, maxX, minZ, maxZ, bottom: -SLAB, top: 0 });
 
   // The railing: posts, a wooden top rail and glass between, on the three open sides.
-  const railH = 1.05;
+  const railH = BALCONY_RAIL - 0.02;
   const ink = toon(PALETTE.deskLeg);
   const wood = toon(PALETTE.wood);
   const inset = 0.06;
@@ -86,7 +87,8 @@ export function buildBalcony(group: THREE.Group, colliders: Collider[], interact
       pane.rotation.y = alongX ? 0 : Math.PI / 2;
       parts.add(pane);
     }
-    colliders.push({ minX: Math.min(x0, x1) - 0.05, maxX: Math.max(x0, x1) + 0.05, minZ: Math.min(z0, z1) - 0.05, maxZ: Math.max(z0, z1) + 0.05, bottom: -SLAB, top: 99 });
+    // As high as its top rail, so it keeps you on the balcony unless you jump up onto it, and off it by parachute (see features/parachute).
+    colliders.push({ minX: Math.min(x0, x1) - 0.05, maxX: Math.max(x0, x1) + 0.05, minZ: Math.min(z0, z1) - 0.05, maxZ: Math.max(z0, z1) + 0.05, bottom: -SLAB, top: BALCONY_RAIL });
   }
 
   // Lamp poles on the outer corners, with string lights to them from the wall and between them.
