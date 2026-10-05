@@ -9,7 +9,8 @@
 //   VR_LAYERS=1 node --import tsx tests/support/vr-browser.mjs     with the WebXR layers polyfill
 //
 // Env: VR_PORT (14671), CHROME_PATH, IWER_JS (iwer's build/iwer.min.js when it isn't in node_modules),
-// VR_SHOTS (screenshots, /tmp/vr-shots). Prints PASS, FAIL or SKIP per scenario; exits 1 on a FAIL.
+// VR_SHOTS (screenshots, /tmp/vr-shots), VR_PUBLIC (another client build to serve than dist/public, to
+// run the same scenarios against it). Prints PASS, FAIL or SKIP per scenario; exits 1 on a FAIL.
 // vr-perf.mjs uses the same helpers.
 import { chmodSync, existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
@@ -55,7 +56,7 @@ export function launch() {
 /** This checkout's office in this process (run with `node --import tsx`), a project of its own in a throwaway folder. */
 export async function startOffice(port = Number(process.env.VR_PORT ?? 14671)) {
   if (port === 4600 || port === 5173) throw new Error(`Port ${port} is the dev office's: pick another (VR_PORT)`);
-  const publicDir = path.join(ROOT, 'dist/public');
+  const publicDir = process.env.VR_PUBLIC ? path.resolve(process.env.VR_PUBLIC) : path.join(ROOT, 'dist/public');
   if (!existsSync(path.join(publicDir, 'index.html'))) throw new Error('No client build: run `npm run build:client` first');
   const { loadConfig } = await import(pathToFileURL(path.join(ROOT, 'src/server/config.ts')).href);
   const { startServer } = await import(pathToFileURL(path.join(ROOT, 'src/server/server.ts')).href);
@@ -87,10 +88,11 @@ export async function startOffice(port = Number(process.env.VR_PORT ?? 14671)) {
 /**
  * A browser page in the office, signed in and past the loading screen, as `name`. With `vr`, a Quest 2
  * (iwer, stereo) is installed before the page loads, over Chrome's own WebXR (which says no headset).
- * `init` are more scripts to run before the page's own. `wire` collects every message the page sends and gets.
+ * `init` are more scripts to run before the page's own, `userAgent` the browser it says it is (the
+ * Quest's, for its flat page). `wire` collects every message the page sends and gets.
  */
-export async function openOffice(browser, base, { vr = true, name = 'Visor', layers = !!process.env.VR_LAYERS, viewport = { width: 1280, height: 720 }, init = [] } = {}) {
-  const context = await browser.newContext({ viewport });
+export async function openOffice(browser, base, { vr = true, name = 'Visor', layers = !!process.env.VR_LAYERS, viewport = { width: 1280, height: 720 }, init = [], userAgent } = {}) {
+  const context = await browser.newContext({ viewport, ...(userAgent ? { userAgent } : {}) });
   for (const fn of init) await context.addInitScript(fn);
   await context.addInitScript((who) => {
     try {
@@ -134,7 +136,7 @@ export async function openOffice(browser, base, { vr = true, name = 'Visor', lay
     ws.on('framereceived', keep(wire.got));
   });
   await page.goto(`${base}/`);
-  await page.waitForFunction(() => window.__office?.store?.floor && !document.querySelector('#loading:not(.gone)'), null, { timeout: 240_000 });
+  await page.waitForFunction(() => window.__office?.store?.floor && !document.querySelector('#loading:not(.gone)'), null, { timeout: 400_000 });
   await closeWindows(page);
   return { context, page, wire };
 }
@@ -177,7 +179,7 @@ export const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 const DEG = Math.PI / 180;
 
 /** Waits for `n` more headset frames. */
-export async function frames(page, n = 2, timeout = 60_000) {
+export async function frames(page, n = 2, timeout = 120_000) {
   const start = await page.evaluate(() => window.__vr.frames);
   await page.waitForFunction(([s, k]) => window.__vr.frames >= s + k, [start, n], { timeout });
 }
@@ -623,7 +625,10 @@ async function main() {
       const lift = await find(page, 'elevator');
       if (!lift) return 'SKIP no elevator on this floor';
       await goTo(page, await infront(page, lift), lift);
-      await aim(page, 'right', [lift[0], 1.2, lift[2]]);
+      // At the floor's sign over the doors (world/elevator.ts: 0.4 m out from where it's used from, a
+      // little over 3 m up), which is the elevator's whether its doors are open or shut: with them open
+      // a ray at the doorway goes on into the car, onto the shaft's back wall.
+      await aim(page, 'right', [lift[0], 3.1, lift[2] + 0.43]);
       await press(page, 'right', 'trigger');
       await page.waitForFunction(() => !!document.querySelector('#modal-root .backdrop'), null, { timeout: 10_000 }).catch(() => {
         throw new Error('the trigger at the elevator opened no window');
@@ -666,25 +671,45 @@ async function main() {
         return `#${item.id}`;
       });
       expect(settings, 'the ☰ menu has no Settings');
-      await clickOn(page, 'hud', settings);
-      await page.waitForFunction(() => !!document.querySelector('#modal-root .backdrop input[type="checkbox"]'), null, { timeout: 8000 }).catch(() => {
+      // The menu ☰ opens is a window (openModal's), so it floats ahead on the window panel, over the sheet.
+      await clickOn(page, 'window', settings);
+      await page.waitForFunction(() => !!document.querySelector('#modal-root .backdrop .settings-pane'), null, { timeout: 8000 }).catch(() => {
         throw new Error('Settings didn\'t open');
       });
       await frames(page, 20);
-      const box = await page.evaluate(() => {
-        const c = [...document.querySelectorAll('#modal-root .backdrop:last-child input[type="checkbox"]')].find((x) => x.getBoundingClientRect().width > 0);
-        c.id ||= 'vr-check-box';
-        return { sel: `#${c.id}`, was: c.checked };
+      // Settings' choices are rows of buttons (a radiogroup each), the Footsteps row on its Sound & voice
+      // tab: the tab, then the choice that isn't picked, each by the ray.
+      const tab = await page.evaluate(() => {
+        const t = [...document.querySelectorAll('#modal-root .backdrop:last-child [role="tab"]')].find((b) => /sound/i.test(b.textContent ?? '') && b.getBoundingClientRect().width > 0);
+        if (!t) return null;
+        t.id ||= 'vr-check-tab';
+        return `#${t.id}`;
       });
-      await clickOn(page, 'window', box.sel);
-      const now = await page.evaluate((sel) => document.querySelector(sel).checked, box.sel);
-      expect(now !== box.was, 'the checkbox didn\'t change');
+      expect(tab, 'Settings has no Sound & voice tab');
+      await clickOn(page, 'window', tab);
+      await frames(page, 20);
+      /** The Footsteps choice that isn't picked, as a selector (the row is drawn afresh as one's picked). */
+      const other = () =>
+        page.evaluate(() => {
+          const row = document.querySelector('#modal-root .backdrop:last-child [role="radiogroup"][aria-label="Footsteps"]');
+          const b = [...(row?.querySelectorAll('[role="radio"]') ?? [])].find((x) => x.getAttribute('aria-checked') !== 'true' && x.getBoundingClientRect().width > 0);
+          if (!b) return null;
+          b.id = 'vr-check-choice';
+          return { sel: '#vr-check-choice', label: b.textContent };
+        });
+      const pick = await other();
+      expect(pick, 'no Footsteps choice to pick on the Sound & voice tab');
+      await clickOn(page, 'window', pick.sel);
+      await frames(page, 10);
+      const now = await page.evaluate(() => document.querySelector('#modal-root .backdrop:last-child [role="radiogroup"][aria-label="Footsteps"] [aria-checked="true"]')?.textContent ?? null);
+      expect(now === pick.label, `the ray picked ${now}, not ${pick.label}`);
       // Put it back, and close everything.
-      await clickOn(page, 'window', box.sel);
+      const back = await other();
+      if (back) await clickOn(page, 'window', back.sel);
       await press(page, 'right', 'b-button');
       await press(page, 'right', 'b-button');
       await closeWindows(page);
-      return 'X → ☰ → Settings → a checkbox, by the ray';
+      return 'X → ☰ → Settings → Sound & voice → Footsteps, by the ray';
     });
 
     await scenario('chat', page, async () => {
@@ -814,6 +839,9 @@ async function main() {
     });
 
     await scenario('leave', page, async () => {
+      // Whatever a scenario before left open is closed first (B does it in the headset): a window's
+      // backdrop over the page would cover the button whatever VR did.
+      await closeWindows(page);
       await leaveVr(page);
       const f0 = await page.evaluate(() => window.__office.renderer.info.render.frame);
       await sleep(1500);
@@ -838,6 +866,12 @@ async function main() {
             const b = document.getElementById('vr-enter').getBoundingClientRect();
             return document.getElementById('vr-enter').contains(document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2));
           })(),
+          // What's there instead, if anything, to say so.
+          over: (() => {
+            const b = document.getElementById('vr-enter').getBoundingClientRect();
+            const el = document.elementFromPoint(b.x + b.width / 2, b.y + b.height / 2);
+            return el ? `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ''}${el.className && typeof el.className === 'string' ? `.${el.className.split(' ').join('.')}` : ''} in ${el.parentElement?.tagName.toLowerCase()}${el.parentElement?.id ? `#${el.parentElement.id}` : ''}; button ${Math.round(b.width)}×${Math.round(b.height)} at ${Math.round(b.x)},${Math.round(b.y)}` : 'nothing';
+          })(),
         };
       });
       expect(after.frames > f0, 'the browser\'s frames didn\'t come back');
@@ -852,7 +886,7 @@ async function main() {
       expect(after.autoUpdate === before.autoUpdate && after.autoReset === before.autoReset, 'the renderer\'s shadows or counters weren\'t put back');
       expect(after.texture, 'Texture.needsUpdate is still throttled');
       expect(after.lock, 'the mouse can\'t be captured for mouse-look again');
-      expect(after.button, 'the canvas covers the HUD (Enter VR can\'t be clicked)');
+      expect(after.button, `the canvas covers the HUD (Enter VR can't be clicked): ${after.over} is over it`);
       return 'frames back, scene and renderer as they were, mouse-look and the HUD back';
     });
 

@@ -20,8 +20,45 @@ export interface Picture {
 
 /** A wall picture never needs more pixels than this, and big photos would eat GPU memory. */
 const MAX_TEXTURE = 1024;
+/** Fewer still on a headset that asks for it (see capPictures); 0 for MAX_TEXTURE. */
+let cap = 0;
+const longest = () => (cap > 0 ? Math.min(cap, MAX_TEXTURE) : MAX_TEXTURE);
 const pictures = new Map<string, Promise<Picture>>();
 const holds = new Map<string, number>();
+
+/** Draws `img` (`iw` × `ih`) into a canvas no more than `longest()` across. */
+function fitted(img: CanvasImageSource, iw: number, ih: number): HTMLCanvasElement {
+  const k = Math.min(1, longest() / Math.max(iw, ih));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(iw * k));
+  canvas.height = Math.max(1, Math.round(ih * k));
+  canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+  return canvas;
+}
+
+/**
+ * The pictures at most `px` across from now on (0: the office's own MAX_TEXTURE), the ones already
+ * loaded drawn again at that size from the image they came from. A headset's quality profile sets it
+ * (see features/vr/quality.ts): a laptop never does.
+ */
+export function capPictures(px: number) {
+  if (px === cap) return;
+  cap = px;
+  for (const p of pictures.values()) {
+    void p.then(async (pic) => {
+      const img = new Image();
+      img.src = pic.src;
+      await img.decode();
+      const was = pic.texture.image as HTMLCanvasElement;
+      const canvas = fitted(img, img.naturalWidth || MAX_TEXTURE, img.naturalHeight || MAX_TEXTURE);
+      if (canvas.width === was.width && canvas.height === was.height) return;
+      // A texture of another size is made afresh: the old one let go of first.
+      pic.texture.dispose();
+      pic.texture.image = canvas;
+      pic.texture.needsUpdate = true;
+    }).catch(() => {});
+  }
+}
 
 /** The office fetches images for us, so a picture shows up whatever its host allows. */
 export function imageUrl(url: string): string {
@@ -55,11 +92,7 @@ async function fetchPicture(url: string): Promise<Picture> {
     // An SVG without a size reports 0×0.
     const iw = img.naturalWidth || MAX_TEXTURE;
     const ih = img.naturalHeight || MAX_TEXTURE;
-    const k = Math.min(1, MAX_TEXTURE / Math.max(iw, ih));
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.max(1, Math.round(iw * k));
-    canvas.height = Math.max(1, Math.round(ih * k));
-    canvas.getContext('2d')!.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const canvas = fitted(img, iw, ih);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.anisotropy = 8;

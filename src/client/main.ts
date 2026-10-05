@@ -15,7 +15,7 @@ import { loadingScreen } from './ui/loading';
 import { offerLite, touchOnly } from './ui/litesuggest';
 import { createCtx } from './core/ctx';
 import type { Parts } from './core/parts';
-import { createScene, fitWindow, installSky, makeRenderer, noWebGL } from './core/scene';
+import { createScene, fitWindow, installSky, makeRenderer, noWebGL, warmingSteps } from './core/scene';
 import { createWorlds } from './core/worlds';
 import { frameLoop, installLoop } from './core/loop';
 import { installPlace } from './core/place';
@@ -238,6 +238,8 @@ void whoami().then(() => {
     loading.until([
       { say: 'Knocking on the door', done: welcomed },
       { say: 'Fetching the dog', done: parts.dog.firstReady },
+      // In a headset's browser, the floor's shaders once it's here (see warmShaders).
+      ...warmingSteps(ctx, welcomed),
     ]);
   } else {
     // Pick a character first (people from before there was a choice keep their name and color).

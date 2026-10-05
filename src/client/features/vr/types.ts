@@ -8,12 +8,9 @@ import type { Frame, Off, TickPhase } from '../../core/registry';
 
 export type Hand = 'left' | 'right';
 
-export interface VrQuality {
-  name: 'quest2' | 'quest3' | 'other';
+/** The knobs a headset's profile has in VR and on its flat page alike (see quality.ts). */
+export interface SceneQuality {
   outline: boolean;
-  framebufferScale: number;      // 0.5..1, applied when a session starts
-  foveation: number;             // 0..1
-  frameRate: number | null;      // 72 | 80 | 90 | 120, or the headset's own
   shadows: 'on' | 'throttled' | 'off';
   shadowMapSize: number;
   shadowEveryMs: number;
@@ -21,7 +18,22 @@ export interface VrQuality {
   maxLamps: number;              // 24 = all
   hotTextureEveryMs: number;     // 0 = no cap
   sceneryReach: number;          // x fog far for the scenic loop
+  batching: boolean;             // the office's still meshes merged (world/batch)
+  textureCap: number;            // px, longest side of a picture; 0 = the office's own cap
+}
+
+export interface VrQuality extends SceneQuality {
+  name: 'quest2' | 'quest3' | 'other';
+  framebufferScale: number;      // 0.5..1, applied when a session starts
+  foveation: number;             // 0..1
+  frameRate: number | null;      // 72 | 80 | 90 | 120, or the headset's own
   panelScale: number;            // texture px per CSS px
+}
+
+/** A headset browser's page outside VR (see flat.ts). */
+export interface FlatQuality extends SceneQuality {
+  name: 'quest2' | 'quest3';
+  pixelRatio: number;
 }
 
 export interface VrPrefs { snapDeg: 30 | 45; vignette: boolean; heightOffset: number; dominant: Hand; scale: number | null; perf: boolean }
