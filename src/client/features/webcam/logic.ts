@@ -109,7 +109,7 @@ export function camScale(width: number | undefined, height: number | undefined):
  * room round it, and all of that on a round face reads as someone seen through a porthole: closer in,
  * it's their face.
  */
-export const FACE_ZOOM = 0.75;
+export const FACE_ZOOM = 0.5;
 
 /**
  * The middle of a `width`×`height` picture, as a texture's repeat and offset: a square, so a camera
