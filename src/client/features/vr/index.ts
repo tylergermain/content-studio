@@ -5,12 +5,15 @@
  *
  * All this loads is the 🥽 Enter VR button, and only where the browser says a VR headset is there:
  * a desktop gets nothing at all. The rest of VR (session.ts, and everything it starts) loads once
- * you press it, and how someone else in a headset turns their head and moves their hands
- * (remote.ts) with the first word of it.
+ * you press it, how someone else in a headset turns their head and moves their hands (remote.ts)
+ * with the first word of it, and the headset browser's own quality profile outside VR (flat.ts) as
+ * the page loads, in a headset's browser only, where the floor's shaders are compiled behind the
+ * loading screen too.
  */
 import type { Ctx } from '../../core/context';
 import type { FrameLoop } from '../../core/loop';
 import type { Parts } from '../../core/parts';
+import { warmShadersOnLoad } from '../../core/scene';
 import { toast } from '../../ui/dom';
 import { type VrButton, vrButton } from './button';
 import type { VrDebug } from './types';
@@ -19,7 +22,7 @@ import type { VrDebug } from './types';
 export const SESSION_INIT: XRSessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'layers'] };
 
 /** The parts VR reaches for. */
-export type VrParts = Pick<Parts, 'stage' | 'pointer' | 'peers' | 'focus'>;
+export type VrParts = Pick<Parts, 'stage' | 'pointer' | 'peers' | 'focus' | 'rooftop'>;
 
 export interface VrDeps {
   /** The office's frame loop, which a session borrows (see FrameLoop). */
@@ -32,6 +35,13 @@ type Offering = XRSystem & { offerSession?(mode: XRSessionMode, init?: XRSession
 export function installVr(ctx: Ctx, parts: VrParts, deps: VrDeps): void {
   // Someone else in a headset: their head turning and their hands, on a screen too.
   ctx.messages.on('peer.vr', (m) => void import('./remote').then((r) => r.peerPose(ctx, parts, m)));
+  // A headset's own page outside VR has a profile of its own (flat.ts, which says which headsets),
+  // and its loading screen stays up until the floor's shaders are compiled (warmShaders): only a
+  // browser that might be one does either, so a laptop's office loads and is drawn as it always was.
+  if (/\bQuest\b|OculusBrowser/i.test(navigator.userAgent)) {
+    warmShadersOnLoad();
+    void import('./flat').then((f) => f.startFlat(ctx, parts));
+  }
 
   const xr = navigator.xr as Offering | undefined;
   // WebXR only comes to a secure page (https, or localhost).

@@ -1,6 +1,6 @@
 import type { AgentEffort, AgentProvider, GhIssue, GhMergeMethod, GhPull } from '../../../shared/protocol';
 import { store } from '../../state';
-import { repoUrlOf } from '../markdown';
+import { repoUrlOf } from '../repo-url';
 import type { MeetingPreset } from '../meeting';
 import { officePrompt } from '../prompts';
 

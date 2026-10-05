@@ -297,6 +297,8 @@ const KNOBS: readonly [keyof VrQuality, string][] = [
   ['maxLamps', 'Lamps'],
   ['hotTextureEveryMs', 'Video cap (ms)'],
   ['sceneryReach', 'Scenery reach'],
+  ['batching', 'Batching'],
+  ['textureCap', 'Picture cap (px)'],
 ];
 
 interface Button {
@@ -331,9 +333,9 @@ function makeOverlay(ctx: Ctx, s: VrSession, read: { latest(): VrPerfSample | nu
 
   const buttons: Button[] = KNOBS.map(([k, name], i) => ({
     x: 24 + (i % 2) * 300,
-    y: 330 + Math.floor(i / 2) * 76,
+    y: 306 + Math.floor(i / 2) * 70,
     w: 288,
-    h: 64,
+    h: 60,
     label: () => `${name}: ${show(s.quality[k])}`,
     press: () => {
       const steps = KNOB_STEPS[k] as readonly VrQuality[typeof k][] | undefined;

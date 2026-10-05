@@ -3,12 +3,11 @@ import type { GhIssue, GhLabel, GhPull, WorkerInfo } from '../../shared/protocol
 import type { Net } from '../net';
 import { store, workerForPull } from '../state';
 import { h, openModal, timeAgo } from './dom';
-import { openIssue } from './github/issue-window';
 import { labelChip, openLabels } from './github/labels';
 import { inProgress } from './github/progress';
 import type { BoardActions } from './github/prompts';
-import { openPull } from './github/pull-window';
 import { providerLabel } from './provider';
+import { openIssue, openPull } from './pull';
 
 const TILTS = ['-1.2deg', '0.8deg', '-0.4deg', '1.4deg', '0deg', '-0.9deg'];
 const NOTE_COLORS = ['#fff7b0', '#ffd6e0', '#caffbf', '#bde0fe', '#ffe5b4'];

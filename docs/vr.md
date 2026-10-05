@@ -83,22 +83,36 @@ While you're in VR the office sends where your head is turned from your body and
 
 ## How hard it works the headset
 
-three.js's WebGL renderer draws each eye as a pass of its own, so VR doubles the draw calls, and the toon outline would double them again. The Quest 2 has about 13.7 ms a frame at 72 Hz. So each headset gets a profile (`features/vr/quality-profile.ts`), picked from the browser's user agent:
+three.js's WebGL renderer draws each eye as a pass of its own, so VR doubles the draw calls, and the toon outline would double them again. The Quest 2 has about 13.7 ms a frame at 72 Hz, and Meta's budget for a native app there is about a hundred draw calls and 750k triangles a frame. So each headset gets a profile (`features/vr/quality-profile.ts`), picked from the browser's user agent: one for VR, and one for the headset browser's own page outside VR (its flat page: the office in a window floating in the headset, drawn once rather than for two eyes, but by the same GPU and CPU). A laptop gets neither, and draws the office exactly as it always has.
 
-| Knob | Quest 2 | Quest 3 / Pro | Anything else |
-| --- | --- | --- | --- |
-| Toon outline | off | on | off |
-| Resolution (framebuffer scale) | 0.8 | 1 | 1 |
-| Foveation | 1 (most) | 0.5 | 0.5 |
-| Frame rate | 72 Hz | 72 Hz | the headset's |
-| Sun's shadows | 1024², drawn 4 times a second | 2048², 10 times a second | 2048², 10 times a second |
-| Night halos | off | on | on |
-| Lamps lighting the toon shaders | all 24 | all 24 | all 24 |
-| Video, TV, screens, arcade uploads | 10 a second at most | 15 | 15 |
-| Scenery drawn out to | 0.6 of the haze | 0.8 | 0.8 |
-| Panel texture | 1.5 px per CSS px | 1.5 | 1.5 |
+| Knob | Quest 2 VR | Quest 3 / Pro VR | Other headsets in VR | Quest 2 page | Quest 3 / Pro page |
+| --- | --- | --- | --- | --- | --- |
+| Toon outline | off | on | off | off | off |
+| Resolution | 0.8 framebuffer scale | 1 | 1 | pixel ratio 1 | pixel ratio 1 |
+| Foveation | 1 (most) | 0.5 | 0.5 | | |
+| Frame rate | 72 Hz | 72 Hz | the headset's | | |
+| Sun's shadows | 1024², drawn 4 times a second | 2048², 10 times a second | 2048², 10 times a second | 1024², 4 times a second | 2048², 10 times a second |
+| Night halos | off | on | on | off | on |
+| Lamps lighting the toon shaders | all 24 | all 24 | all 24 | all 24 | all 24 |
+| Video, TV, screens, arcade uploads | 10 a second at most | 15 | 15 | 10 | 15 |
+| Scenery drawn out to | 0.6 of the haze | 0.8 | 0.8 | 0.6 | 0.8 |
+| The still office batched | yes | yes | yes | yes | yes |
+| Pictures on the walls at most | 512 px | 1024 px | 1024 px | 512 px | 1024 px |
+| Panel texture | 1.5 px per CSS px | 1.5 | 1.5 | | |
 
-The Quest 2's values are where measuring starts, not where it ends: each stays or changes on numbers measured in the headset. Every knob can be flipped live in the perf overlay (both sticks clicked) for an A/B on the spot, and the resolution, which a session can't change, is kept for next time. Switching shadows off outright recompiles every material once, which is why the profile throttles them instead. YouTube screens show their poster in VR (an embedded player can't be drawn into the headset's eyes) and keep playing their sound.
+Profiles stack: on a Quest the page's profile is on from the moment it loads, VR's goes over it while you're in VR, and the page's is back as you leave (`quality.ts`). The Quest 2's values are where measuring starts, not where it ends: each stays or changes on numbers measured in the headset. Every knob can be flipped live in the perf overlay (both sticks clicked) for an A/B on the spot, and the resolution, which a session can't change, is kept for next time. Switching shadows off outright recompiles every material once, which is why the profiles throttle them instead. YouTube screens show their poster in VR (an embedded player can't be drawn into the headset's eyes) and keep playing their sound.
+
+### The still office, batched
+
+A floor is two to three thousand meshes, and most never move: walls, floors, desks, chairs, shelves, plants, the street. Drawn one by one they're thousands of draw calls a frame, each of them CPU time three.js and the browser spend before the GPU sees anything, and on a Quest 2 that's most of the frame. With batching on (`world/batch`), the meshes that keep still are drawn as merged meshes instead, a region and a kind at a time: a cell of the building 8 m across and a storey high, so what's out of view is still left out, and one kind per draw (every plain-coloured lit surface in a cell as one mesh, its colours kept in its vertices; anything with a picture with its own material), each keeping whether it casts and takes shadows. What's see-through, a sprite or a line, skinned or instanced, drawn in an order of its own or with a hook of its own is never batched.
+
+Nothing else has to know. Batching starts once a floor's world is built: the batcher watches every mesh for a second and a half and batches those that kept still, a few batches a frame. A batched mesh stays where it was, so whatever picks things with a ray (E, the VR trigger, the builder, a picture being hung) finds it as before: only the cameras that draw the office pass it by. Every frame, just before the office is drawn, the batcher checks each batched mesh is where it was and as it was; one that's moved, been hidden or changed draws itself again from that frame on (a door opening, the ball picked up), and its batch is merged again without it. It starts over on another floor, when the floor's layout, furniture or room change, and up on the roof, and holds off while the office builder is open.
+
+On a laptop batching stays off. Merged meshes are drawn in another order and with their positions worked out on the CPU, which moves a pixel here and there where two surfaces meet, and the outline of a mesh stretched unevenly comes out a little different; the laptop is drawn exactly as before instead. What batching would save a laptop is in the table below.
+
+### Loading
+
+The office's first load is smaller: the terminal window (xterm), an agent's conversation and workspace, the PR and issue windows (marked and DOMPurify) and the bookshelf each load the first time they open, a third of a megabyte of JavaScript less before the office is up. While the loading screen is up the floor's shaders are compiled (`warmShaders` in `core/scene.ts`), side by side where the browser can, so the first steps don't stall on each one as it comes into view. The pictures on the walls are at most 512 px across on a Quest 2.
 
 The perf overlay shows frames a second and the share of late frames (from the headset's own frame times), the page's CPU time per frame (median and p95), the GPU's time where the browser can measure it, draw calls, triangles, shader programs, textures and how long the panels took to paint. It keeps the last ten minutes, a sample a second, in `window.__vr.perf.samples`.
 
@@ -112,7 +126,12 @@ node --import tsx tests/support/vr-browser.mjs                # every scenario; 
 VR_LAYERS=1 node --import tsx tests/support/vr-browser.mjs    # again, with the WebXR layers polyfill (the Quest has projection layers)
 node --import tsx tests/support/vr-perf.mjs                   # the numbers below, as Markdown and JSON
 node --import tsx tests/support/vr-perf.mjs --base http://127.0.0.1:14672   # and the desktop against another build (the base branch's)
+node --import tsx tests/support/floors-perf.mjs --building <dir>             # every floor's spots, laptop, Quest page and VR, startup, census
+node --import tsx tests/support/floors-check.mjs --building <dir>            # seat, elevator, ball, builder, and batched against unbatched
+node --import tsx tests/support/floors-compare.mjs --building <dir> --base <dist/public of another build>   # a laptop's office, before and after
 ```
+
+The three `floors-` scripts take a building to measure in (`--building`: a `floors.json` of `{ id, name, palette }` and a folder per floor holding its `.agent-office`, copied into a throwaway office so nothing writes to it), and `floors-perf.mjs --public <dir>` serves another build, so the same run measures before and after. `floors-perf.mjs` stands at the desks and in the lounge of every floor, on the street and up on the roof; measures a laptop's page, the Quest 2 browser's flat page (by its user agent) and VR, at 1× and 4× CPU throttling; times the office coming up at 4×; and takes a census of the draw calls, by part of the scene and by the module that built them (with a build that has source maps, `npx vite build --sourcemap`). `VR_PUBLIC` runs `vr-browser.mjs`'s scenarios against another build too.
 
 The scenarios: no button on a computer with no headset; Enter VR gives the Quest 2 profile; your eyes 1.7 m over your feet with the headset at 1.7 m, and your view turning with your head; walking the headset half a metre moves your feet as far, and walking it into a wall keeps your head over them; the left stick walks at 4.6 m/s; one snap turn a flick; the grip jumps; the trigger at the elevator opens its window as a panel, a ray click lands on its button and B closes it; X, then ☰, then Settings and a checkbox, all by the ray; *hi* typed on the VR keyboard goes out in the chat; a shell takes typed text and Ctrl+C; the trigger sits you down and the grip gets you up; the arcade cabinet leaves your head where it is; a desktop page sees your head turn and a headset on your character; the lights go down on an elevator ride; and leaving VR gives the browser its frames back, with the scene and the renderer as they were.
 

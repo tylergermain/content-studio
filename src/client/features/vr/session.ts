@@ -31,6 +31,7 @@ import { startInteract } from './interact';
 import { startPresence } from './presence';
 import { profileFor } from './quality-profile';
 import { qualityBefore, startQuality } from './quality';
+import { officeBatcher } from './batching';
 import { startFade } from './fade';
 
 /** Where your eyes are over the floor in a 'local' room, whose origin is your head where it started. */
@@ -178,7 +179,7 @@ export async function startSession(ctx: Ctx, parts: VrParts, deps: VrDeps, xr: X
     const perf = startPerf(ctx, parts, s, panels);
     startInteract(ctx, parts, s, pads, panels, perf);
     startPresence(ctx, s, pads);
-    const knobs = startQuality(ctx, parts, s);
+    const knobs = startQuality(ctx, parts, s, { batcher: officeBatcher(ctx, parts) });
     startFade(ctx, s);
     // (The panels say what they have themselves: VrDebug.panels.)
     Object.assign(debug, { presenting: true, frames: 0, profile: quality.name, pads, perf, knobs });
