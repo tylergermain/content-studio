@@ -129,3 +129,5 @@ To look at the course in the lab, open `/lab/minigolf.html` on the Vite dev serv
 `node src/client/lab/shot.mjs <url> <out.png>` takes a screenshot of it.
 
 The putting camera now retracts before solid course obstacles, including while easing between views, then expands again when the view clears. The regular third-person camera uses the same clearance check.
+
+While standing over the ball, move the mouse across the game canvas to aim without holding a button. This works in third-person view and with an unlocked cursor as well as mouse-look. Only holding left click enters power selection.

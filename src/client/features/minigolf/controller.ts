@@ -118,14 +118,22 @@ export class Putter {
     window.addEventListener('keyup', (e) => this.key(e, false));
     // Tabbed away mid-putt: the key never comes back up, so it's no putt.
     window.addEventListener('blur', () => this.letGo());
+    window.addEventListener('pointercancel', () => this.letGo());
     window.addEventListener('pointerdown', (e) => {
       if (e.button !== 0 || this.stage !== 'aim' || modalOpen() || !(e.target instanceof HTMLCanvasElement || document.pointerLockElement)) return;
       e.preventDefault(); e.stopImmediatePropagation(); this.source = 'mouse'; this.pull = 0; this.stage = 'charge'; this.overview = false;
     }, true);
     window.addEventListener('pointermove', (e) => {
-      if (this.stage !== 'charge' || this.source !== 'mouse') return;
-      this.pull = pullPower(this.pull, e.movementY);
-      e.stopImmediatePropagation();
+      if (modalOpen() || (!(e.target instanceof HTMLCanvasElement || document.pointerLockElement) && !(this.stage === 'charge' && this.source === 'mouse'))) return;
+      if (this.stage === 'aim' || (this.stage === 'charge' && this.source === 'space')) {
+        // Golf owns hover aiming in every office view, including an unlocked third-person cursor.
+        this.aim = wrapAngle(this.aim - Math.max(-250, Math.min(250, e.movementX)) * 0.0022);
+        this.player.camYaw = this.aim + Math.PI;
+        e.stopImmediatePropagation();
+      } else if (this.stage === 'charge' && this.source === 'mouse') {
+        this.pull = pullPower(this.pull, e.movementY);
+        e.stopImmediatePropagation();
+      }
     }, true);
     window.addEventListener('pointerup', (e) => {
       if (e.button === 0 && this.stage === 'charge' && this.source === 'mouse') { e.stopImmediatePropagation(); this.release(); }
