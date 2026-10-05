@@ -26,6 +26,7 @@ Back to the [README](../README.md).
 | Ctrl + K (⌘K on a Mac) | Command palette: find a worker, issue, PR, service, board, teammate or action; Enter opens it, Shift+Enter walks you there first |
 | V | Join voice; in voice, hold to talk (you're muted when you let go). It works with the boss's desk's windows open too |
 | M | Mute / unmute in voice, with the boss's desk's windows open too |
+| I | Your webcam as your face, on or off. Off until you turn it on, every time; on, the people near you on your floor see it on your character's face, you see yourself in the bottom-right corner (click it to turn it off) and **📷 On camera** is on the top bar, both of them staying up through the telescope and the office builder. **⚙️ Settings → Sound & voice → Webcam face** does the same and picks the camera |
 | Ctrl + Space | Dictate, in a worker's terminal or a prompt box: hold it and talk, and what you said is typed in when you let go. A quick tap leaves it listening until the next tap. The **🎤** does the same |
 | Tab | The ☰ menu: every window, and what shows on screen |
 | Esc | Close any window (a terminal too) and get back to looking around |

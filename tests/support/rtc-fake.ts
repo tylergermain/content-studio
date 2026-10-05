@@ -5,8 +5,12 @@
 // - setLocalDescription() makes an offer or an answer by the state it's in, and setRemoteDescription()
 //   of an offer rolls back an offer of our own first;
 // - a track added with addTrack goes on a line of the other side's offer of the same kind, if there's
-//   one free, and on a line of our own in our next offer otherwise; a line of theirs is ours to receive
-//   on until its direction is opened, and replaceTrack changes what a line carries with nothing to agree;
+//   one free, and on a line of our own in our next offer otherwise; one added with addTransceiver always
+//   goes on a line of its own, which an offer of theirs never takes for one of its lines (JSEP 5.10); a
+//   line of theirs is ours to receive on until its direction is opened, and replaceTrack changes what a
+//   line carries with nothing to agree;
+// - a line's currentDirection is how the two sides last agreed on it, and its receiver has the one
+//   track for as long as it's there, which `ontrack` hands over each time the other side starts sending;
 // - "negotiationneeded" fires once, when the connection is stable and nothing is being applied, and not
 //   again until a negotiation has gone through (so an offer that failed is not tried again by itself);
 // - an answer only fits the offer it was made for, a later offer has to keep the lines agreed so far,
@@ -77,23 +81,38 @@ class Transceiver {
   receiving = false;
   /** A rollback stopped what it was sending (Chrome): nothing goes out until its track is put on again. */
   dead = false;
-  readonly sender: { track: FakeTrack | null; replaceTrack(track: FakeTrack | null): Promise<void> };
-  readonly receiver: { track: { kind: Kind } };
+  /** Made by addTransceiver: an offer of theirs never takes it for one of its lines. */
+  own = false;
+  /** How the two sides last agreed on it, this side's way round: null until they have. */
+  currentDirection: 'sendrecv' | 'sendonly' | 'recvonly' | 'inactive' | null = null;
+  readonly sender: {
+    track: FakeTrack | null;
+    replaceTrack(track: FakeTrack | null): Promise<void>;
+    getParameters(): { encodings: Record<string, unknown>[] };
+    setParameters(p: { encodings: Record<string, unknown>[] }): Promise<void>;
+  };
+  readonly receiver: { track: FakeTrack };
   private way: 'sendrecv' | 'recvonly';
   constructor(
     readonly kind: Kind,
     track: FakeTrack | null,
-    /** Made by addTrack, not by an offer of theirs. */
+    /** Made here (by addTrack or addTransceiver), not by an offer of theirs. */
     readonly added: boolean,
     private readonly changed: () => void,
   ) {
     this.way = added ? 'sendrecv' : 'recvonly';
-    this.receiver = { track: { kind } };
+    this.receiver = { track: new FakeTrack(kind) };
+    let params = { encodings: [{}] as Record<string, unknown>[] };
     const sender = {
       track,
       replaceTrack: (now: FakeTrack | null) => {
         sender.track = now;
         this.dead = false;
+        return Promise.resolve();
+      },
+      getParameters: () => structuredClone(params),
+      setParameters: (p: typeof params) => {
+        params = p;
         return Promise.resolve();
       },
     };
@@ -128,7 +147,7 @@ export class FakePC {
   onnegotiationneeded: (() => void) | null = null;
   onicecandidate: ((e: { candidate: { toJSON(): object } | null }) => void) | null = null;
   oniceconnectionstatechange: (() => void) | null = null;
-  ontrack: ((e: { track: FakeTrack; streams: FakeStream[] }) => void) | null = null;
+  ontrack: ((e: { track: FakeTrack; streams: FakeStream[]; transceiver: Transceiver }) => void) | null = null;
 
   private pendingRemote: Desc | null = null;
   private readonly transceivers: Transceiver[] = [];
@@ -156,6 +175,15 @@ export class FakePC {
     return t.sender;
   }
 
+  addTransceiver(track: FakeTrack, init: { direction?: 'sendrecv' | 'recvonly' } = {}) {
+    if (this.signalingState === 'closed') throw error('InvalidStateError', 'The RTCPeerConnection is closed.');
+    const t = Object.assign(this.line(track.kind, track, true), { own: true });
+    if (init.direction) t.direction = init.direction;
+    this.transceivers.push(t);
+    this.need();
+    return t;
+  }
+
   getTransceivers() {
     return [...this.transceivers];
   }
@@ -181,7 +209,7 @@ export class FakePC {
       if (FakePC.chrome && !this.currentRemoteDescription) for (const kind of this.picked) if (!sdp.lines.some((l) => l.kind === kind)) this.spoiled.add(kind);
       for (const l of sdp.lines) {
         if (this.at(l.mid)) continue;
-        const ours = this.transceivers.find((t) => t.mid === null && t.added && t.kind === l.kind);
+        const ours = this.transceivers.find((t) => t.mid === null && t.added && !t.own && t.kind === l.kind);
         if (ours) ours.mid = l.mid;
         else this.transceivers.push(Object.assign(this.line(l.kind, null, false), { mid: l.mid }));
       }
@@ -273,13 +301,18 @@ export class FakePC {
   /** The negotiation has gone through: what the two descriptions say is how it is now. */
   private settle(mine: Desc, theirs: Desc) {
     const lines = parse(mine).lines;
+    const back = parse(theirs).lines;
     this.localDescription = this.currentLocalDescription = mine;
     this.currentRemoteDescription = theirs;
     this.pendingRemote = null;
     this.agreed = lines.map((l) => l.mid);
     for (const t of this.transceivers) {
       t.provisional = false;
-      if (lines.some((l) => l.mid === t.mid && l.sends)) t.sent = true;
+      const ours = lines.find((l) => l.mid === t.mid);
+      if (!ours) continue;
+      const theySend = back.find((l) => l.mid === t.mid)?.sends;
+      t.currentDirection = ours.sends ? (theySend ? 'sendrecv' : 'sendonly') : theySend ? 'recvonly' : 'inactive';
+      if (ours.sends) t.sent = true;
     }
     this.signalingState = 'stable';
     this.asked = false;
@@ -291,8 +324,8 @@ export class FakePC {
       const was = t.receiving;
       t.receiving = l.sends;
       if (!l.sends || was) continue;
-      const track = new FakeTrack(l.kind);
-      this.ontrack?.({ track, streams: [new FakeStream([track])] });
+      const { track } = t.receiver;
+      this.ontrack?.({ track, streams: [new FakeStream([track])], transceiver: t });
     }
   }
 

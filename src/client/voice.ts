@@ -1,5 +1,6 @@
 import type { Net } from './net';
 import { store } from './state';
+import { camMid, heardCam, isCamLine, openCam, sendCam, theirCam, theirCamLine } from './voice-camera';
 
 interface Conn {
   pc: RTCPeerConnection;
@@ -23,7 +24,7 @@ interface Conn {
   analyser?: AnalyserNode;
 }
 
-type Signal = { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null; gen?: number };
+type Signal = { description?: RTCSessionDescriptionInit; candidate?: RTCIceCandidateInit | null; gen?: number; cam?: string };
 
 /** How many times in a row a connection is started over before it's left as it is. */
 const RETRIES = 3;
@@ -50,9 +51,10 @@ function fresh() {
  * Either side can change the connection at any time, the same moment as the other included, and what
  * each is sending still arrives. Three things see to that:
  *
- * - There's little to agree on. A connection keeps one line for audio and one for video, each made the
- *   first time either side sends that kind and open both ways from then on. A track goes on its line
- *   and comes off it again (`carry`, `takeOff`) without the two sides negotiating anything.
+ * - There's little to agree on. A connection keeps one line for audio and one for video, plus the
+ *   webcam's own line (voice-camera.ts), each made the first time either side sends that kind and open
+ *   both ways from then on. A track goes on its line and comes off it again (`carry`, `takeOff`,
+ *   `sendCamera`) without the two sides negotiating anything.
  * - What is negotiated (a line that isn't there yet) follows the "perfect negotiation" pattern: when
  *   both make an offer at once, the impolite side's stands and the polite side's gives way. Signals are
  *   applied one at a time, in the order they came.
@@ -224,6 +226,16 @@ export class Voice {
     for (const id of [...this.conns.keys()]) this.drop(id);
   }
 
+  sendCamera(peerId: string, track: MediaStreamTrack | null, scale?: number) {
+    const c = this.conns.get(peerId);
+    if (c) sendCam(c.pc, track, scale, c.polite);
+  }
+
+  remoteCamera(peerId: string): MediaStreamTrack | null {
+    const c = this.conns.get(peerId);
+    return c ? theirCam(c.pc) : null;
+  }
+
   /** Proximity voice: louder when you're close, never fully silent. */
   setVolume(peerId: string, volume: number) {
     const c = this.conns.get(peerId);
@@ -261,6 +273,7 @@ export class Voice {
         // With nothing agreed on yet there's nothing to lose: a new RTCPeerConnection takes their offer.
         // They ignored ours, so they've nothing to be told.
         if (collision) pc = this.reopen(id, c);
+        heardCam(pc, data.cam);
         c.settingAnswer = description.type === 'answer';
         try {
           await pc.setRemoteDescription(description);
@@ -271,6 +284,7 @@ export class Voice {
         if (description.type === 'offer') {
           // Every line of theirs is answered open both ways, so a track of ours can go on it at any time.
           for (const line of pc.getTransceivers()) if (line.direction === 'recvonly') line.direction = 'sendrecv';
+          openCam(pc);
           // A new RTCPeerConnection carries nothing yet. Now their offer is in, our tracks go on the lines
           // it brought, and a line it didn't bring is offered once this is answered.
           if (collision) this.addTracks(c);
@@ -295,7 +309,7 @@ export class Voice {
   }
 
   private signal(to: string, c: Conn, data: Signal) {
-    this.net.send({ t: 'rtc', to, data: { ...data, gen: c.gen } });
+    this.net.send({ t: 'rtc', to, data: { ...data, gen: c.gen, cam: camMid(c.pc) } });
   }
 
   /**
@@ -359,11 +373,22 @@ export class Voice {
 
   /**
    * Puts a track of ours on a connection: on the line it has for that kind, which takes nothing more
-   * than that, or on a new line, which the two sides then negotiate.
+   * than that, or on a new line, which the two sides then negotiate. Never on a webcam's line, ours or
+   * theirs (see voice-camera.ts). addTrack would take one of the track's kind that nothing of ours is on
+   * and that was never agreed to send on (theirs, while their offer of it is being answered), so while
+   * there's one like that the new line is made with addTransceiver, which never takes a line. Otherwise
+   * it's addTrack (a mic's always): a line of that kind that their offer brings as this goes on is the
+   * one it takes. A line from addTransceiver never is (JSEP 5.10), so it would be a second line beside
+   * theirs, which they'd answer open and send nothing on, and which ontrack would have us play instead.
    */
   private carry(c: Conn, track: MediaStreamTrack, stream: MediaStream): RTCRtpSender {
-    const line = c.pc.getTransceivers().find((t) => t.receiver.track.kind === track.kind && t.direction !== 'stopped');
-    if (!line) return c.pc.addTrack(track, stream);
+    const cam = (t: RTCRtpTransceiver) => isCamLine(c.pc, t);
+    const line = c.pc.getTransceivers().find((t) => t.receiver.track.kind === track.kind && t.direction !== 'stopped' && !cam(t));
+    if (!line) {
+      const sent = (t: RTCRtpTransceiver) => t.currentDirection === 'sendrecv' || t.currentDirection === 'sendonly';
+      const takeable = c.pc.getTransceivers().some((t) => cam(t) && t.receiver.track.kind === track.kind && !t.sender.track && !sent(t));
+      return takeable ? c.pc.addTransceiver(track, { streams: [stream] }).sender : c.pc.addTrack(track, stream);
+    }
     // A line of theirs from before lines were answered open (an older page's): opening it is negotiated.
     if (line.direction !== 'sendrecv') line.direction = 'sendrecv';
     void line.sender.replaceTrack(track).catch(() => {});
@@ -401,7 +426,8 @@ export class Voice {
     pc.oniceconnectionstatechange = () => {
       if (pc.iceConnectionState === 'failed') pc.restartIce();
     };
-    pc.ontrack = ({ track, streams }) => {
+    pc.ontrack = ({ track, streams, transceiver }) => {
+      if (theirCamLine(pc, transceiver)) return this.listeners.forEach((fn) => fn());
       const stream = streams[0] ?? new MediaStream([track]);
       if (track.kind === 'audio') {
         c.audioStream = stream;

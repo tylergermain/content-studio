@@ -2,15 +2,19 @@
 // The case that used to lose a track: one starts a screen share (Voice.startShare) while the other joins
 // voice (Voice.joinVoice), on a connection that has negotiated nothing yet. Both tracks must arrive,
 // every time, whichever of the two is the polite side. The other scenes are the same moment with other
-// changes in it, and an offer that's made to fail, which the connection has to get over by itself.
+// changes in it, the webcam's own line among them (src/client/voice-camera.ts), and an offer that's
+// made to fail, which the connection has to get over by itself.
 //
 //   node tests/support/rtc-glare-browser.mjs            20 rounds each way (5 of each other scene)
 //   RTC_ROUNDS=5 RTC_VERBOSE=1 node tests/support/…     fewer, and say what each round did
 //   RTC_SCENE='offer fails' node tests/support/…         only the scenes with that in their name
+//   RTC_SCENE=webcam node tests/support/…                only the webcam's
 //
 // It needs no office running: it serves the page's own modules with Vite, and stands in for the
 // office's socket itself (signals go from one browser to the other in order, a few ms late, as the
-// socket would carry them). The mic is Chrome's fake one, the share a canvas.
+// socket would carry them). The mic is Chrome's fake one, the share and the webcam canvases.
+import os from 'node:os';
+import path from 'node:path';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 
@@ -55,10 +59,19 @@ const SCENES = [
       ['mic', 'mic', 'audio video', 'audio video'],
     ],
   },
+  // The webcam (features/webcam): its own line, made by whichever side turns one on first, then replaceTrack.
+  { name: 'webcam: one turns theirs on as the other shares', rounds: FEW, steps: [['warm', 'warm', '', ''], ['cam', 'share', 'video', 'cam']] },
+  { name: 'webcam: both turn theirs on at once', rounds: FEW, steps: [['warm', 'warm', '', ''], ['cam', 'cam', 'cam', 'cam']] },
+  { name: 'webcam: both at once, on a call', rounds: FEW, steps: [['mic', 'mic', 'audio', 'audio'], ['warm', 'warm', 'audio', 'audio'], ['cam', 'cam', 'audio cam', 'audio cam']] },
+  { name: 'webcam: a share and a webcam from one side, as the other joins voice', rounds: FEW, steps: [['warm', 'warm', '', ''], ['camShare', 'mic', 'audio', 'cam video']] },
+  { name: 'webcam: off and on again, and on beside a share', rounds: FEW, steps: [['warm', 'warm', '', ''], ['cam', '', '', 'cam'], ['camOff', 'share', 'video', '!cam'], ['cam', '', 'video', 'cam']] },
   { name: 'on a call, an offer fails', rounds: FEW, warns: true, steps: [['mic', 'mic', 'audio', 'audio'], ['failingShare', '', 'audio', 'audio video', 1]] },
 ];
 
-const vite = await createServer({ logLevel: 'error', server: { port: 0, host: '127.0.0.1', proxy: {} }, optimizeDeps: { noDiscovery: true } });
+// A cache of its own: a worktree's node_modules is often the main checkout's, and its dev server's
+// optimized dependencies are in there, which a Vite with another root would otherwise clear out.
+const cacheDir = path.join(os.tmpdir(), 'agent-office-rtc-glare-vite');
+const vite = await createServer({ logLevel: 'error', cacheDir, server: { port: 0, host: '127.0.0.1', proxy: {} }, optimizeDeps: { noDiscovery: true } });
 await vite.listen();
 const port = vite.httpServer.address().port;
 const launch = () =>
@@ -90,9 +103,28 @@ async function rig() {
   /** How much of each track had come in, the last time `seen` looked. */
   const counted = new Map();
   const share = () => voice.startShare(canvas.captureStream(15));
+  // A webcam: another canvas, sent the way features/webcam does, again every 200 ms.
+  const camCanvas = document.createElement('canvas');
+  camCanvas.width = camCanvas.height = 240;
+  const camPaint = camCanvas.getContext('2d');
+  setInterval(() => {
+    camPaint.fillStyle = `hsl(${(performance.now() / 7) % 360} 70% 40%)`;
+    camPaint.fillRect(0, 0, 240, 240);
+  }, 50);
+  let camTrack = null;
+  let camTick = 0;
+  const camSend = () => voice.sendCamera(peer, camTrack);
+  const camLoop = () => {
+    clearInterval(camTick);
+    camTick = setInterval(camSend, 200);
+    camSend();
+  };
   window.rig = {
     /** A new connection between `you` and `them`, with nothing sent on it yet. */
     meet(you, them) {
+      clearInterval(camTick);
+      camTrack?.stop();
+      camTrack = null;
       voice.stopShare();
       voice.leaveVoice();
       voice.reset();
@@ -103,6 +135,24 @@ async function rig() {
       voice.syncPeers();
     },
     mic: () => voice.joinVoice(),
+    /** The webcam's tick running with nothing to send, long enough for the connection to have settled (CAM_SETTLE). */
+    async warm() {
+      camLoop();
+      await new Promise((r) => setTimeout(r, 1700));
+    },
+    cam() {
+      camTrack = camCanvas.captureStream(15).getVideoTracks()[0];
+      camLoop();
+    },
+    camOff() {
+      camTrack?.stop();
+      camTrack = null;
+      camSend();
+    },
+    async camShare() {
+      this.cam();
+      return share();
+    },
     leave: () => voice.leaveVoice(),
     share,
     stopShare: () => voice.stopShare(),
@@ -143,6 +193,7 @@ async function rig() {
       return {
         audio: await arriving(c.audioStream),
         video: await arriving(voice.remoteScreens().get(peer)),
+        cam: await arriving(voice.remoteCamera(peer) && new MediaStream([voice.remoteCamera(peer)])),
         gen: c.gen ?? 0,
         settled: c.pc.signalingState === 'stable',
         state: `${c.pc.signalingState}/${c.pc.connectionState}, started over ${c.gen ?? 0}×; ${lines.join('; ') || 'no lines'}`,
@@ -243,7 +294,7 @@ async function round(scene, n, x, politeX) {
     wants[x] = wantX;
     wants[y] = wantY;
     const { s, took } = await arrives(wants);
-    const got = (i) => ['audio', 'video'].filter((kind) => s[i][kind]).join(' and ') || 'nothing';
+    const got = (i) => ['audio', 'video', 'cam'].filter((kind) => s[i][kind]).join(' and ') || 'nothing';
     if (took === null) return fail(`step ${at + 1}: X has ${got(x)} arriving (wants ${wantX || 'nothing'}), Y has ${got(y)} (wants ${wantY || 'nothing'})`, s);
     if (s.some((p) => p.gen !== over)) return fail(`step ${at + 1}: it arrived, but the connection was started over to get there`, s);
     if (!scene.warns && s.some((p) => p.warnings.length)) return fail(`step ${at + 1}: it arrived, but only after something went wrong`, s);

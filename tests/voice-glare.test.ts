@@ -28,12 +28,16 @@ fake(
 
 const { Voice } = await import('../src/client/voice.js');
 const { store } = await import('../src/client/state/index.js');
+const cams = await import('../src/client/voice-camera.js');
 type Voice = InstanceType<typeof Voice>;
 type Msg = { t: string; to?: string; data?: { description?: { type: string }; gen?: number } };
 
 const turns = async (n: number) => {
   for (let i = 0; i < n; i++) await new Promise<void>((r) => setImmediate(r));
 };
+
+/** The time as the webcam's line sees it (performance.now, in a test that stands it in): moved on by hand. */
+let clock = 0;
 
 /** What Voice warned of while `run` went on. */
 async function warnings(run: () => Promise<void>): Promise<string[]> {
@@ -103,6 +107,7 @@ function pair(seed: number) {
   }
 
   return {
+    ids,
     voices,
     lines,
     conn,
@@ -112,10 +117,31 @@ function pair(seed: number) {
     crossed,
     signals: () => signals,
     share: (i: number) => void voices[i].startShare(new FakeStream([new FakeTrack('video')]) as never),
-    /** `kind` from side `from` is arriving: agreed on by both connections, and the far side's Voice has it. */
+    /**
+     * Side `i` turns its webcam on, sent the way features/webcam sends it, on a connection that has had
+     * time to settle (CAM_SETTLE, and CAM_DEFER for the polite side). Hands back the webcam's track.
+     */
+    cam(i: number) {
+      const track = new FakeTrack('video');
+      const send = (t: FakeTrack | null) => voices[i].sendCamera(ids[1 - i], t as never);
+      send(null);
+      clock += cams.CAM_SETTLE;
+      send(track);
+      clock += cams.CAM_DEFER;
+      send(track);
+      return track;
+    },
+    /**
+     * `kind` from side `from` (its mic, or its share) is arriving: agreed on by both connections, and what
+     * the far side's Voice plays for it is what comes in on the line it's sent on, not on another line.
+     */
     arrives(from: number, kind: 'audio' | 'video') {
+      const sender: unknown = kind === 'audio' ? conn(from).micSender : conn(from).screenSender;
+      const mid = sender ? pc(from).getTransceivers().find((l) => l.sender === sender)?.mid : null;
+      const line = mid ? pc(1 - from).getTransceivers().find((l) => l.mid === mid) : undefined;
       const there = conn(1 - from);
-      return flows(pc(from), pc(1 - from), kind) && !!(kind === 'audio' ? there.audioStream : there.screen);
+      const played: unknown = (kind === 'audio' ? there.audioStream : there.screen)?.getTracks()[0];
+      return flows(pc(from), pc(1 - from), kind) && !!line && played === line.receiver.track;
     },
   };
 }
@@ -342,6 +368,115 @@ test('a signal for a connection that has since been started over is dropped', as
   assert.deepEqual([p.conn(0).gen, p.conn(1).gen], [1, 1]);
   assert.ok(p.arrives(0, 'video'), "a's share");
   assert.ok(p.arrives(1, 'audio') && p.arrives(1, 'video'), "b's voice and share");
+});
+
+/** The line side `i` sends `track` on, if it's on one. */
+const lineOf = (p: ReturnType<typeof pair>, i: number, track: unknown) => p.pc(i).getTransceivers().find((t) => t.sender.track === track);
+
+for (const camSide of [0, 1]) {
+  test(`a share never goes on a webcam's line, ours or theirs: the ${camSide === 0 ? 'polite' : 'impolite'} side's webcam is on`, async (t) => {
+    t.mock.method(performance, 'now', () => clock);
+    const other = 1 - camSide;
+    for (const [sharer, when] of [[camSide, 'at once'], [camSide, 'after'], [other, 'after']] as const) {
+      for (let seed = 1; seed <= 5; seed++) {
+        const at = `seed ${seed}, side ${sharer} shares ${when}`;
+        const p = pair(seed);
+        let cam!: FakeTrack;
+        const warned = await warnings(async () => {
+          cam = p.cam(camSide);
+          // Before its line has been offered, or once both sides have agreed on it.
+          if (when === 'after') await p.settle();
+          p.share(sharer);
+          await p.settle();
+        });
+        const mid = lineOf(p, camSide, cam)?.mid;
+        assert.ok(mid, `${at}: the webcam has its line`);
+        // Both sides take it for a webcam's: ours on the one side, theirs on the other.
+        for (const i of [0, 1]) assert.ok(cams.isCamLine(p.conn(i).pc, p.pc(i).getTransceivers().find((l) => l.mid === mid) as never), `${at}: side ${i}`);
+        const screen = p.voices[sharer].localScreen!.getVideoTracks()[0];
+        const shared = lineOf(p, sharer, screen);
+        assert.ok(shared?.mid && shared.mid !== mid, `${at}: the share is on a line of its own`);
+        assert.equal(lineOf(p, camSide, cam)?.mid, mid, `${at}: and the webcam still on its own`);
+        assert.ok(p.arrives(sharer, 'video'), `${at}: the share arrives as a share`);
+        assert.ok(p.voices[other].remoteCamera(p.ids[camSide]), `${at}: the webcam arrives as a webcam`);
+        assert.deepEqual(warned, [], at);
+        assert.deepEqual([p.conn(0).gen, p.conn(1).gen], [0, 0], at);
+      }
+    }
+  });
+}
+
+test("nor on their webcam's line while their offer of it is still being answered, where addTrack would take it", async (t) => {
+  t.mock.method(performance, 'now', () => clock);
+  for (const camSide of [0, 1]) {
+    for (let seed = 1; seed <= 5; seed++) {
+      const at = `seed ${seed}, side ${camSide}'s webcam`;
+      const p = pair(seed);
+      const other = 1 - camSide;
+      const cam = p.cam(camSide);
+      await turns(10);
+      assert.equal(p.lines[camSide][0]?.data?.description?.type, 'offer', at);
+      // The other side takes its time over the answer, and starts a share while it's at it: their line
+      // is open its way by then, and nothing of its own has gone out on it yet.
+      FakePC.pause = (pc, step) => turns(pc === p.pc(other) && step === 'setLocalDescription' ? 20 : 1);
+      while (p.lines[camSide].length) p.carry(camSide);
+      for (let n = 0; p.pc(other).signalingState !== 'have-remote-offer'; n++) {
+        assert.ok(n < 100, `${at}: the offer is in`);
+        await turns(1);
+      }
+      await turns(1);
+      const mid = lineOf(p, camSide, cam)!.mid;
+      const theirs = p.pc(other).getTransceivers().find((l) => l.mid === mid)!;
+      assert.equal(theirs.direction, 'sendrecv', at);
+      assert.ok(cams.isCamLine(p.conn(other).pc, theirs as never), at);
+      p.share(other);
+      FakePC.pause = () => turns(1);
+      await p.settle();
+      const shared = lineOf(p, other, p.voices[other].localScreen!.getVideoTracks()[0]);
+      assert.ok(shared !== theirs && shared?.mid && shared.mid !== mid, `${at}: the share is on a line of its own`);
+      assert.equal(theirs.sender.track, null, `${at}: nothing of theirs on the webcam's line`);
+      assert.ok(p.arrives(other, 'video'), `${at}: the share arrives as a share`);
+      assert.ok(p.voices[other].remoteCamera(p.ids[camSide]), `${at}: the webcam arrives as a webcam`);
+      assert.deepEqual([p.conn(0).gen, p.conn(1).gen], [0, 0], at);
+    }
+  }
+});
+
+test("with a webcam's line agreed, a mic or a share added as an offer of a line for one comes in goes on that line: one line, heard both ways", async (t) => {
+  t.mock.method(performance, 'now', () => clock);
+  for (const kind of ['audio', 'video'] as const) {
+    for (const camSide of [0, 1]) {
+      for (const first of [0, 1]) {
+        const at = `${kind === 'audio' ? 'voice' : 'a share'}, side ${camSide}'s webcam on, side ${first} first`;
+        const p = pair(7);
+        const second = 1 - first;
+        const add = async (i: number) => void (kind === 'audio' ? await p.voices[i].joinVoice() : p.share(i));
+        p.cam(camSide);
+        await p.settle();
+        // The first joins voice (or shares), and its offer of a line for it is on its way across.
+        await add(first);
+        const offer = () => p.lines[first].findIndex((m) => m.data?.description?.type === 'offer');
+        for (let n = 0; offer() < 0; n++) {
+          assert.ok(n < 100, `${at}: the first makes an offer`);
+          await turns(1);
+        }
+        while (offer() > 0) p.carry(first);
+        // The second does the same, and the offer comes in before the second has offered a line of its
+        // own: its track goes on the line the offer brings, rather than a second line beside it that the
+        // first answers open, sends nothing on, and the second then plays instead.
+        const warned = await warnings(async () => {
+          await add(second);
+          p.carry(first);
+          await p.settle();
+        });
+        const lines = (i: number) => p.pc(i).getTransceivers().filter((l) => l.kind === kind && !cams.isCamLine(p.conn(i).pc, l as never));
+        for (const i of [0, 1]) assert.equal(lines(i).length, 1, `${at}: one line for it on side ${i}`);
+        for (const i of [0, 1]) assert.ok(p.arrives(i, kind), `${at}: side ${i}'s arrives`);
+        assert.deepEqual(warned, [], at);
+        assert.deepEqual([p.conn(0).gen, p.conn(1).gen], [0, 0], at);
+      }
+    }
+  }
 });
 
 test('no offer is rolled back, in any of the above', () => {
