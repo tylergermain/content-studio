@@ -22,6 +22,7 @@ import { Dj, hiccup, pour } from '../features/bar/sound';
 import { carDoor, crash, honk, Motors, type Engine } from '../features/cars/sound';
 import { bonk, hatch, poleLanding, rung, slide, twirl } from '../features/climbing/sound';
 import { coffee } from '../features/coffee/sound';
+import { chute } from '../features/parachute/sound';
 import { AudioCore, type Listener } from './core';
 import { bark, yip } from '../features/dog/sound';
 import { bleat } from '../features/goat/sound';
@@ -190,6 +191,11 @@ export class OfficeSound {
 
   twirl() {
     twirl(this.a);
+  }
+
+  /** A parachute opening over you, or your landing under it (see features/parachute). */
+  chute(kind: 'open' | 'land') {
+    chute(this.a, kind);
   }
 
   poleLanding(speed: number, at?: Pos) {

@@ -7,14 +7,11 @@ import { PlayerInput, isTyping } from './pointer';
 import { HEIGHT, STEP, blockerAt, ceilingAt, groundAt, stepTo } from './collide';
 import { EYE_HEIGHT, aimCamera, shakeCamera, type Room } from './camera';
 import { Effects } from './effects';
+import { GRAVITY, JUMP_V, RUN, WALK } from './motion';
 
 // You: walking, running, jumping and sitting, bumping into things and climbing stairs, and the camera
 // that follows. The keys and the mouse are PlayerInput's (pointer.ts).
 
-const WALK = 4.6;
-const RUN = 7.5;
-const JUMP_V = 6.4;
-const GRAVITY = 18;
 
 // What the rest of the client takes from here, wherever it lives now: the eye height (camera.ts), the
 // ground under someone (collide.ts) and isTyping (pointer.ts).
@@ -62,6 +59,8 @@ export class PlayerController extends PlayerInput {
    * frame, with no walking, falling or bumping into things, and the camera follows.
    */
   rig: ((dt: number) => void) | null = null;
+  /** The fastest you fall, in m/s: a parachute open over you holds you to how fast it sinks (see features/parachute). */
+  maxFall = Infinity;
   /** The rig is a car (see features/cars/controller.ts): out on the street or in the garage, not up a shaft indoors. */
   riding = false;
   /**
@@ -231,7 +230,7 @@ export class PlayerController extends PlayerInput {
       this.stepOffset += this.pos.y - ground;
       this.pos.y = ground;
     }
-    this.vy -= GRAVITY * dt;
+    this.vy = Math.max(this.vy - GRAVITY * dt, -this.maxFall);
     this.pos.y += this.vy * dt;
     if (this.pos.y <= ground) {
       this.pos.y = ground;
