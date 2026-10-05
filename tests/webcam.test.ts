@@ -77,7 +77,7 @@ test('the camera is asked for a small square at 15 a second, from the camera pic
 });
 
 test('the middle of the picture goes on the face, closer in than the camera frames it, a mirror’s for your own', () => {
-  // The middle three quarters of the middle square, across and down: a face, not a porthole.
+  // The middle half of the middle square, across and down: a face, not a porthole.
   assert.equal(FACE_ZOOM, 0.5);
   assert.deepEqual(squareCrop(240, 240, false), { repeat: [0.5, 0.5], offset: [0.25, 0.25] });
   assert.deepEqual(squareCrop(640, 480, false), { repeat: [0.375, 0.5], offset: [0.3125, 0.25] });
@@ -86,7 +86,7 @@ test('the middle of the picture goes on the face, closer in than the camera fram
   const m = squareCrop(640, 480, true);
   assert.deepEqual(m.repeat, [-0.375, 0.5]);
   const u = (at: number) => at * m.repeat[0] + m.offset[0];
-  assert.equal(u(0), 0.78125);
+  assert.equal(u(0), 0.6875);
   assert.equal(u(1), 0.3125);
   assert.equal((u(0) + u(1)) / 2, 0.5);
   assert.deepEqual(squareCrop(0, 0, false), { repeat: [0.5, 0.5], offset: [0.25, 0.25] }, 'before the picture has a size');
