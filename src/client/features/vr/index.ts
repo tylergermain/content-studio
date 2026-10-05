@@ -15,8 +15,12 @@ import { toast } from '../../ui/dom';
 import { type VrButton, vrButton } from './button';
 import type { VrDebug } from './types';
 
-/** What VR asks the headset for: the floor (else it makes do with where your head started), the play area, and layers. */
-export const SESSION_INIT: XRSessionInit = { optionalFeatures: ['local-floor', 'bounded-floor', 'layers'] };
+/**
+ * What VR asks the headset for: the floor (else it makes do with where your head started) and layers.
+ * Not the play area ('bounded-floor'): nothing here uses it, and it was the one thing asked for that
+ * touches the shape of your room, which the Quest guards with its spatial-data prompts.
+ */
+export const SESSION_INIT: XRSessionInit = { optionalFeatures: ['local-floor', 'layers'] };
 
 /** The parts VR reaches for. */
 export type VrParts = Pick<Parts, 'stage' | 'pointer' | 'peers' | 'focus'>;
