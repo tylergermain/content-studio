@@ -11,6 +11,7 @@ import { HOOP } from './hoop.js';
 import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
 import { hasBoss, levelY } from './mezzanine.js';
 import { LOFT_SEATS } from './office-fixed.js';
+import { cleanProject, cleanProjectSize, type ProjectLink } from './project-rooms.js';
 import { hasSteps, stepsSeats } from './steps.js';
 
 export type FurnitureGroup = 'Work' | 'Rooms' | 'Seating' | 'Tables' | 'Plants' | 'Play' | 'Decor';
@@ -72,6 +73,10 @@ export interface KindDef {
   wall?: boolean;
   /** It hangs from the ceiling, or high on a wall: nothing's in the way under it, and it can't go under a mezzanine. */
   overhead?: boolean;
+  /** Each one is as long and wide as it's made (see Piece.w and Piece.d): `w` and `d` are what it's laid down at. */
+  stretch?: boolean;
+  /** It marks out one project's room, and keeps which project (see Piece.project, and shared/project-rooms.ts). */
+  project?: boolean;
 }
 
 export const FURNITURE = {
@@ -108,6 +113,8 @@ export const FURNITURE = {
   doorway: { label: 'Doorway', icon: '🚪', group: 'Rooms', w: 1.2, d: 0.14, top: 0, color: '#fff6ea', text: 'Office' },
   // A slatted panel hung low from the ceiling on rods, with a light under it: a soffit over a way in, a few side by side. Nothing's in the way under it.
   'ceiling-panel': { label: 'Ceiling panel', icon: '🔳', group: 'Rooms', w: 2.4, d: 2.4, top: 0, color: '#7a5236', overhead: true },
+  // One project's room, marked out on the floor under its desks: workers hired at a desk on it start in its project's folder (see shared/project-rooms.ts).
+  'project-room': { label: 'Project room', icon: '📁', group: 'Rooms', w: 6, d: 5, top: 0, color: '#7ab8ff', text: 'Project', stretch: true, project: true },
   table: { label: 'Table', icon: '🟫', group: 'Tables', w: 2.4, d: 1.1, top: 0.76, color: '#c98b5a' },
   'standing-table': { label: 'Standing table', icon: '🍸', group: 'Tables', r: 0.5, top: 1.05, color: '#c98b5a' },
   'coffee-table': { label: 'Coffee table', icon: '☕', group: 'Tables', r: 0.8, top: 0.46, color: '#c98b5a' },
@@ -200,6 +207,11 @@ export interface Piece {
   aspect?: number;
   /** How high the picture's middle hangs above the floor the piece is on. */
   lift?: number;
+  /** How long (across x) and wide (along z) it is, for a kind that stretches (see KindDef.stretch). */
+  w?: number;
+  d?: number;
+  /** The project a project room is for: its folder, its app and whether the room is kept (see shared/project-rooms.ts). */
+  project?: ProjectLink;
 }
 
 /** The most pieces a floor takes: the rooms upstairs and the paintings on their walls are all pieces. */
@@ -287,7 +299,7 @@ export function pieceY(p: Piece): number {
 /** Whether a kind can go upstairs: not what the office has one of, what's for playing with, or what hangs from the office's own ceiling (the ticker, a ceiling panel). */
 export function canGoUp(kind: FurnitureKind): boolean {
   const k = kindDef(kind);
-  return !k.fixed && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel';
+  return !k.fixed && !k.project && k.group !== 'Play' && kind !== 'ticker' && kind !== 'ceiling-panel';
 }
 
 /**
@@ -334,7 +346,7 @@ export function pieceBox(p: Piece): Box {
   }
   // What hangs is on the wall's face, and takes the floor from there out: as wide as its frame.
   if (k.hangs) return turnedBox(p.x, p.z, p.rotY, hangSize(p).w, k.d ?? 0.08, (k.d ?? 0.08) / 2);
-  return turnedBox(p.x, p.z, p.rotY, k.w ?? 1, k.d ?? 1);
+  return k.stretch ? turnedBox(p.x, p.z, p.rotY, p.w ?? k.w ?? 1, p.d ?? k.d ?? 1) : turnedBox(p.x, p.z, p.rotY, k.w ?? 1, k.d ?? 1);
 }
 
 /**
@@ -498,6 +510,9 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
       piece.scale = tidy(round(Math.max(PIECE_SCALE.min, Math.min(PIECE_SCALE.max, scale)), GRID));
     }
     if (k.text !== undefined) piece.text = cleanPieceText(r.text) || k.text;
+    if (k.stretch) Object.assign(piece, { w: cleanProjectSize(r.w, k.w ?? 1), d: cleanProjectSize(r.d, k.d ?? 1) });
+    const project = k.project ? cleanProject(r.project) : undefined;
+    if (project) piece.project = project;
     // A file of the floor's own; a screen that plays can follow the floor's channels instead, which a picture can't.
     if ((k.plays || k.shows) && typeof r.media === 'string' && ((k.plays && r.media === WATCH_MEDIA) || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
     if (r.level === 1 && canGoUp(kind)) piece.level = 1;

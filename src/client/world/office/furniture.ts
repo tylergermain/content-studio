@@ -5,6 +5,7 @@ import { mesh, roundedBox, textPlane, toon } from '../toon';
 import { DECOR_BUILDERS } from './furniture-decor';
 import { DARK_WOOD, legs, placeholder, type BuiltPiece, type Builders } from './furniture-kit';
 import { PLAY_BUILDERS } from './furniture-play';
+import { PROJECT_BUILDERS } from './furniture-project';
 import { ROOMS_BUILDERS } from './furniture-rooms';
 import { SCREENS_BUILDERS } from './furniture-screens';
 import { STUDIO_BUILDERS } from './furniture-studio';
@@ -229,6 +230,7 @@ const BUILDERS: Builders = {
   'floor-lamp': (_p, color) => floorLamp(color),
   sign: (p, color) => sign(color, p.text ?? kindDef(p.kind).text ?? ''),
   ...ROOMS_BUILDERS,
+  ...PROJECT_BUILDERS,
   ...DECOR_BUILDERS,
   ...STUDIO_BUILDERS,
   ...SCREENS_BUILDERS,

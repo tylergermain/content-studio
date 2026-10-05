@@ -91,11 +91,11 @@ function noOutline(obj: THREE.Object3D) {
 const hung = (p: Piece) => (kindDef(p.kind).shows ? [p.frame ?? PAINTING.frame, p.size ?? PAINTING.size, p.aspect ?? PAINTING.aspect, p.lift ?? PAINTING.lift].join('|') : '');
 
 /**
- * Whether a piece has to be built again to look like `next`: its paint or what it says changed, the
- * floor it's on (a neon sign upstairs hangs on no wires), or what a painting is built to. Not its
- * picture: whoever shows that swaps the image on the same canvas (see PieceView.screen).
+ * Whether a piece has to be built again to look like `next`: its paint, what it says or a project
+ * room's size changed, the floor it's on (a neon sign upstairs hangs on no wires), or what a painting
+ * is built to. Not its picture: whoever shows that swaps the image on the same canvas (see PieceView.screen).
  */
-const rebuilt = (was: Piece, next: Piece) => was.kind !== next.kind || was.color !== next.color || was.text !== next.text || was.level !== next.level || hung(was) !== hung(next);
+const rebuilt = (was: Piece, next: Piece) => was.kind !== next.kind || was.color !== next.color || was.text !== next.text || was.level !== next.level || hung(was) !== hung(next) || was.w !== next.w || was.d !== next.d;
 
 export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
   // The couches' throw pillows are in the floor's own paint.

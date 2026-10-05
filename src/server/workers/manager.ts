@@ -30,11 +30,11 @@ import type { HookEnv, OpenedPr, RepoSource, RunAs, Worker, WorkerContext, Worke
 import { clamp, safeEq, truncate } from './util.js';
 import { COLORS, NAMES, newWorker } from './worker.js';
 import { WorkerTrees, lostMessage } from './worktree.js';
+import { seatProblem } from './hiring.js';
+import { projectBrief, type WorkerProject } from '../../shared/project-rooms.js';
 const SCREEN_INTERVAL_MS = 250;
 /** How often a steady typist's "last typed" time is refreshed for everyone. */
 const TYPED_REFRESH_MS = 15_000;
-/** The most other repositories one worker can take on (see WorkerInfo.repos). */
-export const MAX_REPOS = 8;
 /** How often every worker's transcript is checked for new spend, on top of the hook-driven checks. */
 const USAGE_SCAN_MS = 10_000;
 /** How often a terminal with new output is saved to disk, so even a crash loses at most this much. */
@@ -69,6 +69,8 @@ export class WorkerManager {
   private drops: DropStore;
   private saveTimer: NodeJS.Timeout;
   hiringPolicy?: (owner: string | undefined, specialist: string | undefined, kind: WorkerKind) => string | undefined;
+  /** The project room a desk is in (see shared/project-rooms.ts): who's hired there works in its project. */
+  projectAt?: (deskId: string) => WorkerProject | undefined;
   wing: () => number = () => 0;
 
   constructor(
@@ -231,15 +233,9 @@ export class WorkerManager {
     const seat = DESK_BY_ID.get(deskId);
     if (!seat) return 'Unknown desk';
     if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
-    if (this.deskOccupied(deskId)) return seat.station ? `The ${this.prompts?.stationName?.(seat.station) ?? STATION_AGENT[seat.station].name} is already there` : `That ${seat.beanbag ? 'bean bag' : 'desk'} is taken`;
-    if (kind === 'shell' && seat.station) return 'A board agent is always an agent, not a shell';
-    if (seat.station && !prompt?.trim()) return 'Tell the board agent what to do';
-    if (!seat.room !== !meeting) return seat.room ? 'Only a meeting seats workers at the meeting table: call one in the meeting room' : 'A meeting seats its workers at the meeting table';
-    if (meeting && (kind !== 'agent' || worktree)) return 'A meeting seats agents, in its own worktree';
-    if (repos.length && (kind !== 'agent' || !worktree || seat.station || meeting)) return 'Only a worker in its own worktree can work in other repositories too';
-    if (repos.length > MAX_REPOS) return `A worker can take on at most ${MAX_REPOS} other repositories`;
-    if (kind === 'shell' && provider !== undefined) return 'Shell workers do not have an agent provider';
-    if (kind === 'agent' && selectedProvider === 'custom' && this.defaultProvider !== 'custom') return 'Custom is not the configured agent provider';
+    const project = seat.station || meeting ? undefined : this.projectAt?.(deskId);
+    const problem = seatProblem(seat, { kind, prompt, worktree, meeting: !!meeting, repos, provider, configured: this.defaultProvider, occupied: this.deskOccupied(deskId), stationName: seat.station && this.prompts?.stationName?.(seat.station), project });
+    if (problem) return problem;
     if (kind === 'agent') {
       const paused = this.ledger.hiringPaused;
       if (paused) return paused;
@@ -274,6 +270,7 @@ export class WorkerManager {
       kind,
       provider: selectedProvider,
       specialist,
+      project,
       model: takesModel(selectedProvider) ? model : undefined,
       effort: takesEffort(selectedProvider) ? effort : undefined,
       deskId,
@@ -298,7 +295,8 @@ export class WorkerManager {
     this.workers.set(id, w);
     if (info.prompt) this.tasks.notePrompt(w, info.prompt);
     // A board agent is told what it's there for ahead of its first request (which is what shows).
-    this.launch(w, seat.station && info.prompt ? `${stationBrief(seat.station, this.prompts)}\n\n${info.prompt}` : info.prompt, undefined);
+    const brief = seat.station && info.prompt ? stationBrief(seat.station, this.prompts) : project && (info.prompt || specialist) ? projectBrief(project, !specialist) : undefined;
+    this.launch(w, brief ? [brief, info.prompt].filter(Boolean).join('\n\n') : info.prompt, undefined);
     this.persist();
     return info;
   }
@@ -857,7 +855,7 @@ export class WorkerManager {
   private cwd(info: WorkerInfo): string {
     if(info.specialist) return specialistFolder(this.dir,info.specialist);
     const rel = workspaceOf(info);
-    return rel ? path.join(this.dir, rel) : this.dir;
+    return rel ? path.join(this.dir, rel) : (info.project?.dir ?? this.dir);
   }
 
   private scheduleScan(w: Worker) {

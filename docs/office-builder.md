@@ -42,6 +42,7 @@ A few notes on particular pieces:
 - **Rooms.** The walls are all 2.6 m tall with square-cut ends, so a row of them tiles end to end: that's how a floor gets a studio, a booth or an office of its own. A wall takes paint (its skirting and cap come out a shade of it). A glass wall is a steel frame three panes high, in the piece's color. A wood slat panel has slats on both faces, at a pitch that carries across the joins.
 - **Doorway.** A frame to walk through, as long as a short wall and as tall as the others, with the room's name over the opening on both sides. Leave a gap for it in a row of walls; nothing bumps into it. *The room's name* in the panel on the right sets what it says.
 - **Ceiling panel.** A 2.4 m square of timber slats hung low (2.6 m up) on four rods from the office's ceiling, with a flat light in its middle. A few side by side make a soffit over a way in or a row of desks: the slats carry on from one panel to the next. It takes paint, and nothing bumps into it, so it hangs over desks and walkways. It only hangs over the office floor, with a clear run up to the ceiling: not upstairs, not under the big mezzanine or the corner loft, where a floor is between it and the ceiling, not over a flight of stairs and not through the elevator's shaft.
+- **Project room.** One project's room, marked out on the floor: a pale wash of its paint with a band of the paint round the edge and the room's name lying on the floor at its front. Lay it under the desks of one project; nothing bumps into it, and it stays downstairs with the desks. See [Project rooms](#project-rooms).
 - **Painting.** One of the floor's own pictures in a frame, on any wall: see [Paintings](#paintings).
 - **Plants.** Every plant but the planter box comes in sizes. You bump into the planter, not the leaves. The planter box is planted end to end, with vines over its front only: its back is clear, so it can stand against a wall.
 - **Neon sign.** It hangs at head height at the front of its footprint, so on the same spot as a wall or a wood panel it lies on that wall's face. Its words and its color are the piece's.
@@ -148,6 +149,28 @@ For wood on part of a wall, or on an office of its own, use the catalog's wood s
 ### One tee, or two
 
 **1 tee** is the balcony as it comes: the tee next to the ashtray, and the bistro table with its two stools. **2 tees** adds a second bay east of the balcony doors, with its own bag of clubs, and puts the bistro table and its stools away to make room (anyone sitting on a stool is stood up). With two, one person is on each and both can swing at once; see [Features](features.md).
+
+## Project rooms
+
+A **Project room** (catalog → Rooms) gives part of a floor to one project, so one floor can hold several projects at once: a room for each thing you're working on now, and rooms you keep for the projects you're always on. Put walls, glass and a doorway round it to make it a room you walk into; the project room itself is the floor inside, and it's what says whose desks they are.
+
+In the panel on the right:
+
+- **Wide** and **Deep** stretch it from 2 m to 30 m each way. Turn it with **R** like anything else.
+- **The room's name** is what it says on the floor, and what the hire window and the 2D view call it.
+- **Project folder** is the project's folder on the office's computer, as a full path (`/Users/you/Workspaces/kenna`). It has to be a folder inside the home folder of whoever runs the office, not the home folder itself and not a floor's `.agent-office`; the office checks when you save, and says which room's folder won't do. A room without a folder is only a name.
+- **Its app's address** is where the project's app runs (`http://localhost:3000`), with **Open the app** to go there.
+- **Keep this room** marks a room for a project you're always on, rather than one for now.
+
+Whoever's hired at a desk or bean bag on a project room works in that room's project:
+
+- A general worker starts in the project's folder, and its first request starts with where it is: the room, the folder, the app, and not to switch branches, stash, reset or commit there unless asked, since others in the room share the folder.
+- A specialist keeps its role's own folder (so its role's instructions apply) and is told the project's folder and app the same way, even when it's hired without a task.
+- The hire window says so before you hire: *📁 The Kenna room works in /Users/you/Workspaces/kenna*, and *✨ New worker · Desk 1 · 📁 Kenna* in the 2D view's **New task**.
+- A worker in a project room with a folder can't have a worktree of the floor's own repository (the room's project is another one), so the hire window leaves that option out there.
+- The worker keeps its room across restarts. Moving the room later doesn't move the workers already in it; it's where their desk was when they were hired that counts.
+
+A desk in two project rooms is in the smaller one, so a room marked out inside a bigger one is its own.
 
 ## Upstairs
 

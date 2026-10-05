@@ -26,7 +26,7 @@ import { openSignIns } from './ui/signins';
 import { modelBadge, providerLabel } from './ui/provider';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { askNotifyPermission, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
-import { repoChoices } from './shared/hiring';
+import { deskLabel, repoChoices, worktreeAt } from './shared/hiring';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
 
@@ -270,9 +270,9 @@ function sendToWorker(title: string, text: { context?: string; initial?: string 
   openAsk({
     title,
     ...text,
-    newDesk: desk ? DESK_BY_ID.get(desk)!.label : undefined,
+    newDesk: desk ? deskLabel(desk, DESK_BY_ID.get(desk)!.label) : undefined,
     workers: awake.map((w) => ({ id: w.id, name: w.name, color: w.color, status: w.status })),
-    worktreeOption: !!store.project.branch,
+    worktreeOption: desk ? worktreeAt(desk) : !!store.project.branch,
     providerOption: true,
     repoOptions: repoChoices(),
     onSubmit: (prompt, to, worktree, provider, model, effort, repos, specialist) => {
