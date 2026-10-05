@@ -75,7 +75,7 @@ test('the meter runs up to the top and back down', () => {
 test('the office only passes on throws from inside the building, no faster than anyone throws', () => {
   const ok = { x: -12, y: 1.4, z: 10, vx: -5, vy: 5, vz: 0 };
   assert.ok(throwOk(ok));
-  assert.ok(!throwOk({ ...ok, vx: -BALL.maxSpeed, vy: 5 }), 'too fast');
+  assert.ok(!throwOk({ ...ok, vx: -BALL.heaveSpeed, vy: 5 }), 'too fast');
   assert.ok(!throwOk({ ...ok, x: Number.NaN }), 'not a number');
   assert.ok(!throwOk({ ...ok, x: 60 }), 'out in the street');
 });

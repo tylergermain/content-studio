@@ -1,8 +1,8 @@
-import { BALL, backboard, launch, nearSolids, step, type BallHit, type BallShot, type Solid } from '../shared/hoop.js';
+import { BALL, backboard, hoopArms, launch, nearSolids, step, type BallHit, type BallShot, type Solid } from '../shared/hoop.js';
 import { pieceAway, pieceCollider, type Piece } from '../shared/furniture.js';
 import { deckSolids } from '../shared/mezzanine.js';
 import { stepsSolids } from '../shared/steps.js';
-import { FLOOR, WALL_T } from '../shared/layout.js';
+import { FLOOR, SLAB, WALL_HEIGHT, WALL_T } from '../shared/layout.js';
 import { FARTHEST, rimDistance } from '../shared/longshots.js';
 import type { FloorRoom } from '../shared/floorplan.js';
 
@@ -10,17 +10,21 @@ import type { FloorRoom } from '../shared/floorplan.js';
  * The office's own flight of a throw at the hoop: whether it went in, worked out from the throw the
  * same way every page flies it (shared/hoop.ts), so a page never says it scored, or from how far.
  *
- * The office flies it past what it knows of the floor: the backboard and the ring, the floor and the
- * outside walls, the furniture as the floor's layout has it, the big mezzanine and the Steps. What only
- * a page has (the kitchen, the corner loft's walls, the desks) it doesn't: a ball that only goes in off
- * one of those (or is kept out by one) counts the office's way. Anything aimed at the hoop meets none.
+ * The office flies it past what it knows of the floor: the backboard, its arms and the ring, the floor,
+ * the outside walls and the ceiling, the furniture as the floor's layout has it, the big mezzanine and
+ * the Steps. What only a page has (the kitchen, the corner loft and the glass room under it, the
+ * elevator, the desks) it doesn't: a ball that only goes in off one of those (or is kept out by one)
+ * counts the office's way. Anything aimed at the hoop meets none, as a page only offers a long shot
+ * where nothing's in its way to the ring (clearWay in shared/hoop-range.ts).
  */
 
 /** What a throw meets on a floor arranged as `layout`. */
 export function floorSolids(layout: { furniture: readonly Piece[]; room: FloorRoom }, wing = 0): Solid[] {
-  const solids: Solid[] = [backboard(), { ...FLOOR, bottom: -0.3, top: 0 }];
-  // The outside walls, floor to ceiling (a door's opening is only a page's: past it, the shot missed anyway).
+  const solids: Solid[] = [backboard(), hoopArms(), { ...FLOOR, bottom: -0.3, top: 0 }];
+  // The outside walls, floor to ceiling (a door's opening is only a page's: past it, the shot missed anyway),
+  // and the ceiling, which a heave from way out only just clears (see shared/hoop-range.ts).
   solids.push(
+    { ...FLOOR, bottom: WALL_HEIGHT, top: WALL_HEIGHT + SLAB },
     { minX: FLOOR.minX - WALL_T, maxX: FLOOR.minX, minZ: FLOOR.minZ, maxZ: FLOOR.maxZ, top: 99 },
     { minX: FLOOR.maxX, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ, maxZ: FLOOR.maxZ, top: 99 },
     { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.minZ, top: 99 },
