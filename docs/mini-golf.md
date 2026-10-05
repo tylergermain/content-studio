@@ -127,3 +127,5 @@ To look at the course in the lab, open `/lab/minigolf.html` on the Vite dev serv
 - `&roll=0,0.42&at=1.4` rolls a putt from the tee with the office's own physics, so you can check the drawing against it.
 
 `node src/client/lab/shot.mjs <url> <out.png>` takes a screenshot of it.
+
+The putting camera now retracts before solid course obstacles, including while easing between views, then expands again when the view clears. The regular third-person camera uses the same clearance check.

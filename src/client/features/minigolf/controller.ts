@@ -4,6 +4,7 @@ import { BALL_R } from '../../../shared/minigolf/types';
 import { isTyping, type PlayerController } from '../../player';
 import { $, h, modalOpen } from '../../ui/dom';
 import type { Person } from '../../world/character';
+import { clearCamera } from '../../player/camera-clearance';
 import { pullPower } from './arcade';
 import { distText, feltAt, meterAt, nth, stanceAt, wrapAngle, yawTo } from './play';
 
@@ -308,7 +309,9 @@ export class Putter {
       target.set(this.at.x + sin * 1.6, street + this.at.y - BALL_R, this.at.z + cos * 1.6);
     }
     const k = 1 - Math.exp(-dt * (ball ? 4 : 7));
+    clearCamera(target, want, this.player.colliders);
     this.camPos.lerp(want, k);
+    clearCamera(target, this.camPos, this.player.colliders);
     lookAt.lookAt(this.camPos, target, UP);
     turn.setFromRotationMatrix(lookAt);
     this.camQuat.slerp(turn, k);

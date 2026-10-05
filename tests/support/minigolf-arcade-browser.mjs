@@ -12,7 +12,7 @@ try {
   const hidden=document.createElement('style');hidden.textContent='.hidden{display:none!important}';document.head.append(hidden);
   for(const id of ['modal-root','toasts']){const el=document.createElement('div');el.id=id;document.body.append(el);}
   window.putts=[];const at=teeBall(HOLES[2]);const ball=new THREE.Vector3(at.x,at.y,at.z);
-  const player={pos:new THREE.Vector3(),camYaw:0,view:'third',holding:()=>false};const me={setGolf(){},golfBack(){},golfHit(){}};
+  const player={pos:new THREE.Vector3(),camYaw:0,view:'third',colliders:[],holding:()=>false};const me={setGolf(){},golfBack(){},golfHit(){}};
   window.putter=new Putter(player,me,new THREE.PerspectiveCamera(),{ball:()=>ball,rolling:()=>null,stillUp:()=>true,taken:()=>0,street:()=>0,done(){},stroke:(yaw,power)=>window.putts.push({yaw,power})});
   window.putter.start(2);window.putter.update(1/60);
  }, '/@fs'+fileURLToPath(new URL('../../src/shared/minigolf/',import.meta.url)));
