@@ -11,7 +11,7 @@ import type { CoreState } from './ctx';
 import { builtFloors } from './floors';
 import type { Parts } from './parts';
 
-export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worlds' | 'seating' | 'climbing' | 'cars'>) {
+export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worlds' | 'seating' | 'climbing' | 'cars' | 'heli'>) {
   const { player } = ctx;
 
   /** In the car, facing out through the doors: where you are when you arrive on a floor, or down in the `garage`. */
@@ -40,6 +40,7 @@ export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worl
     if (player.seat) parts.seating.standUp();
     // Out of the car, wherever you are (none before the cars are there: nobody's in one yet).
     ctx.activities.stop('driver', 'desk');
+    ctx.activities.stop('heli', 'desk');
     player.pos.set(at.x, at.y, at.z);
     player.vy = 0;
     player.facing = at.rotY;
@@ -50,9 +51,9 @@ export function installPlace(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'worl
   /** Where you're standing, to come back to (see lastSpot): nowhere while you're between floors, or climbing between them. */
   function spotHere(): Spot | null {
     if (!store.floor || core.trip || parts.climbing.climber.active) return null;
-    // Sitting, it's where you'd get up to; in a car, where you'd get out.
+    // Sitting, it's where you'd get up to; in a car or Friday One, where you'd get out.
     const { driver } = parts.cars;
-    const at = (driver.active ? driver.wayOut() : player.standingSpot()) ?? player.pos;
+    const at = (driver.active ? driver.wayOut() : (parts.heli.wayOut() ?? player.standingSpot())) ?? player.pos;
     const name = store.floor === ROOF ? ROOF_NAME : (store.currentFloor()?.name ?? '');
     return { floor: store.floor, name, x: at.x, y: at.y, z: at.z, facing: player.facing };
   }

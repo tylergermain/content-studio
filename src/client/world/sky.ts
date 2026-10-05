@@ -20,7 +20,7 @@ export { HAZE_MAX, hazeReach } from './haze';
  * same lines darken the ground outside when it's wet and lay snow on whatever faces up out there.
  */
 
-const MAX_LAMPS = 24;
+export const MAX_LAMPS = 24;
 const DEG = Math.PI / 180;
 /** The building, walls included: the office upstairs and the garage under it. */
 const B = { minX: FLOOR.minX - WALL_T, maxX: FLOOR.maxX + WALL_T, minZ: FLOOR.minZ - WALL_T, maxZ: FLOOR.maxZ + WALL_T } as const;

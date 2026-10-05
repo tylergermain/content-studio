@@ -281,6 +281,17 @@ export const FOOTHILLS: [number, number, number, number][] = [
 /** The spur of mountain the tunnel goes through: how far it reaches either side of the road (z), and how high its ridge gets. */
 export const RIDGE = { north: 30, south: 40, height: 26 } as const;
 
+/**
+ * The shoulders of rock either side of each end of the tunnel through the spur: [x, z, radius at the
+ * foot, height], as world/scenic/mountains.ts draws them. Friday One flies round them (shared/heli.ts).
+ */
+export const SPURS: readonly (readonly [number, number, number, number])[] = [
+  [TUNNEL.x0 + 1, TUNNEL.z - 22, 12, 17],
+  [TUNNEL.x0 + 2, TUNNEL.z + 27, 15, 26],
+  [TUNNEL.x1 - 1, TUNNEL.z - 22, 12, 16],
+  [TUNNEL.x1 - 2, TUNNEL.z + 27, 15, 27],
+];
+
 /** The lake inside the loop, under the mountains: its middle and its two half-widths. */
 export const LAKE = { x: 60, z: 306, rx: 38, rz: 17 } as const;
 
@@ -295,17 +306,23 @@ export const CREEK: [number, number][] = [
   [292, 196],
 ];
 
-/** The farm by the road out of town to the east: the barn, the silo, the windmill, and its fields. */
+/**
+ * The farm by the road out of town to the east: the barn, the silo, the windmill, and its fields. All
+ * of it east of x 82, clear of Main Street's plots (shared/mainstreet.ts), whose last is x 34..78.
+ */
 export const FARM = {
   barn: { x: 96, z: 58, rotY: -0.25 },
   silo: { x: 110, z: 50 },
   windmill: { x: 128, z: -6 },
   fields: [
-    { minX: 58, maxX: 132, minZ: 70, maxZ: 104 },
-    { minX: 62, maxX: 150, minZ: -40, maxZ: 14 },
+    { minX: 82, maxX: 132, minZ: 70, maxZ: 104 },
+    { minX: 82, maxX: 150, minZ: -40, maxZ: 14 },
   ],
-  /** The fenced field the cows are in, by the barn. */
-  pasture: { minX: 48, maxX: 86, minZ: 38, maxZ: 62 },
+  /**
+   * The fenced field the cows are in, east of the barn and south of the silo, a meter clear of both
+   * (the barn stands in x 89..103, z 51..65, and the silo is 3 m round). Its gate faces the barn.
+   */
+  pasture: { minX: 104, maxX: 134, minZ: 54, maxZ: 68 },
 } as const;
 
 /**

@@ -32,6 +32,9 @@ export function whereabouts(p: PeerInfo, car?: { car: number; seat: CarSeat }, r
   // In one of the garage's cars (see Store.carOf).
   const def = car && CARS[car.car];
   if (def) return `🏎️ ${car.seat === 'driver' ? 'driving' : 'riding in'} the ${def.name}`;
+  // Aboard Friday One, from whichever floor they got in on (see Store.heliSeatOf).
+  const heli = store.heliSeatOf(p.id);
+  if (heli) return `🚁 ${heli.seat === 'pilot' ? 'flying' : 'riding in'} Friday One`;
   if (p.smoking) return '🚬 on a smoke break';
   if (p.golfing) return '🏌️ teeing off';
   if (p.throwing) return p.throwing === 'darts' ? '🎯 playing darts' : '🪓 throwing axes';

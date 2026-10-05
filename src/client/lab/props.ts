@@ -15,6 +15,7 @@ import { DESKS } from '../../shared/layout';
 import { buildCabinet } from '../features/cabinet/world';
 import { supercar } from '../features/cars/world';
 import { buildGong } from '../features/gong/world';
+import { ROTOR_TURNS, buildHeli, poseHeli } from '../features/heli/model';
 import { buildJukebox } from '../features/jukebox/world';
 import { buildKitchen } from '../world/kitchen';
 import { preloadModels } from '../world/models';
@@ -78,6 +79,18 @@ const SHOW: Record<string, () => Shown> = {
   },
   lambo: () => ({ object: supercar('lambo', '#ffd166').root }),
   ferrari: () => ({ object: supercar('ferrari', '#ef476f').root }),
+  heli: () => {
+    // Friday One with its rotor turning at spin=<0..1>: 0.3 by default, so the blades show (above 0.6 they blur).
+    const heli = buildHeli();
+    const spin = Number(q.get('spin') ?? 0.3);
+    const pose = { x: 0, h: 0, z: 0, yaw: 0, pitch: 0, roll: 0, spin };
+    let angle = 0.6;
+    poseHeli(heli, pose, 0, angle, spin, 0);
+    return {
+      object: new THREE.Group().add(heli.root),
+      update: (dt, t) => poseHeli(heli, pose, 0, (angle += spin * ROTOR_TURNS * Math.PI * 2 * dt), spin, t),
+    };
+  },
 };
 
 const q = new URLSearchParams(location.search);

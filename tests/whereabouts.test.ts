@@ -157,3 +157,20 @@ test("on another floor, whose room isn't known, there's no saying who's on the S
     store.floorPlan = was.plan;
   }
 });
+
+test('aboard Friday One is flying it or riding in it, from whichever floor, and out of it is wherever they are', () => {
+  const was = store.heli;
+  try {
+    const crew = (seat: 'pilot' | 'passenger') => ({ id: 'p', name: 'P', color: '#fff', seat, place: seat === 'pilot' ? 0 : 1, floor: 'theirs' });
+    store.heli = { ...was, landed: false, stage: 'flying', crew: [crew('pilot')] };
+    assert.equal(whereabouts(peer(13, 68, 'agent-office', -3.6)), '🚁 flying Friday One');
+    store.heli = { ...was, crew: [crew('passenger')] };
+    assert.equal(whereabouts(peer(13, 68, 'agent-office', -3.6)), '🚁 riding in Friday One');
+    // A window open says what's open, as it does in a car.
+    assert.equal(whereabouts({ ...peer(13, 68, 'agent-office', -3.6), doing: '🏙️ looking at Main Street' }), '🏙️ looking at Main Street');
+    store.heli = { ...was, crew: [] };
+    assert.equal(whereabouts(peer(13, 68, 'agent-office', -3.6)), '🚶 outside');
+  } finally {
+    store.heli = was;
+  }
+});

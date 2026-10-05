@@ -5,6 +5,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { EMPTY_PLAN } from '../src/shared/floorplan.js';
 import { parked } from '../src/shared/garage.js';
+import { homePose } from '../src/shared/heli.js';
 import { JUKEBOX_TUNES } from '../src/shared/jukebox.js';
 import type { ServerMsg } from '../src/shared/protocol.js';
 
@@ -73,10 +74,10 @@ const welcome = () =>
   });
 
 /** What a floor you arrive on fires, in order. */
-const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky'];
+const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'heli'];
 
 /** Every topic, to listen for them all. */
-const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky'] as const;
+const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'puttRolled', 'heli'] as const;
 
 /** Every message the store takes in (and one it doesn't), and the topics it fires, in the order it has always fired them. */
 const RUN: [ServerMsg, string[]][] = [
@@ -126,6 +127,12 @@ const RUN: [ServerMsg, string[]][] = [
   [msg({ t: 'hoop.board', board: { shots: [{ name: 'Ann', color: '#fff', dist: 7.2, at: 1 }], wins: [] }, latest: { name: 'Ann', dist: 7.2, rank: 1, first: true } }), ['hoopBoard']],
   [msg({ t: 'pig', pig: null }), ['pig']],
   [msg({ t: 'cars', cars: [{ x: 0, z: 0, rotY: 0, speed: 0, steer: 0 }] }), ['cars']],
+  [msg({ t: 'street', street: { cards: [{ id: 'acme', name: 'Acme', plot: 'P3', accent: '#ff8800', skin: 'brick', stage: 'site', home: 'hosted', storeys: [] }] } }), ['street']],
+  [msg({ t: 'putt', rounds: [{ id: 'r1', stage: 'forming', hole: 0, turn: 0, players: [], starter: 'p-a', since: 1, until: 2 }] }), ['putt']],
+  [msg({ t: 'putt.rolled', round: 'r1', id: 'p-a', hole: 0, path: [0, 0, 0], events: [], startAt: 1, power: 0.5, rest: { x: 0, y: 0, z: 0 }, holed: false, out: null, taken: 1 }), ['puttRolled']],
+  [msg({ t: 'putt.board', board: { record: null, best: [], aces: [], rounds: [] } }), ['puttBoard']],
+  [msg({ t: 'heli', heli: { pose: { x: 13, h: 0.25, z: 68, yaw: 0, pitch: 0, roll: 0, spin: 0 }, landed: true, stage: 'parked', pad: 'park', crew: [] } }), ['heli']],
+  [msg({ t: 'heli.move', pose: { x: 13, h: 5, z: 68, yaw: 0, pitch: 0, roll: 0, spin: 1 }, at: 1 }), []],
   [msg({ t: 'car.move', car: 0, x: 1, z: 1, rotY: 0, speed: 1, steer: 0 }), []],
   [msg({ t: 'sky', state: { hour: 2 } }), ['sky']],
   [msg({ t: 'theme', state: { pick: 'none', active: null } }), ['theme']],
@@ -230,7 +237,7 @@ test('what the browser remembers keeps its keys and shapes', () => {
 
 test("the store's keys are its state, as window.__office shows them", () => {
   // As the office had them before its store was split into slices: methods and the slices aren't among them.
-  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drams', 'drawing', 'floor', 'floorPlan', 'floors', 'goat', 'goatStart', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'queue', 'repos', 'screens', 'services', 'signins', 'sky', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
+  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drams', 'drawing', 'floor', 'floorPlan', 'floors', 'goat', 'goatStart', 'heli', 'heliPose', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'pulls', 'puttBoard', 'puttLatest', 'puttRolls', 'puttRounds', 'queue', 'repos', 'screens', 'services', 'signins', 'sky', 'street', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
 });
 
 test('a new store starts every field where it always has', async () => {
@@ -238,6 +245,7 @@ test('a new store starts every field where it always has', async () => {
   const { SLICES } = await import('../src/client/state/slices/index.js');
   const s = new Store(SLICES);
   const { profile, subs, ...rest } = Object.fromEntries(Object.entries(s));
+  const HOME = homePose();
   void subs;
   assert.deepEqual({ name: profile.name, color: profile.color }, { name: 'Guest', color: '#4f86f7' });
   assert.deepEqual(
@@ -259,6 +267,9 @@ test('a new store starts every field where it always has', async () => {
       goat: null, goatStart: 0,
       hoopBoard: { shots: [], wins: [] }, hoopLatest: null, pig: null,
       drams: [],
+      street: { cards: [] },
+      puttRounds: [], puttBoard: { record: null, best: [null, null, null, null, null, null, null, null, null], aces: [], rounds: [] }, puttLatest: null, puttRolls: [],
+      heli: { pose: HOME, landed: true, stage: 'parked', pad: 'park', crew: [] }, heliPose: { pose: HOME, at: 0 },
     },
   );
 });

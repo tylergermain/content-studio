@@ -48,9 +48,12 @@ import { installGoat } from './features/goat';
 import { installGolf } from './features/golf';
 import { installGong } from './features/gong';
 import { installGallery, installHanging } from './features/hanging';
+import { installHeli } from './features/heli';
 import { installHud } from './features/hud';
 import { installJukebox } from './features/jukebox';
+import { installMainStreet } from './features/mainstreet';
 import { installMeeting } from './features/meeting';
+import { installMiniGolf } from './features/minigolf';
 import { installNeedsYou } from './features/needsyou';
 import { installPalette } from './features/palette';
 import { installPeers } from './features/peers';
@@ -145,6 +148,9 @@ parts.bargames = installBarGames(ctx, { roof: parts.rooftop.roof, standUp, stopW
 parts.hanging = installHanging(ctx, { gallery: parts.gallery, reach });
 parts.climbing = installClimbing(ctx, { travel: (floorId, how, at) => parts.travel.travel(floorId, how, at), standUp, stopWalking });
 parts.cars = installCars(ctx, { standUp, stopWalking });
+parts.putt = installMiniGolf(ctx, { standUp, stopWalking, personOf });
+parts.heli = installHeli(ctx, { standUp, stopWalking, personOf, roofFloors: () => parts.rooftop.roofFloors() });
+installMainStreet(ctx, { roofFloors: () => parts.rooftop.roofFloors() });
 
 parts.travel = installTravel(ctx, core, parts);
 parts.arrival = installArrival(ctx, core, parts);
