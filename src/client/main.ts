@@ -76,6 +76,7 @@ import { installWebcam } from './features/webcam';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
+import { installHeadLook } from './features/head-look';
 import { installVr } from './features/vr';
 
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
@@ -208,6 +209,7 @@ fitWindow(ctx);
 const frame = frameLoop(ctx, loading);
 // A VR headset borrows the loop while you're in it (see features/vr).
 installVr(ctx, parts, { loop: frame });
+installHeadLook(ctx, parts);
 
 // ---- Boot ------------------------------------------------------------------------------------------
 function boot() {

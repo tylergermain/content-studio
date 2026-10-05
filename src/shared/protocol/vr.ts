@@ -28,10 +28,13 @@ export interface VrPose {
   right?: VrPoint;
 }
 
+import type { HeadLook } from '../head-look.js';
 export type VrClientMsg =
+  | { t: 'head.look'; look: HeadLook }
   /** Your head and hands: at most ten times a second, at least once a second in VR, and null as you leave it. */
-  { t: 'vr.pose'; pose: VrPose | null };
+  | { t: 'vr.pose'; pose: VrPose | null };
 
 export type VrServerMsg =
+  | { t: 'peer.head'; id: string; look: HeadLook }
   /** `id`'s head and hands (see VrPose), to everyone else on their floor; null: they've left VR. */
-  { t: 'peer.vr'; id: string; pose: VrPose | null };
+  | { t: 'peer.vr'; id: string; pose: VrPose | null };

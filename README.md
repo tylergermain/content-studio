@@ -457,3 +457,4 @@ The AI Innovators floor has a **Skill library** in place of its Docs shelf, with
 Putt Street now has arcade-style mouse pull-back shots, a percentage power meter, numbered cup pins, checker greens, and a C-key hole overview. Space putting remains available. See [mini golf controls](docs/mini-golf.md).
 The putting and third-person cameras keep clearance from solid props and walls while moving between views.
 Mini golf supports free mouse aiming before clicking, including third-person view with an unlocked cursor.
+Desktop avatars now share head-look direction, including helicopter passengers on different floors.
