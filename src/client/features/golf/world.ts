@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { BALCONY, FLOOR, GOLF_HOLE, ROAD, SLAB, STOREY, STREET_Y, WALL_HEIGHT, WALL_T } from '../../../shared/layout';
 import type { Collider } from '../../world/types';
 import type { Fixture, StreetSite } from '../../world/office/fixture';
-import { bulb, neighbourBoxes, streetLamp, tree, type NightParts } from '../../world/outside';
+import { bulb, obstacleBoxes, streetLamp, tree, type NightParts } from '../../world/outside';
 import { disposeSprite, mergeByMaterial, mesh, textPlane, textSprite, toon } from '../../world/toon';
 import { BALL_R, golfBall, mownTexture, teeBall } from './tee';
 
@@ -36,10 +36,17 @@ const FRINGE = 0.7;
 /** The fairway starts past the far sidewalk. */
 const FAIRWAY_Z0 = ROAD.maxZ + 2.5;
 /** Sand traps round the green: [x, z, radius]. The first two make one kidney-shaped trap in front. */
-const BUNKERS: [number, number, number][] = [
+export const BUNKERS: readonly (readonly [number, number, number])[] = [
   [GOLF_HOLE.x - 5.4, GOLF_HOLE.z - 4.4, 1.7],
   [GOLF_HOLE.x - 3.7, GOLF_HOLE.z - 5.7, 1.25],
   [GOLF_HOLE.x + 5.6, GOLF_HOLE.z + 3.2, 1.6],
+];
+/** The trees round the back of the green: [x, z, scale]. Friday One's pad keeps clear of them (shared/mainstreet.ts PARK). */
+export const GREEN_TREES: readonly (readonly [number, number, number])[] = [
+  [GOLF_HOLE.x - 9, GOLF_HOLE.z + 7, 1.2],
+  [GOLF_HOLE.x + 8.5, GOLF_HOLE.z + 8, 1.05],
+  [GOLF_HOLE.x - 1, GOLF_HOLE.z + 12, 1.3],
+  [GOLF_HOLE.x + 11, GOLF_HOLE.z - 3, 0.95],
 ];
 /** How far from the pin a ball drops in: rolling in slower than CUP_SPEED, or landing straight in. */
 const CUP = 0.12;
@@ -93,7 +100,8 @@ export interface Green {
 /**
  * The hole across the street, in `ground` (with its colliders): a mown fairway from the far sidewalk
  * up to a round green with the cup and the flag in it, bunkers either side, trees behind, a lamp
- * that lights it at night, and a sign.
+ * that lights it at night, and a sign. The roof bar's copy of Friday Park (features/mainstreet/roof.ts)
+ * hands it a `night` whose lamps and halos go nowhere, so the floors' lamp isn't doubled.
  */
 export function buildGreen(ground: THREE.Group, colliders: Collider[], night: NightParts): Green {
   const G = STREET_Y;
@@ -121,12 +129,7 @@ export function buildGreen(ground: THREE.Group, colliders: Collider[], night: Ni
   parts.add(mesh(new THREE.CylinderGeometry(0.035, 0.035, STICK, 8), toon('#fffaf3'), px, G + STICK / 2, pz));
   parts.add(mesh(new THREE.SphereGeometry(0.06, 10, 8), toon('#ffd166'), px, G + STICK + 0.03, pz));
   // Trees round the back of the green.
-  for (const [tx, tz, s] of [
-    [px - 9, pz + 7, 1.2],
-    [px + 8.5, pz + 8, 1.05],
-    [px - 1, pz + 12, 1.3],
-    [px + 11, pz - 3, 0.95],
-  ]) {
+  for (const [tx, tz, s] of GREEN_TREES) {
     const t = tree(s);
     t.position.set(tx, G, tz);
     parts.add(t);
@@ -247,9 +250,11 @@ export function fly(shot: Shot, street: number, index: number, bay = 0): Flight 
   const dt = 1 / STEPS;
   const path: number[] = [x, y, z];
   const hits: Hit[] = [];
-  // The neighbours stand on the street; the building's floors above its garage stand in the way too.
+  // The neighbours, and what stands on Main Street (its sites and shells, Putt Street's kiosk and
+  // windmill: see obstacleBoxes), stand on the street; the building's floors above its garage stand in
+  // the way too.
   const boxes = [
-    ...neighbourBoxes().map((n) => ({ ...n, bottom: street, top: street + n.top, roof: true })),
+    ...obstacleBoxes().map((n) => ({ ...n, bottom: street, top: street + n.top, roof: true })),
     { ...B, bottom: street - STREET_Y - SLAB, top: Infinity, roof: false },
   ];
   let rolling = false;

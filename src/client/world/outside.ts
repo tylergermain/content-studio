@@ -277,19 +277,13 @@ export function roadTexture(): THREE.CanvasTexture {
 }
 
 /**
- * The neighbours' buildings: [x, z, width, height, depth, paint], across the street and further out
- * behind and beside the office. The gap across the street from the balcony is the golf hole's
- * (GOLF_HOLE in layout).
+ * The neighbours' buildings: [x, z, width, height, depth, paint], out behind the office. Across the
+ * street and either side of it is Main Street now (shared/mainstreet.ts): its plots, Friday Park and
+ * Putt Street, drawn by features/mainstreet and features/minigolf.
  */
 const NEIGHBOURS: [number, number, number, number, number, string][] = [
-  [-38, 45, 12, 10, 9, '#8ecae6'],
-  [-22, 46, 14, 16, 10, '#ffb4a2'],
-  [12, 47, 16, 19, 12, '#cdb4db'],
-  [30, 45, 12, 9, 9, '#ffd6a5'],
   [-20, -42, 18, 14, 10, '#a2d2ff'],
   [8, -44, 16, 20, 12, '#f4acb7'],
-  [-48, -6, 10, 12, 16, '#ffe5b4'],
-  [50, 4, 10, 15, 18, '#bde0fe'],
 ];
 
 /** Which way a neighbour at (x, z) is turned: its front to the office. */
@@ -304,9 +298,31 @@ export function neighbourBoxes(): { minX: number; maxX: number; minZ: number; ma
   });
 }
 
+/** A box out on the street that a golf ball bounces off: its footprint, and how tall it stands above the street. */
+export interface StreetBox {
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+  top: number;
+}
+
+/** What else stands in golf's way out on the street, by whose it is (see setObstacleBoxes). */
+const obstacles = new Map<string, readonly StreetBox[]>();
+
+/** Puts `owner`'s boxes in golf's way (Main Street's sites and shells, Putt Street's kiosk and windmill), in place of the ones it had. */
+export function setObstacleBoxes(owner: string, boxes: readonly StreetBox[]): void {
+  obstacles.set(owner, boxes);
+}
+
+/** Everything a golf ball bounces off out on the street: the neighbours, and every owner's boxes. */
+export function obstacleBoxes(): StreetBox[] {
+  return [...neighbourBoxes(), ...[...obstacles.values()].flat()];
+}
+
 /**
  * Everything outside, down on the street: grass, the lot in front of the garage, a road with
- * sidewalks and street lamps, trees and neighbours' buildings, and in `sky` some clouds.
+ * sidewalks and street lamps, trees, the neighbours' buildings out back, and in `sky` some clouds.
  */
 export function buildStreet(group: THREE.Group, colliders: Collider[], night: NightParts, sky: THREE.Group) {
   const lawn = new THREE.Mesh(new THREE.PlaneGeometry(REACH - LAWN_WEST, REACH * 2), toon('#a7d98b'));
@@ -374,7 +390,7 @@ export function buildStreet(group: THREE.Group, colliders: Collider[], night: Ni
   for (const x of [-34, -22, -4, 8, 26, 36]) streetLamp(lamps, night, glass, colliders, x, 31.8, -1);
   group.add(mergeByMaterial(lamps));
 
-  // The neighbours: across the street, and further out behind and beside the office.
+  // The neighbours, out behind the office.
   for (const [x, z, w, h, d, color] of NEIGHBOURS) {
     const b = building(w, h, d, color, night.windows);
     b.position.set(x, G, z);

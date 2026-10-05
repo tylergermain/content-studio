@@ -27,7 +27,9 @@ import { bark, yip } from '../features/dog/sound';
 import { bleat } from '../features/goat/sound';
 import { golf, type GolfSound } from '../features/golf/sound';
 import { gong } from '../features/gong/sound';
+import { Rotor, type RotorState } from '../features/heli/sound';
 import { Jukebox, type JukeboxPlay } from '../features/jukebox/sound';
+import { putt, type PuttSound } from '../features/minigolf/sound';
 import { needsYou } from '../features/needsyou/sound';
 import { plaything, type PlaySound } from '../features/playthings/sound';
 import type { Pos } from './places';
@@ -44,6 +46,7 @@ export class OfficeSound {
   private readonly typing = new Typing(this.a);
   private readonly feet = new Footsteps(this.a);
   private readonly motors = new Motors(this.a);
+  private readonly rotor = new Rotor(this.a);
   private readonly fridge = new Fridge(this.a);
   private readonly rain = new Rain(this.a);
   private readonly birds = birdsong(this.a);
@@ -232,6 +235,16 @@ export class OfficeSound {
 
   crash(at: Pos, speed: number) {
     crash(this.a, at, speed);
+  }
+
+  /** Friday One (features/heli), wherever it is; null when it's quiet. */
+  setRotor(state: RotorState | null) {
+    this.rotor.set(state);
+  }
+
+  /** Putt Street (features/minigolf): a putt, and what the ball hits as it goes. */
+  putt(kind: PuttSound, at: Pos, amount = 1) {
+    putt(this.a, kind, at, amount);
   }
 
   // ---- The kitchen, the dog, the weather, the gong, the dings --------------------------------------

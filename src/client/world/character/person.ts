@@ -13,10 +13,11 @@ import { disposeSprite, mesh, textSprite, toon, toonUnique } from '../toon';
 import { EXHALE_AT, REACH_TIME, SMOKE_CYCLE, dragCurve, reachCurve } from './curves';
 import { cigarette, coffeeMug, drinkGlass, putDownGlass, undress } from './props';
 import { styleHair } from './person-hair';
-import { clubSwing, strike, swingStep, type Golf } from './person-golf';
+import { clubSwing, strike, swingStep, type Club, type Golf } from './person-golf';
 import { propPosition, throwStep, type Oche } from './person-throw';
 import { heaveTurn, shotStep } from './person-shot';
 import { poseEmote, type Emoting } from './person-emote';
+import { DrawnFace } from './person-face';
 
 export type Pose = 'stand' | 'walk' | 'sit' | 'type';
 
@@ -52,13 +53,10 @@ export class Person {
   private speaking = false;
   private mic: THREE.Mesh;
   private head: THREE.Group;
-  private smile: THREE.Mesh;
-  private mouth: THREE.Mesh;
+  private face: DrawnFace;
+  /** What's on the head in the drawn face's place (see wearFace). */
+  private worn: THREE.Object3D | null = null;
   private voiceLevel = 0;
-  /** 0 = lips together, 1 = wide open. Follows the voice's loudness. */
-  private mouthOpen = 0;
-  /** Keep the talking mouth up through the short gaps between words. */
-  private talkUntil = 0;
   private walkPhase = 0;
   private reachT = -1;
   /** Held in the left hand, kept upright however the arm swings: a mug of coffee or a drink. */
@@ -138,20 +136,8 @@ export class Person {
     head.add(mesh(new THREE.SphereGeometry(0.34, 20, 16), skin));
     head.add(this.hair);
     this.buildHair();
-    for (const sx of [-1, 1]) {
-      head.add(mesh(new THREE.SphereGeometry(0.055, 10, 8), ink, sx * 0.12, 0.02, 0.3, false));
-      head.add(mesh(new THREE.SphereGeometry(0.05, 10, 8), toon('#ff9f9f'), sx * 0.2, -0.08, 0.27, false));
-    }
-    const smile = (this.smile = mesh(new THREE.TorusGeometry(0.06, 0.015, 6, 12, Math.PI), ink, 0, -0.08, 0.32, false));
-    smile.rotation.z = Math.PI;
-    head.add(smile);
-    // Talking mouth: a flattened ball pressed into the face, scaled open and shut with the voice.
-    this.mouth = mesh(new THREE.SphereGeometry(1, 16, 12), toon('#7a2635'), 0, -0.1, 0.295, false);
-    const tongue = mesh(new THREE.SphereGeometry(1, 12, 10), toon('#ff8fa3'), 0, -0.5, 0, false);
-    tongue.scale.set(0.6, 0.45, 1.15);
-    this.mouth.add(tongue);
-    this.mouth.visible = false;
-    head.add(this.mouth);
+    this.face = new DrawnFace(ink);
+    head.add(this.face.group);
     this.body.add(head);
 
     const limb = (len: number, r: number, mat: THREE.Material, x: number, y: number) => {
@@ -323,6 +309,15 @@ export class Person {
     (on === 'head' ? this.head : on === 'hand' ? this.armL : on === 'offhand' ? this.armR : this.body).add(o);
   }
 
+  /** Wears `face` on the head in place of the drawn one (their webcam, see features/webcam), or the drawn face again (null). */
+  wearFace(face: THREE.Object3D | null) {
+    if (face === this.worn) return;
+    if (this.worn) this.head.remove(this.worn);
+    this.worn = face;
+    if (face) this.head.add(face);
+    this.face.group.visible = !face;
+  }
+
   /** A mug of coffee in the left hand, or not. */
   holdMug(on: boolean) {
     this.wantsMug = on;
@@ -471,8 +466,8 @@ export class Person {
     this.grip = grip;
   }
 
-  /** At the golf tee with a club in both hands, over the ball (the ball in front of their feet, the hole off to their left), or not. */
-  setGolf(on: boolean) {
+  /** At the golf tee (or on Putt Street, `club` a putter) with a club in both hands, over the ball (in front of their feet, the hole off to their left), or not. */
+  setGolf(on: boolean, club: Club = 'driver') {
     if (on === !!this.golf) return;
     if (!on) {
       const { swing } = this.golf!;
@@ -483,9 +478,9 @@ export class Person {
       for (const limb of [this.armL, this.armR, this.legL, this.legR]) limb.rotation.set(0, 0, 0);
       return;
     }
-    const swing = clubSwing();
+    const swing = clubSwing(club);
     this.body.add(swing);
-    this.golf = { swing, back: 0, want: 0, top: 0, swingT: -1, autoT: -1, power: 0 };
+    this.golf = { swing, club, back: 0, want: 0, top: 0, swingT: -1, autoT: -1, power: 0 };
   }
 
   /** Taking the club back, `k` of the way (0 at the ball, 1 as far as it goes), the harder to hit it. */
@@ -638,16 +633,9 @@ export class Person {
     if (sit) this.body.position.y = THREE.MathUtils.lerp(this.body.position.y, this.seatHips - HIPS, sit);
     if (this.speaking) this.mic.scale.setScalar(1 + Math.sin(t * 14) * 0.2);
 
-    // Lip flap: pop open fast on each syllable, close a little slower.
-    const want = THREE.MathUtils.clamp((this.voiceLevel - 0.02) / 0.12, 0, 1);
-    this.mouthOpen += (want - this.mouthOpen) * Math.min(1, dt * (want > this.mouthOpen ? 35 : 15));
-    if (this.voiceLevel > SPEAKING * 0.75) this.talkUntil = t + 0.4;
-    const talking = t < this.talkUntil;
-    this.smile.visible = !talking;
-    this.mouth.visible = talking;
-    if (talking) this.mouth.scale.set(0.07 * (1 - this.mouthOpen * 0.2), 0.01 + this.mouthOpen * 0.045, 0.05);
+    this.face.talk(dt, t, this.voiceLevel, SPEAKING);
     // Reading, they look down into the book.
-    this.head.rotation.x = -this.mouthOpen * 0.08 + (this.book ? 0.32 : 0);
+    this.head.rotation.x = -this.face.open * 0.08 + (this.book ? 0.32 : 0);
     this.head.rotation.y = this.head.rotation.z = 0;
     this.body.rotation.y = this.body.rotation.z = 0;
     if (this.shootT >= 0 && this.heave) heaveTurn(this.rig, this.shootT);

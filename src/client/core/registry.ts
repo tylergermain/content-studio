@@ -329,6 +329,11 @@ export interface ViewEffect<G = unknown> {
   covers?(): boolean;
   /** Draws the frame through this. */
   filter?: FrameFilter;
+  /**
+   * Draws the frame itself, instead of the office's way and every filter (a VR headset's two eyes):
+   * true when it drew this frame.
+   */
+  takeover?(f: Frame): boolean;
 }
 
 /** How what you're doing changes you and your view each frame (see ViewEffect). */
@@ -367,8 +372,9 @@ export class View<G = unknown> {
   /** The filters that are on this frame (kept, so drawing one allocates nothing). */
   private readonly on: FrameFilter[] = [];
 
-  /** Draws the frame (`draw`) through every filter that's on, the first one outermost. */
+  /** Draws the frame (`draw`) through every filter that's on, the first one outermost; or the first takeover that draws it does. */
   draw(f: Frame, draw: () => void): void {
+    for (const e of this.effects.items) if (e.takeover?.(f)) return;
     const on = this.on;
     on.length = 0;
     for (const e of this.effects.items) if (e.filter?.begin()) on.push(e.filter);

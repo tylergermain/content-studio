@@ -21,6 +21,14 @@ export interface HandsInput {
   grip?: 'ladder' | 'pole' | null;
 }
 
+/** Where your hands go in VR (see Hands.mount): an anchor for each arm (on a controller), and one for what's held in both. */
+export interface HandsMount {
+  right: THREE.Object3D;
+  left: THREE.Object3D;
+  /** Where the camera would be: the card, the book and the ball keep their places in front of it. */
+  between: THREE.Object3D;
+}
+
 /** Lifting the mug for a sip and lowering it again, in seconds. */
 const SIP_TIME = 1.1;
 const aimQ = new THREE.Quaternion();
@@ -102,6 +110,8 @@ export class Hands {
   private skinTone: string;
   /** Mittens for Christmas (see setCostume). */
   private costume: Theme | null = null;
+  /** What each arm hangs from while your hands are on VR controllers (see mount), or null. */
+  private mounts: THREE.Object3D[] | null = null;
 
   constructor(shirt: string, skin: string) {
     this.shirt = shirt;
@@ -146,6 +156,31 @@ export class Hands {
     this.ball = ballMesh();
     this.ball.visible = false;
     this.scene.add(this.ball);
+  }
+
+  /**
+   * Puts your hands on a VR headset's controllers (see features/vr/hands.ts), or back in their own
+   * scene (null). Each arm hangs under its anchor with its rest pose taken back off, so at rest it's
+   * right on the anchor and reaching, sipping, smoking and the emotes still move it from there; the
+   * card, the book and the ball go under `between`.
+   */
+  mount(m: HandsMount | null) {
+    for (const o of this.mounts ?? []) o.removeFromParent();
+    this.mounts = null;
+    const held = [this.holder, this.bookHolder, this.ball];
+    if (!m) return void this.scene.add(this.right.group, this.left.group, ...held);
+    const arms = [
+      [this.right, m.right],
+      [this.left, m.left],
+    ] as const;
+    this.mounts = arms.map(([arm, anchor]) => {
+      const off = new THREE.Group();
+      off.matrixAutoUpdate = false;
+      off.matrix.compose(arm.base, new THREE.Quaternion().setFromEuler(arm.baseRot), new THREE.Vector3(1, 1, 1)).invert();
+      anchor.add(off.add(arm.group));
+      return off;
+    });
+    m.between.add(...held);
   }
 
   /** The basketball in both hands, or not. The mug waits while your hands are full. */
@@ -346,8 +381,10 @@ export class Hands {
   }
 
   update(dt: number, t: number, s: HandsInput) {
+    // On VR controllers (see mount) they're where your own hands are: no lag, bob or breath, and no ladder or pole to go to.
+    const free = this.mounts ? 0 : 1;
     // Hands lag a touch behind quick turns of the head.
-    if (this.last && dt > 0) {
+    if (this.last && dt > 0 && free) {
       const dyaw = Math.atan2(Math.sin(s.yaw - this.last.yaw), Math.cos(s.yaw - this.last.yaw));
       const dpitch = s.pitch - this.last.pitch;
       const tx = THREE.MathUtils.clamp((dyaw / dt) * 0.012, -0.05, 0.05);
@@ -355,13 +392,14 @@ export class Hands {
       this.sway.x += (tx - this.sway.x) * Math.min(1, dt * 10);
       this.sway.y += (ty - this.sway.y) * Math.min(1, dt * 10);
     }
+    if (!free) this.sway.set(0, 0);
     this.last = { yaw: s.yaw, pitch: s.pitch };
-    this.air += ((s.airborne && !s.grip ? 1 : 0) - this.air) * Math.min(1, dt * 8);
-    this.ladderK += ((s.grip === 'ladder' ? 1 : 0) - this.ladderK) * Math.min(1, dt * 10);
-    this.poleK += ((s.grip === 'pole' ? 1 : 0) - this.poleK) * Math.min(1, dt * 10);
-    this.walk += ((s.walking ? 1 : 0) - this.walk) * Math.min(1, dt * 8);
+    this.air += ((free && s.airborne && !s.grip ? 1 : 0) - this.air) * Math.min(1, dt * 8);
+    this.ladderK += ((free && s.grip === 'ladder' ? 1 : 0) - this.ladderK) * Math.min(1, dt * 10);
+    this.poleK += ((free && s.grip === 'pole' ? 1 : 0) - this.poleK) * Math.min(1, dt * 10);
+    this.walk += ((free && s.walking ? 1 : 0) - this.walk) * Math.min(1, dt * 8);
 
-    const breathe = Math.sin(t * 1.7) * 0.004;
+    const breathe = Math.sin(t * 1.7) * 0.004 * free;
     const step = Math.sin(s.walkPhase) * this.walk;
     const bounce = Math.sin(s.walkPhase * 2) * 0.006 * this.walk;
     const k = this.reachT >= 0 ? reachCurve(this.reachT / REACH_TIME) : 0;

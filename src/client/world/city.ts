@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { FLOOR, SLAB, STREET_Y, WALL_T, roofDrop } from '../../shared/layout';
+import { onMain } from '../../shared/mainstreet';
 import { mulberry32 } from '../../shared/rng';
 import type { NightParts } from './outside';
 import { tilingCanvasTexture } from './texture';
@@ -286,8 +287,7 @@ export function buildCity(night: NightParts): City {
       const { x: bx, z: bz } = blockAt(i, j);
       const dist = Math.hypot(bx, bz);
       if (dist > RADIUS) continue;
-      // The block the office stands on: a plaza round it.
-      if (i === 0 && j === 0) continue;
+      if (onMain(i, j)) continue; // Main Street's blocks: features/mainstreet/roof.ts
       // Now and then a park, with trees.
       if (r() < 0.1 && dist > 60) {
         const park = mesh(new THREE.PlaneGeometry(inner, inner).rotateX(-Math.PI / 2), toon('#8fcf7a'), bx, 0.03, bz, false);

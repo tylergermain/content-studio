@@ -14,7 +14,11 @@ The catalog also has what a studio needs: walls, glass and wood slat panels to d
 
 Outside, the building is a 15-storey Friday Labs tower. The real floors are its bottom storeys, in graphite with warm-paper window frames and a second row of windows high up every wall; each one's slab band and its name, lit along its south wall, are in its floor's color, the trim of the paint it's given in the office builder. Above them three glass bars stacked and shifted like the Friday Labs mark run up to the rooftop bar, with a green light line in the dark seam at the foot of each, the lit lockup near the top and the red beacon on a mast. A lit marquee hangs over the garage, where a green lane leads to the lift and a board lists the floors. See [Features](docs/features.md).
 
+In a Meta Quest's browser the office is VR too: **🥽 Enter VR** and you walk it at your real height, with your hands on the controllers, every window floating in front of you as a panel you point at and click, and everyone else seeing your head turn and your hands move. A computer without a headset gets none of it, not even the button. The headset's browser gets a lighter office outside VR too (no outline, a pixel per pixel, the still office merged into a few hundred draw calls), so the page in its floating window runs smoothly as well. Getting the Quest onto the tailnet, the controls and the headset's quality profiles are in [VR](docs/vr.md).
+
 The building has one goat, Marc, on its bottom floor beside that floor's dog: he grazes on the plants, nibbles the rugs and gets the zoomies, and **E** pets him, after which he follows you about for a minute. The lounge's arcade cabinet and the boss's monitor play the same four games (Minesweeper, Blockfall, 2048 and Snake) against one high-score table per game for the whole building. The scoreboard beside the basketball hoop keeps the building's longest shots, and two people at the court can play PIG (**P** asks). Past 16 m the green on the shooting meter shrinks the further out you are, only its middle is sure to go in and nothing let go of outside it does, and from 22 m out a shot is a one-handed heave on a faster meter. See [Features](docs/features.md).
+
+The street out front is **Main Street** now. Plots either side of the tower and across the road are for other businesses: a street admin (one of the office's admins) claims one at its FOR LEASE board or the map board in Friday Park, and everyone on every floor sees a building site go up, with a tower crane slewing over it, or the shell of the business's tower, 1 to 8 storeys in its colors. Across the road, **Friday Park** has golf's first hole and a heliport, and **Putt Street** is a nine-hole mini golf course (par 26) for groups of up to four, with a windmill, a loop-the-loop, a volcano and a record board; the office referees every putt, and every page plays the same roll. **Friday One**, the helicopter on the heliport, is for street admins to fly round the tower and out over the town, with up to three riding along; it lands only where it's safe, never on anyone, and flies itself home if its pilot leaves. See [Main Street](docs/main-street.md), [Putt Street](docs/mini-golf.md) and [Friday One](docs/helicopter.md).
 
 Only admins change the building: adding, renaming, moving or removing a floor, the office builder, a floor's boards and agents, the back office, and which floor Marc lives on (he follows only an admin into the elevator). Team members ride the elevator and use what's there. This holds once the admins have their own accounts and the shared office password is off: see [Add users](#add-users).
 
@@ -63,10 +67,10 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **From your phone, too.** `/lite` is the office in 2D: every worker and what it's waiting on, its terminal with the keys a phone keyboard lacks, and the boards. The 3D office offers it on a phone or a slow computer.
 - **GitHub on the walls.** Issues and pull requests hang on cork boards. Hand an issue to a worker, queue tasks, give a worker its own git worktree and open its PR with one key (if one gets deleted behind the office's back, the worker waits at its desk until you rebuild it). One task can span several projects: the worker gets a worktree of each, and a PR in each that links the others.
 - **Agents that manage agents.** Every worker can list, hire, message and send home the others, through an `agent-office` MCP server (Claude Code, Codex, OpenCode) or the `office-workers` command. Ask one to "send everyone whose PR merged home" and it does, deleting their worktrees and branches unless they hold unpushed work. A worker that opens its pull request itself (`gh pr create`) shows it at its desk, and one the office missed can be told which is its own (`office-workers pr`).
-- **Together.** Voice, chat, screen sharing on the lounge TV, a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
+- **Together.** Voice, chat, screen sharing on the lounge TV, your webcam as your character's face (**I**, off until you turn it on; it goes browser to browser, or encrypted through a TURN server if you set one, and the office never decodes or records it), a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
 - **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
-There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach): see [docs/features.md](docs/features.md).
+There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach, and out front Main Street, with plots for other businesses, a mini golf course and a helicopter to fly over it all): see [docs/features.md](docs/features.md).
 
 ## Requirements
 
@@ -378,6 +382,7 @@ From a checkout without the command installed, the same is `npx tsx src/server/c
 | T / Enter | Chat |
 | V | Join voice; then hold V to talk |
 | M | Mute / unmute in voice |
+| I | Your webcam as your face (on or off) |
 | Ctrl + Space | Dictate into a terminal or a prompt box: hold it and talk (or hold the **🎤**) |
 | Tab | The ☰ menu: every window |
 | Esc | Close any window |
@@ -405,6 +410,9 @@ Every change to the app that lands on `main` is published as a GitHub release by
 ## More
 
 - [Features](docs/features.md): everything in the office, room by room
+- [Main Street](docs/main-street.md): the plots either side of Friday Tower, claiming one as a building site or a shell, Friday Park, and `street.json`
+- [Putt Street](docs/mini-golf.md): the nine-hole mini golf course on Main Street, its rules, its meter and its records
+- [Friday One](docs/helicopter.md): the helicopter: who flies it, the keys, where it lands and where it never will
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself
@@ -416,6 +424,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Azure reference](docs/azure.md): picking a VM size, pausing, and everything `deploy/azure.sh` does
 - [How it works](docs/how-it-works.md): the architecture, and security notes
 - [Code layout](docs/code-layout.md): where the code lives, adding a feature or an agent provider, and the size guard
+- [VR](docs/vr.md): the office in a Meta Quest, getting the headset onto the tailnet, its controls, and measuring how hard it works the headset
 
 The lounge jukebox is audible across most of the floor, with a gentle fade at distant desks. Adjust your personal jukebox volume in Settings → Sound & voice.
 

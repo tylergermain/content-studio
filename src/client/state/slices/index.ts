@@ -17,16 +17,19 @@ import { decor } from './decor';
 import { dog } from './dog';
 import { floorPlan } from './floor-plan';
 import { goat } from './goat';
+import { heli } from './heli';
 import { hoop } from './hoop';
 import { jukebox } from './jukebox';
 import { leaveOnMerge } from './leave-on-merge';
 import { machine } from './machine';
 import { meeting } from './meeting';
+import { minigolf } from './minigolf';
 import { notify } from './notify';
 import { prompts } from './prompts';
 import { services } from './services';
 import { signins } from './signins';
 import { sky } from './sky';
+import { street } from './street';
 import { studio } from './studio';
 import { team } from './team';
 import { theme } from './theme';
@@ -67,4 +70,7 @@ export const SLICES: readonly Slice[] = [
   goat,
   hoop,
   whisky,
+  street,
+  minigolf,
+  heli,
 ];
