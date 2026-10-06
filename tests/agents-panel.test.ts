@@ -34,3 +34,14 @@ test('a search matches every word in the name, floor, task, model or branch', ()
   assert.ok(agentMatches(a, 'HERO codex'));
   assert.ok(!agentMatches(a, 'kenna pricing'));
 });
+
+test('the assistant reads Codex plan usage from a token_count event, and names what it ran', async () => {
+  const { codexPlan } = await import('../src/server/assistant/codex-limits.js');
+  const { stepOf } = await import('../src/server/assistant/runner.js');
+  const plan = codexPlan({ primary: { used_percent: 18, window_minutes: 10080, resets_at: 1_791_592_389 }, secondary: { used_percent: 40.5, window_minutes: 300 }, credits: { has_credits: true, unlimited: false, balance: '53288.67' }, plan_type: 'pro' }, 5);
+  assert.deepEqual(plan, { provider: 'codex', plan: 'pro', windows: [{ label: '5 hours', pct: 40.5 }, { label: 'week', pct: 18, resetsAt: 1_791_592_389_000 }], credits: '53289', at: 5 });
+  assert.equal(codexPlan({ primary: null, secondary: null }, 1), undefined);
+  assert.equal(stepOf("/bin/zsh -lc 'office home Byte --force --why \"done\"'"), 'office home Byte');
+  assert.equal(stepOf('bash -lc "office agents"'), 'office agents');
+  assert.equal(stepOf('office agent "Pixel"'), 'office agent Pixel');
+});

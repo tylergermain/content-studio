@@ -19,7 +19,7 @@ export function installAgentsPanel(ctx: Ctx, deps: AgentsPanelDeps) {
   let open: { close(): void } | undefined;
   const waiting = () => store.floors.reduce((n, f) => n + (f.waiting ?? 0), 0);
 
-  function show() {
+  function show(start?: 'assistant' | 'agent') {
     if (open) return;
     const panel = openAgentsPanel({
       currentFloor: () => store.floor ?? undefined,
@@ -39,7 +39,7 @@ export function installAgentsPanel(ctx: Ctx, deps: AgentsPanelDeps) {
       },
       wake: (id) => ctx.net.send({ t: 'worker.resume', workerId: id }),
       sendHome: (id) => ctx.net.send({ t: 'worker.kill', workerId: id, cleanup: 'keep' }),
-    });
+    }, { start });
     open = panel;
     // The panel closes itself (\u2715 or Esc); this hears it through the modal stack going quiet.
     const watch = window.setInterval(() => {
@@ -58,6 +58,16 @@ export function installAgentsPanel(ctx: Ctx, deps: AgentsPanelDeps) {
     count: waiting,
     tone: () => (waiting() ? 'danger' : undefined),
     title: () => 'Every agent on every floor in one place: what each is doing, message it, wake it, send it home',
-    run: show,
+    run: () => show(),
+  });
+  // The executive assistant has no desk: it's in the Agents panel, and here.
+  addHudAction({
+    id: 'assistant',
+    icon: '\u{1f9d1}\u200d\u{1f4bc}',
+    label: 'Assistant',
+    section: 'Open',
+    shown: () => store.me.admin,
+    title: () => 'Your executive assistant: ask what everyone is doing, who can go home, how your tokens are going',
+    run: () => show('assistant'),
   });
 }

@@ -28,6 +28,17 @@ A review is sent the way a typed message is: it wakes an asleep worker, goes onc
 
 Who may message, interrupt, wake or send an agent home is the same as in its chat: admins, and the agent's owner within their org-chart roles. Anyone else sees it all read-only.
 
+## The executive assistant
+
+An admin's Agents panel opens on their **🧑‍💼 Assistant** (also **☰ › 🧑‍💼 Assistant**): an agent with no desk and no body that keeps the others organized. The right side has it and the agent you choose, a tab each.
+
+- **Ask it anything** in the box, or with the quick asks: **What's everyone doing?**, **Who can go home?** (it lists them and waits), **Tidy up** (it sends home the agents that are finished or idle with their work saved, and says who went and who stayed), **Am I using my tokens well?**
+- **Your plans' usage** shows over the conversation as meters: Codex's (each window's percent used, when it resets, credits left), read from Codex's own session logs, and Claude's, from Claude Code. Under them is what its own answers have used.
+- **What it can do** is the `office` command (`bin/office.js`), which only it has: list every agent on every floor, read one's conversation, message, wake or interrupt one, send one home (its worktree and branch go only when its work is all on GitHub, and it won't send home one that's working or waiting on you unless you ask for that one), start a task on a floor, and read the plans' usage. What it does shows on the floor as “The assistant sent … home”.
+- **How it runs:** each question is one turn of a Codex conversation run headless (`codex exec --json`, resumed for the next), in `.agent-office/assistant/` beside its brief, `AGENTS.md`. Edit the brief there, and take out the mark on its first line so the office leaves your version alone. Questions wait their turn. **New conversation** starts it over. A turn reads its brief and the office's state again, so it costs about 20,000 input tokens, most of them cached.
+
+Only admins have it, since it acts on every agent on every floor.
+
 ## Content preview and links
 
 The **Files** tab is the preview as it always was: a strip of every file, the worker's first, then the newest supported files in its folder: images, video, audio, Markdown, text, PDF, and HTML. A specialist's folder for this is the floor's project; any other agent's is its worktree. The folder scan is bounded (five levels deep, 3,000 entries, the newest 60), so a render saved deep in a project may only appear because a message links it. With nothing chosen, Files opens the newest linked video, else the newest linked picture, else a picture or the newest file from the folder.

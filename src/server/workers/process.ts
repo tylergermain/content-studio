@@ -87,7 +87,7 @@ export function shq(s: string) {
 export function writeOfficeCommands(dataDir: string): string | undefined {
   const dir = path.join(dataDir, 'bin');
   let wrote = false;
-  for (const [name, what] of [['office-queue', "Agent Office's task queue, for the board agents"], ['office-workers', "Agent Office's workers, for every worker"], ['office-board', "A floor's own bulletin boards, for every worker"]]) {
+  for (const [name, what] of [['office-queue', "Agent Office's task queue, for the board agents"], ['office-workers', "Agent Office's workers, for every worker"], ['office-board', "A floor's own bulletin boards, for every worker"], ['office', "Every agent on every floor, for the executive assistant"]]) {
     const script = binScript(`${name}.js`);
     if (!script) continue;
     mkdirSync(dir, { recursive: true, mode: 0o700 });

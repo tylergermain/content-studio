@@ -2,6 +2,8 @@ import './panel.css';
 import { h, timeAgo, STATUS_LABEL } from '../dom';
 import { serviceUrl } from '../services';
 import { openRoomShell } from '../workspace/room-shell';
+import { store } from '../../state';
+import { assistantPane } from './assistant';
 import { agentFilter, agentMatches, agentOrder, type AgentFilter, type AgentRow, type AgentsView } from '../../../shared/agents';
 import { PROVIDER_META, isAgentProvider } from '../../../shared/providers';
 import type { ChatSnapshot } from '../../../shared/worker-chat';
@@ -44,7 +46,8 @@ async function post(path: string, a: AgentRow, body: unknown) {
   if (!res.ok) throw new Error(out?.error ?? 'The worker could not be reached');
 }
 
-export function openAgentsPanel(d: AgentsDeps): { close(): void } {
+/** `start` says which the right shows first: the assistant (an admin's, and the default) or the agent chosen. */
+export function openAgentsPanel(d: AgentsDeps, o: { start?: 'assistant' | 'agent' } = {}): { close(): void } {
   let view: AgentsView | undefined;
   let selected: string | undefined;
   let filter: AgentFilter = 'all';
@@ -71,6 +74,7 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
     onClose: () => {
       window.clearInterval(listTimer);
       window.clearInterval(chatTimer);
+      pane?.stop();
     },
   });
   shell.name.textContent = 'Agents';
@@ -98,8 +102,26 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
   const list = h('div.ag-list', { role: 'listbox', 'aria-label': 'Agents' });
   shell.stage.classList.add('ag-stage');
   shell.stage.append(list);
-  const detail = h('aside.rr-side.ag-detail', { 'aria-label': 'The agent chosen' });
+  // The right: the executive assistant (an admin's), or the agent chosen, a tab each.
+  const pane = store.me.admin ? assistantPane() : undefined;
+  const agentBox = h('div.ag-agent-box');
+  const tabAssistant = h('button', { type: 'button' }, '\u{1f9d1}\u200d\u{1f4bc} Assistant');
+  const tabAgent = h('button', { type: 'button' }, 'Agent');
+  const sideTabs = h('div.rr-filters.ag-side-tabs', { role: 'tablist' }, tabAssistant, tabAgent);
+  const detail = h('aside.rr-side.ag-detail', { 'aria-label': 'Assistant and the agent chosen' }, pane ? sideTabs : '', pane?.element ?? '', agentBox);
   shell.side(detail);
+  let sideView: 'assistant' | 'agent' = pane ? (o.start ?? 'assistant') : 'agent';
+  function setSide(v: 'assistant' | 'agent') {
+    sideView = pane ? v : 'agent';
+    if (pane) pane.element.hidden = sideView !== 'assistant';
+    agentBox.hidden = sideView !== 'agent';
+    tabAssistant.classList.toggle('on', sideView === 'assistant');
+    tabAgent.classList.toggle('on', sideView === 'agent');
+    tabAgent.textContent = chosen()?.name ?? 'Agent';
+    if (pane && sideView === 'assistant') pane.start();
+  }
+  tabAssistant.addEventListener('click', () => setSide('assistant'));
+  tabAgent.addEventListener('click', () => setSide('agent'));
 
   const agents = () => view?.agents ?? [];
   const shown = () => agents().filter((a) => (!floor || a.floor === floor) && agentFilter(a, filter) && (!query.trim() || agentMatches(a, query))).sort(agentOrder);
@@ -194,6 +216,9 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
     }
     for (const el of list.querySelectorAll<HTMLElement>('.ag-row')) el.setAttribute('aria-selected', String(el.dataset.id === id));
     if (focus) list.querySelector<HTMLElement>(`.ag-row[data-id="${CSS.escape(id)}"]`)?.focus({ preventScroll: false });
+    // Choosing one shows it; the first chosen for you leaves the assistant where it is.
+    if (focus) setSide('agent');
+    else tabAgent.textContent = chosen()?.name ?? 'Agent';
     paintDetail();
   }
 
@@ -268,7 +293,7 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
     detailStamp = stamp;
     if (!a) {
       detailFor = '';
-      detail.replaceChildren(h('div.rr-none', {}, h('strong', {}, 'No agent chosen'), h('p', {}, 'Choose one on the left to see what it\u2019s doing and message it.')));
+      agentBox.replaceChildren(h('div.rr-none', {}, h('strong', {}, 'No agent chosen'), h('p', {}, 'Choose one on the left to see what it\u2019s doing and message it.')));
       return;
     }
     const can = a.canControl;
@@ -307,7 +332,7 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
     box.disabled = sendBtn.disabled = !can || a.kind !== 'agent';
     box.placeholder = !can ? 'Only an admin, or whoever hired it, can message it' : a.kind !== 'agent' ? 'A shell takes typing in its terminal' : `Message ${a.name}\u2026 (\u2318\u21a9 sends)`;
     if (!sameAgent) status.textContent = '';
-    detail.replaceChildren(
+    agentBox.replaceChildren(
       h('div.ag-detail-top', {}, head, actions),
       h('div.ag-detail-body', {}, now, task, apps, h('section.ag-section.ag-grow', {}, h('h4', {}, 'Conversation'), convo)),
       h('div.rr-compose', {}, box, h('div.rr-compose-row', {}, h('span.rr-hint', {}, a.status === 'working' ? 'It reads it when it\u2019s done with what it\u2019s doing' : ''), sendBtn), status));
@@ -345,6 +370,7 @@ export function openAgentsPanel(d: AgentsDeps): { close(): void } {
     paintList();
     if (typing) (document.activeElement as HTMLElement).focus();
   }
+  setSide(sideView);
   void loadList();
   listTimer = window.setInterval(() => document.visibilityState === 'visible' && void loadList(), LIST_MS);
   chatTimer = window.setInterval(() => document.visibilityState === 'visible' && void loadChat(), CHAT_MS);
