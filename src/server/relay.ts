@@ -26,6 +26,9 @@ function tailnetPort(host: string, tailnet: string | undefined): number {
 export function tunneledPort(req: http.IncomingMessage, officePort: number, tailnet?: string): number | undefined {
   if (req.headers[RELAYED]) return undefined;
   const host = req.headers.host ?? '';
+  // p5173.localhost:4600, on the office's own machine: the worker's server on 5173, through the office's port (a review there needs it, see review/).
+  const named = /^p(\d{2,5})\.localhost:(\d{1,5})$/i.exec(host);
+  if (named && Number(named[2]) === officePort) return Number(named[1]) !== officePort ? Number(named[1]) : undefined;
   const m = LOOPBACK_HOST.exec(host);
   const port = m ? Number(m[1]) : tailnetPort(host, tailnet);
   return port && port !== officePort ? port : undefined;
@@ -54,13 +57,14 @@ export function tunneledService(req: http.IncomingMessage, officePort: number, t
   return port && svc ? { port, svc } : undefined;
 }
 
-function upstreamHeaders(req: http.IncomingMessage, svc: ServiceInfo): http.OutgoingHttpHeaders {
+/** What goes upstream to a worker's server: the request's own headers, without the office's cookies or the review mode's. */
+export function upstreamHeaders(req: http.IncomingMessage, svc: ServiceInfo): http.OutgoingHttpHeaders {
   const headers: http.OutgoingHttpHeaders = { ...req.headers, [RELAYED]: '1' };
   delete headers[SERVICE_HEADER];
   // From the tailnet, the server gets the Host it would through a tunnel: dev servers like Vite
   // refuse names they don't know. X-Forwarded-Host (set by Tailscale Serve) still has the real one.
   if (!LOOPBACK_HOST.test(req.headers.host ?? '')) headers.host = `localhost:${svc.port}`;
-  const cookie = withoutOfficeCookies(req.headers.cookie);
+  const cookie = withoutOfficeCookies(req.headers.cookie)?.split(';').filter((c) => c.split('=', 1)[0].trim() !== 'agent-office-review').join(';').trim() || undefined;
   if (cookie) headers.cookie = cookie;
   else delete headers.cookie;
   return headers;
