@@ -46,9 +46,9 @@ const tenths = (t: number) => {
 
 export function screeningPlayer(o: { onMark(m: TimelineMark): void; onTick(t: number): void; onPlaying(on: boolean): void; onError(): void; onReady(): void; extra?: HTMLElement[] }): Player {
   const video = h('video.sr-video', { preload: 'metadata', playsinline: true }) as HTMLVideoElement;
-  const audioArt = h('div.sr-audio', { 'aria-hidden': 'true' }, '♪');
+  const audioArt = h('div.sr-audio', { 'aria-hidden': 'true' }, '\u266a');
   const problem = h('div.sr-problem.hidden', { role: 'alert' });
-  const bigPlay = h('button.sr-big-play', { type: 'button', 'aria-label': 'Play', tabindex: '-1' }, '▶');
+  const bigPlay = h('button.sr-big-play', { type: 'button', 'aria-label': 'Play', tabindex: '-1' }, '\u25b6');
   const screen = h('div.sr-screen', {}, video, audioArt, bigPlay, problem);
 
   const buffered = h('div.sr-buffered');
@@ -58,14 +58,14 @@ export function screeningPlayer(o: { onMark(m: TimelineMark): void; onTick(t: nu
   const hover = h('div.sr-hover.hidden');
   const timeline = h('div.sr-timeline', { role: 'slider', 'aria-label': 'Time', 'aria-valuemin': '0', tabindex: '-1' }, h('div.sr-rail', {}, buffered, played), marksEl, head, hover);
 
-  const playBtn = h('button.sr-ctl.sr-play', { type: 'button', title: 'Play (Space or K)', 'aria-label': 'Play' }, '▶');
-  const back = h('button.sr-ctl', { type: 'button', title: 'Back 5 seconds (J)', 'aria-label': 'Back 5 seconds' }, '↺5');
-  const ahead = h('button.sr-ctl', { type: 'button', title: 'Ahead 5 seconds (L)', 'aria-label': 'Ahead 5 seconds' }, '5↻');
-  const prev = h('button.sr-ctl', { type: 'button', title: 'A frame back (←)', 'aria-label': 'A frame back' }, '‹');
-  const next = h('button.sr-ctl', { type: 'button', title: 'A frame on (→)', 'aria-label': 'A frame on' }, '›');
+  const playBtn = h('button.sr-ctl.sr-play', { type: 'button', title: 'Play (Space or K)', 'aria-label': 'Play' }, '\u25b6');
+  const back = h('button.sr-ctl', { type: 'button', title: 'Back 5 seconds (J)', 'aria-label': 'Back 5 seconds' }, '\u21ba5');
+  const ahead = h('button.sr-ctl', { type: 'button', title: 'Ahead 5 seconds (L)', 'aria-label': 'Ahead 5 seconds' }, '5\u21bb');
+  const prev = h('button.sr-ctl', { type: 'button', title: 'A frame back (\u2190)', 'aria-label': 'A frame back' }, '\u2039');
+  const next = h('button.sr-ctl', { type: 'button', title: 'A frame on (\u2192)', 'aria-label': 'A frame on' }, '\u203a');
   const now = h('span.sr-now', {}, '0:00.0');
   const total = h('span.sr-total', {}, ' / 0:00');
-  const speed = h('button.sr-ctl.sr-speed', { type: 'button', title: 'Speed' }, '1×');
+  const speed = h('button.sr-ctl.sr-speed', { type: 'button', title: 'Speed' }, '1\u00d7');
   const sound = h('button.sr-ctl', { type: 'button', title: 'Mute (M)', 'aria-label': 'Mute' }, '\u{1f50a}');
   const volume = h('input.sr-volume', { type: 'range', min: '0', max: '1', step: '0.05', value: '1', 'aria-label': 'Volume' }) as HTMLInputElement;
   const controls = h('div.sr-controls', {}, timeline,
@@ -158,7 +158,7 @@ export function screeningPlayer(o: { onMark(m: TimelineMark): void; onTick(t: nu
   next.addEventListener('click', () => step(1));
   speed.addEventListener('click', () => {
     video.playbackRate = SPEEDS[(SPEEDS.indexOf(video.playbackRate) + 1) % SPEEDS.length] ?? 1;
-    speed.textContent = `${video.playbackRate}×`;
+    speed.textContent = `${video.playbackRate}\u00d7`;
   });
   const mute = () => (video.muted = !video.muted);
   sound.addEventListener('click', mute);
@@ -173,7 +173,7 @@ export function screeningPlayer(o: { onMark(m: TimelineMark): void; onTick(t: nu
 
   const playState = () => {
     const on = !video.paused && !video.ended;
-    playBtn.textContent = on ? '❚❚' : '▶';
+    playBtn.textContent = on ? '\u275a\u275a' : '\u25b6';
     playBtn.setAttribute('aria-label', on ? 'Pause' : 'Play');
     element.classList.toggle('playing', on);
     o.onPlaying(on);

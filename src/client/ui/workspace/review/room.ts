@@ -40,11 +40,11 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   })();
 
   // ---- The frame ----
-  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '✕');
+  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '\u2715');
   const appName = h('strong');
   const pick = h('select.rr-pick', { 'aria-label': 'App' }) as HTMLSelectElement;
-  const back = h('button.rr-btn', { type: 'button', title: 'Back', 'aria-label': 'Back' }, '←');
-  const reload = h('button.rr-btn', { type: 'button', title: 'Reload', 'aria-label': 'Reload' }, '⟳');
+  const back = h('button.rr-btn', { type: 'button', title: 'Back', 'aria-label': 'Back' }, '\u2190');
+  const reload = h('button.rr-btn', { type: 'button', title: 'Reload', 'aria-label': 'Reload' }, '\u27f3');
   const address = h('input.rr-address', { type: 'text', spellcheck: 'false', autocomplete: 'off', 'aria-label': 'Page' }) as HTMLInputElement;
   const sizes = h('div.rr-sizes', { role: 'group', 'aria-label': 'Size' }, ...SIZES.map((s) => {
     const b = h('button', { type: 'button', 'data-size': s.id, title: `${s.label} (${s.key})` }, s.label);
@@ -53,10 +53,10 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   }));
   const pill = h('span.rr-state');
   const approveBtn = h('button.rr-approve', { type: 'button' });
-  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open it in a tab of its own', 'aria-label': 'Open in a new tab' }, '↗');
+  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open it in a tab of its own', 'aria-label': 'Open in a new tab' }, '\u2197');
   const frame = h('iframe.rr-frame', { title: 'App under review', allow: 'clipboard-read; clipboard-write' }) as HTMLIFrameElement;
   const device = h('div.rr-device', {}, frame);
-  const useBtn = h('button', { type: 'button', 'aria-pressed': 'true', title: 'Use the app as it is' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '↖'), 'Use app');
+  const useBtn = h('button', { type: 'button', 'aria-pressed': 'true', title: 'Use the app as it is' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u2196'), 'Use app');
   const commentBtn = h('button', { type: 'button', 'aria-pressed': 'false', title: 'Click anything in the app to comment on it (C)' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u{1f4ac}'), 'Comment', h('kbd', {}, 'C'));
   const modes = h('div.rr-modes', { role: 'group', 'aria-label': 'Mode' }, useBtn, commentBtn);
   const notice = h('div.rr-notice.hidden');
@@ -88,7 +88,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     },
   });
 
-  const root = h('div.review-room', { role: 'dialog', 'aria-label': `Review ${host.workerName}’s app`, tabindex: '-1' },
+  const root = h('div.review-room', { role: 'dialog', 'aria-label': `Review ${host.workerName}\u2019s app`, tabindex: '-1' },
     h('header.rr-top', {},
       h('div.rr-left', {}, close, h('div.rr-title', {}, appName, h('span', {}, host.workerName)), pick),
       h('div.rr-nav', {}, back, reload, address),
@@ -136,7 +136,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     ready = false;
     page = path;
     address.value = path;
-    appName.textContent = t.label.replace(/ · port \d+$/, '');
+    appName.textContent = t.label.replace(/ \u00b7 port \d+$/, '');
     appName.title = t.label;
     const base = t.port ? relayBase(t.port) : undefined;
     commentable = !!base;
@@ -222,7 +222,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     pill.textContent = STATUS_LABEL[st];
     pill.dataset.state = st;
     const waiting = target ? comments.drafts().some((d) => d.app === appAddress(target!)) : false;
-    approveBtn.textContent = st === 'approved' ? '✓ Approved' : 'Approve';
+    approveBtn.textContent = st === 'approved' ? '\u2713 Approved' : 'Approve';
     approveBtn.classList.toggle('on', st === 'approved');
     approveBtn.disabled = !target || !host.canSend() || (st !== 'approved' && waiting);
     approveBtn.title = st === 'approved' ? `Approved by ${state.approved!.by}. Click to take it back.` : waiting ? 'Send or remove the comments not sent yet first' : `Tell ${host.workerName} the app is good as it is`;
@@ -313,7 +313,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   const modal = openModal(root, {
     escCloses: false,
     closeButton: false,
-    doing: `reviewing ${host.workerName}’s app`,
+    doing: `reviewing ${host.workerName}\u2019s app`,
     onClose: () => {
       window.clearInterval(poll);
       window.removeEventListener('message', onMessage);

@@ -19,7 +19,7 @@ import type { WorkspaceHost } from '../types';
 type FileRef = { root?: string; path: string };
 const POLL_MS = 15_000;
 const ref = (f: FileRef): FileRef => (f.root ? { root: f.root, path: f.path } : { path: f.path });
-const QUOTE = /^the passage “([\s\S]+)”$/;
+const QUOTE = /^the passage \u201c([\s\S]+)\u201d$/;
 const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** The marks the page wears, by the CSS Custom Highlight API where the browser has it. */
@@ -66,8 +66,8 @@ export function openReaderRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; 
   const nameOf = (f: FileRef & { name?: string }) => versionLabel(f.path) ?? f.name ?? f.path.split('/').pop() ?? f.path;
   const shell = openRoomShell({
     className: 'reports-room',
-    label: `${host.workerName}’s reports`,
-    doing: `reading ${host.workerName}’s reports`,
+    label: `${host.workerName}\u2019s reports`,
+    doing: `reading ${host.workerName}\u2019s reports`,
     key: (e) => !!reader.key?.(e),
     escape: () => {
       if (notes.writing()) return (document.activeElement as HTMLElement).blur(), true;
@@ -95,7 +95,7 @@ export function openReaderRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; 
   shell.middle.append(meta);
   const pick = h('select.rr-pick', { 'aria-label': 'Document' }) as HTMLSelectElement;
   const approval = approveControls({ workerName: host.workerName, approve: async () => current && review({ kind: 'approve', files: [ref(current)] }) });
-  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open it in a tab of its own', 'aria-label': 'Open in a new tab' }, '↗');
+  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open it in a tab of its own', 'aria-label': 'Open in a new tab' }, '\u2197');
   shell.left.append(pick);
   shell.right.append(approval.pill, approval.button, openOut);
 
@@ -110,7 +110,7 @@ export function openReaderRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; 
     whole: 'the whole document',
     hint: 'Select any passage on the page to comment on it. Or write one below about the whole document.',
     canSend: () => host.canSend(),
-    pick: () => (quote ? { where: `the passage “${quote}”`, label: `“${quote.length > 48 ? `${quote.slice(0, 47)}…` : quote}”`, pin: { q: quote } } : undefined),
+    pick: () => (quote ? { where: `the passage \u201c${quote}\u201d`, label: `\u201c${quote.length > 48 ? `${quote.slice(0, 47)}\u2026` : quote}\u201d`, pin: { q: quote } } : undefined),
     unpick: () => {
       quote = undefined;
       highlight();
@@ -172,7 +172,7 @@ export function openReaderRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; 
     badge.textContent = versionLabel(current.path) ?? '';
     shell.name.textContent = current.name;
     shell.name.title = fileTitle(current);
-    meta.textContent = [current.path.slice(0, current.path.lastIndexOf('/') + 1), current.size ? fileSize(current.size) : '', current.modified ? fileTime(current.modified) : ''].filter(Boolean).join(' · ');
+    meta.textContent = [current.path.slice(0, current.path.lastIndexOf('/') + 1), current.size ? fileSize(current.size) : '', current.modified ? fileTime(current.modified) : ''].filter(Boolean).join(' \u00b7 ');
     openOut.setAttribute('href', host.url(current));
     const approved = reviewsOf(current, data).some((r) => r.kind === 'approve');
     approval.set({ status: approved ? 'approved' : notes.open() ? 'changes' : 'new', label: nameOf(current), can: host.canSend() });

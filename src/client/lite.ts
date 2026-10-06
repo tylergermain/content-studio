@@ -8,6 +8,7 @@ import { Net } from './net';
 import { AVATAR_COLORS, loadProfile, loadSettings, saveProfile, store } from './state';
 import { randomLook } from '../shared/avatar';
 import { cloneLabel } from '../shared/floors';
+import { openAgentsPanel, whenReady } from './ui/agents/panel';
 import { ROOF } from '../shared/rooftop';
 import { DESK_BY_ID, nextFreeSeat } from '../shared/layout';
 import { isAsleep } from '../shared/status';
@@ -321,16 +322,34 @@ $('btn-issues').addEventListener('click', () => openBoard('issues', net, boardAc
 $('btn-pulls').addEventListener('click', () => openBoard('pulls', net, boardActions()));
 $('btn-queue').addEventListener('click', () => openQueue(net, { openTerminal: openWorker }));
 $('btn-new').addEventListener('click', () => sendToWorker('✨ New task'));
+// Every agent on every floor (ui/agents/panel.ts): one on another floor is opened once you've gone there.
+$('btn-agents').addEventListener('click', () => openAgentsPanel({
+  currentFloor: () => store.floor ?? undefined,
+  openWorker: (a) => {
+    if (a.floor === store.floor) return openWorker(a.id);
+    net.send({ t: 'floor.go', floor: a.floor });
+    whenReady(() => store.floor === a.floor && store.workers.has(a.id), () => openWorker(a.id));
+  },
+  newTask: (floorId) => {
+    if (floorId === store.floor) return sendToWorker('✨ New task');
+    net.send({ t: 'floor.go', floor: floorId });
+    whenReady(() => store.floor === floorId, () => sendToWorker('✨ New task'));
+  },
+  wake: (id) => net.send({ t: 'worker.resume', workerId: id }),
+  sendHome: (id) => net.send({ t: 'worker.kill', workerId: id, cleanup: 'keep' }),
+}));
 
 function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
   count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
   count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
+  count('btn-agents', store.floors.reduce((n, f) => n + (f.waiting ?? 0), 0));
 }
 store.on('issues', renderNav);
 store.on('pulls', renderNav);
 store.on('queue', renderNav);
+store.on('floors', renderNav);
 
 // ---- What you have open, for the others (see PeerInfo.doing) -----------------------------------
 let doingSent: string | undefined;

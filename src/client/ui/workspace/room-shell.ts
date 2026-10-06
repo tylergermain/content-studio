@@ -2,7 +2,7 @@ import './room.css';
 import { h, openModal } from '../dom';
 
 // The frame every full-screen review room is built in (see room.css), the way Frame.io frames an asset: a top bar
-// with ✕, the file's name and the worker's, a middle and a right of the room's own; the stage; and the notes down the
+// with \u2715, the file's name and the worker's, a middle and a right of the room's own; the stage; and the notes down the
 // right, which F hides. Esc goes to the room first (a note being written, a mode), and closes the room if it doesn't
 // take it. It opens over the worker's window, so closing it goes back there.
 
@@ -33,7 +33,7 @@ export function openRoomShell(o: {
   escape?(e: KeyboardEvent): boolean;
   onClose(): void;
 }): RoomShell {
-  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '✕');
+  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '\u2715');
   const name = h('strong');
   const sub = h('span');
   const left = h('div.rr-left', {}, close, h('div.rr-title', {}, name, sub));
@@ -95,10 +95,10 @@ export function approveControls(o: { workerName: string; approve(): Promise<void
   const button = h('button.rr-approve', { type: 'button' });
   let confirming = false, timer = 0, label = '', approved = false, can = true;
   function paint() {
-    button.textContent = approved ? '✓ Approved' : confirming ? `Approve ${label}? Click again` : 'Approve';
+    button.textContent = approved ? '\u2713 Approved' : confirming ? `Approve ${label}? Click again` : 'Approve';
     button.classList.toggle('on', approved);
     button.disabled = approved || !can;
-    button.title = approved ? `${label} is approved: ${o.workerName} was told it’s final.` : `Tell ${o.workerName} ${label} is final. Nothing is published, moved or renamed.`;
+    button.title = approved ? `${label} is approved: ${o.workerName} was told it\u2019s final.` : `Tell ${o.workerName} ${label} is final. Nothing is published, moved or renamed.`;
   }
   button.addEventListener('click', async () => {
     if (approved) return;

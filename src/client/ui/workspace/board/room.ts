@@ -13,7 +13,7 @@ import { approveControls, openRoomShell } from '../room-shell';
 import type { WorkspaceHost } from '../types';
 
 // The image board full screen, as Frame.io reviews a still: the image as big as the room allows on a dark stage
-// (click it for its actual pixels), every image along a filmstrip under it, two to four side by side (⌘-click them,
+// (click it for its actual pixels), every image along a filmstrip under it, two to four side by side (\u2318-click them,
 // lettered A to D), or each at the size YouTube shows it. Comment mode (C) pins the next comment to the point
 // clicked on the image; the comments are down the right (notes-side.ts). Approve picks it; Ask for variations sends
 // the image, or the ones side by side, back with what to try.
@@ -47,8 +47,8 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
 
   const shell = openRoomShell({
     className: 'board-room',
-    label: `${host.workerName}’s images`,
-    doing: `looking at ${host.workerName}’s images`,
+    label: `${host.workerName}\u2019s images`,
+    doing: `looking at ${host.workerName}\u2019s images`,
     key: onKey,
     escape: () => {
       if (sheet.childElementCount) return closeSheet(), true;
@@ -73,18 +73,18 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
   shell.middle.classList.add('rr-mid');
   shell.middle.append(meta);
   const views = h('div.rr-sizes', { role: 'group', 'aria-label': 'View' }, ...(['one', 'compare', 'youtube'] as View[]).map((v) => {
-    const b = h('button', { type: 'button', 'data-view': v, title: v === 'one' ? 'One image (1)' : v === 'compare' ? 'Side by side: ⌘-click images in the strip (2)' : 'At the size YouTube shows it (Y)' }, v === 'one' ? 'One' : v === 'compare' ? 'Compare' : 'YouTube size');
+    const b = h('button', { type: 'button', 'data-view': v, title: v === 'one' ? 'One image (1)' : v === 'compare' ? 'Side by side: \u2318-click images in the strip (2)' : 'At the size YouTube shows it (Y)' }, v === 'one' ? 'One' : v === 'compare' ? 'Compare' : 'YouTube size');
     b.addEventListener('click', () => setView(v));
     return b;
   }));
   const approval = approveControls({ workerName: host.workerName, approve: async () => current && review({ kind: 'approve', files: [ref(current)] }) });
   const vary = h('button.rr-ghost', { type: 'button', title: 'Send it back with what to try' }, 'Ask for variations');
-  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open the image in a tab of its own', 'aria-label': 'Open in a new tab' }, '↗');
+  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open the image in a tab of its own', 'aria-label': 'Open in a new tab' }, '\u2197');
   shell.right.append(views, approval.pill, vary, approval.button, openOut);
 
   const show = h('div.br-show');
   const sheet = h('div.rr-sheet.hidden');
-  const useBtn = h('button', { type: 'button', 'aria-pressed': 'true', title: 'Look at it' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '↖'), 'View');
+  const useBtn = h('button', { type: 'button', 'aria-pressed': 'true', title: 'Look at it' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u2196'), 'View');
   const commentBtn = h('button', { type: 'button', 'aria-pressed': 'false', title: 'Click a point on the image to comment on it (C)' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u{1f4ac}'), 'Comment', h('kbd', {}, 'C'));
   const modes = h('div.rr-modes', { role: 'group', 'aria-label': 'Mode' }, useBtn, commentBtn);
   const strip = h('div.br-strip', { role: 'group', 'aria-label': 'Images' });
@@ -185,7 +185,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
     const pins = h('div.br-pins');
     const pic = h('div.br-pic', { 'data-actual': String(actual) }, img, pins);
     img.addEventListener('load', () => {
-      meta.textContent = [`${img.naturalWidth} × ${img.naturalHeight}`, shape(img.naturalWidth, img.naturalHeight), fileSize(current!.size), fileTime(current!.modified)].join(' · ');
+      meta.textContent = [`${img.naturalWidth} \u00d7 ${img.naturalHeight}`, shape(img.naturalWidth, img.naturalHeight), fileSize(current!.size), fileTime(current!.modified)].join(' \u00b7 ');
       fit();
     });
     pic.addEventListener('click', (e) => {
@@ -227,7 +227,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
     const pins: HTMLElement[] = notes.pins().flatMap((s) => {
       const p = at(s);
       if (!p) return [];
-      const el = h(`button.br-pin.${s.state}`, { type: 'button', title: s.note.text, style: `left:${p.x}%;top:${p.y}%` }, s.state === 'done' ? '✓' : String(s.n ?? ''));
+      const el = h(`button.br-pin.${s.state}`, { type: 'button', title: s.note.text, style: `left:${p.x}%;top:${p.y}%` }, s.state === 'done' ? '\u2713' : String(s.n ?? ''));
       el.classList.toggle('focus', s.key === focused);
       el.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -262,7 +262,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
       h('span.br-strip-label', {}, s.title),
       ...s.files.map((f) => {
         const k = artifactKey(f), at = side.indexOf(k);
-        const b = h('button.br-thumb', { type: 'button', 'data-key': k, 'aria-pressed': String(at >= 0), title: `${fileTitle(f)}\nClick to show it, ⌘-click to compare` },
+        const b = h('button.br-thumb', { type: 'button', 'data-key': k, 'aria-pressed': String(at >= 0), title: `${fileTitle(f)}\nClick to show it, \u2318-click to compare` },
           h('img', { src: host.url(f), alt: '', loading: 'lazy', decoding: 'async' }),
           h('span.br-thumb-tag', {}, at >= 0 && side.length > 1 ? LETTERS[at] : same(f, latest) ? 'Latest' : versionLabel(f.path) ?? ''));
         b.addEventListener('click', (e) => select(f, e.metaKey || e.ctrlKey || e.shiftKey));
@@ -277,7 +277,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
     badge.textContent = versionLabel(current.path) ?? '';
     shell.name.textContent = current.name;
     shell.name.title = fileTitle(current);
-    if (view !== 'one') meta.textContent = [fileSize(current.size), fileTime(current.modified)].join(' · ');
+    if (view !== 'one') meta.textContent = [fileSize(current.size), fileTime(current.modified)].join(' \u00b7 ');
     openOut.setAttribute('href', host.url(current));
     for (const b of views.querySelectorAll<HTMLElement>('button')) b.classList.toggle('on', b.dataset.view === view);
     const approved = reviewsOf(current, data).some((r) => r.kind === 'approve');
@@ -301,7 +301,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
     const list = view === 'compare' && sideFiles().length > 1 ? sideFiles() : current ? [current] : [];
     if (!list.length) return;
     const many = list.length > 1;
-    const text = h('textarea.rr-input', { rows: 3, maxlength: 3500, 'aria-label': 'What should change', placeholder: many ? 'What should change? Name them by letter: “B’s layout with A’s colors.”' : 'What should change? A bigger face, a warmer background…' }) as HTMLTextAreaElement;
+    const text = h('textarea.rr-input', { rows: 3, maxlength: 3500, 'aria-label': 'What should change', placeholder: many ? 'What should change? Name them by letter: \u201cB\u2019s layout with A\u2019s colors.\u201d' : 'What should change? A bigger face, a warmer background\u2026' }) as HTMLTextAreaElement;
     const go = h('button.rr-approve', { type: 'button' }, `Send to ${host.workerName}`);
     const cancel = h('button.rr-ghost', { type: 'button' }, 'Cancel');
     cancel.addEventListener('click', closeSheet);
@@ -321,7 +321,7 @@ export function openBoardRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; d
     text.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) void sendIt();
     });
-    sheet.replaceChildren(h('label', {}, many ? `Variations of ${LETTERS.slice(0, list.length).join(', ')}` : `Variations of ${nameOf(list[0])}`), text, h('div.rr-sheet-row', {}, go, cancel, h('span.rr-hint', {}, '⌘↩ sends')));
+    sheet.replaceChildren(h('label', {}, many ? `Variations of ${LETTERS.slice(0, list.length).join(', ')}` : `Variations of ${nameOf(list[0])}`), text, h('div.rr-sheet-row', {}, go, cancel, h('span.rr-hint', {}, '\u2318\u21a9 sends')));
     sheet.classList.remove('hidden');
     text.focus();
   });

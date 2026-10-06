@@ -56,7 +56,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
   const newest = () => latestLinked(files.filter((f) => f.type.startsWith('video/')), data) ?? latestLinked(files, data);
 
   // ---- The frame ----
-  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '✕');
+  const close = h('button.rr-close', { type: 'button', 'aria-label': 'Close', title: 'Close (Esc)' }, '\u2715');
   const badge = h('span.sr-badge');
   const name = h('strong');
   const pick = h('select.rr-pick', { 'aria-label': 'Cut' }) as HTMLSelectElement;
@@ -64,8 +64,8 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
   const meta = h('span.sr-meta');
   const pill = h('span.rr-state');
   const approveBtn = h('button.rr-approve', { type: 'button' });
-  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open the file in a tab of its own', 'aria-label': 'Open in a new tab' }, '↗');
-  const theater = h('button.sr-ctl', { type: 'button', title: 'Hide the notes (F)', 'aria-label': 'Hide the notes' }, '⇥');
+  const openOut = h('a.rr-btn', { target: '_blank', rel: 'noopener', title: 'Open the file in a tab of its own', 'aria-label': 'Open in a new tab' }, '\u2197');
+  const theater = h('button.sr-ctl', { type: 'button', title: 'Hide the notes (F)', 'aria-label': 'Hide the notes' }, '\u21e5');
 
   const player = screeningPlayer({
     onMark: (m) => {
@@ -109,7 +109,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
     },
   });
 
-  const root = h('div.review-room.screening-room', { role: 'dialog', 'aria-label': `Screening ${host.workerName}’s cuts`, tabindex: '-1' },
+  const root = h('div.review-room.screening-room', { role: 'dialog', 'aria-label': `Screening ${host.workerName}\u2019s cuts`, tabindex: '-1' },
     h('header.rr-top', {},
       h('div.rr-left', {}, close, h('div.rr-title', {}, h('span.sr-title-line', {}, badge, name), h('span', {}, host.workerName)), pick, newer),
       h('div.rr-nav.sr-nav', {}, meta),
@@ -157,11 +157,11 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
     if (!same(selected, file)) return;
     const playable = code === 200 || code === 206;
     const asked = reviewsOf(file, data).some((r) => r.kind === 'question');
-    const why = code === 404 ? 'It isn’t there any more: it was moved or deleted, or its folder is no longer shared with this floor.'
-      : code === 403 ? 'You can’t open files in this shared folder. An admin, or the person who hired this worker, can.'
-        : playable ? 'This browser can’t play its format. Chrome plays H.264 (8-bit) video with AAC sound; ProRes never plays here, and HEVC or 10-bit files often don’t.'
-          : 'It couldn’t be loaded. Check the office is still running, then try again.';
-    const parts: Node[] = [h('strong', {}, playable ? `${file.name} won’t play here` : `${file.name} can’t be opened`), h('p', {}, why), h('code', {}, fileTitle(file))];
+    const why = code === 404 ? 'It isn\u2019t there any more: it was moved or deleted, or its folder is no longer shared with this floor.'
+      : code === 403 ? 'You can\u2019t open files in this shared folder. An admin, or the person who hired this worker, can.'
+        : playable ? 'This browser can\u2019t play its format. Chrome plays H.264 (8-bit) video with AAC sound; ProRes never plays here, and HEVC or 10-bit files often don\u2019t.'
+          : 'It couldn\u2019t be loaded. Check the office is still running, then try again.';
+    const parts: Node[] = [h('strong', {}, playable ? `${file.name} won\u2019t play here` : `${file.name} can\u2019t be opened`), h('p', {}, why), h('code', {}, fileTitle(file))];
     if (playable && host.canSend()) {
       const ask = h('button.rr-approve', { type: 'button', disabled: asked }, asked ? 'H.264 review copy asked for' : 'Ask for an H.264 review copy');
       ask.addEventListener('click', async () => {
@@ -182,7 +182,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
     player.setProblem(parts);
   }
 
-  // ---- Chapters: a chapters.txt in the cut's folder, or the one above it (jev-v01/chapters.txt for jev-v01/renders/…mp4) ----
+  // ---- Chapters: a chapters.txt in the cut's folder, or the one above it (jev-v01/chapters.txt for jev-v01/renders/\u2026mp4) ----
   function chaptersFile(f: ChatArtifact): ChatArtifact | undefined {
     const dir = dirOf(f.path), up = dir ? dirOf(dir.slice(0, -1)) : undefined;
     const wanted = [`${dir}chapters.txt`, ...(up !== undefined ? [`${up}chapters.txt`] : [])].map((p) => p.toLowerCase());
@@ -223,25 +223,25 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
   function paintTop() {
     if (!selected) return;
     const f = selected, v = versionLabel(f.path), latest = newest();
-    badge.textContent = v ?? (f.type.startsWith('audio/') ? '♪' : '▶');
+    badge.textContent = v ?? (f.type.startsWith('audio/') ? '\u266a' : '\u25b6');
     name.textContent = f.name;
     name.title = fileTitle(f);
-    meta.textContent = [same(latest, f) ? 'Latest' : '', fileFolder(f), fileSize(f.size), fileTime(f.modified)].filter(Boolean).join(' · ');
+    meta.textContent = [same(latest, f) ? 'Latest' : '', fileFolder(f), fileSize(f.size), fileTime(f.modified)].filter(Boolean).join(' \u00b7 ');
     openOut.setAttribute('href', host.url(f));
     const st = status();
     pill.textContent = STATUS_LABEL[st];
     pill.dataset.state = st;
     const label = nameOf(f);
-    approveBtn.textContent = st === 'approved' ? '✓ Approved' : confirming ? `Approve ${label}? Click again` : 'Approve';
+    approveBtn.textContent = st === 'approved' ? '\u2713 Approved' : confirming ? `Approve ${label}? Click again` : 'Approve';
     approveBtn.classList.toggle('on', st === 'approved');
     approveBtn.disabled = st === 'approved' || !host.canSend();
-    approveBtn.title = st === 'approved' ? `${label} is approved: ${host.workerName} was told it’s final.` : `Tell ${host.workerName} ${label} is final. Nothing is published, moved or renamed.`;
+    approveBtn.title = st === 'approved' ? `${label} is approved: ${host.workerName} was told it\u2019s final.` : `Tell ${host.workerName} ${label} is final. Nothing is published, moved or renamed.`;
     // A newer cut: the newest in this one's series of versions, else the latest the worker linked.
     const next = files.filter((x) => !same(x, f) && x.modified > f.modified && seriesKey(x) === seriesKey(f)).sort((a, b) => b.modified - a.modified)[0]
       ?? (latest && !same(latest, f) && latest.modified > f.modified ? latest : undefined);
     newer.classList.toggle('hidden', !next);
     if (next) {
-      newer.textContent = `${nameOf(next)} is newer · Watch it`;
+      newer.textContent = `${nameOf(next)} is newer \u00b7 Watch it`;
       newer.onclick = () => select(next);
     }
   }
@@ -269,7 +269,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
   function paintPick() {
     const groups = sections(files, data, host.workerName);
     const latest = newest();
-    pick.replaceChildren(...groups.map((g) => h('optgroup', { label: g.title }, ...g.files.map((f) => h('option', { value: artifactKey(f) }, `${nameOf(f)}${versionLabel(f.path) ? ` · ${f.name}` : ''}${same(f, latest) ? ' · Latest' : ''}`)))));
+    pick.replaceChildren(...groups.map((g) => h('optgroup', { label: g.title }, ...g.files.map((f) => h('option', { value: artifactKey(f) }, `${nameOf(f)}${versionLabel(f.path) ? ` \u00b7 ${f.name}` : ''}${same(f, latest) ? ' \u00b7 Latest' : ''}`)))));
     pick.hidden = files.length < 2;
     if (selected) pick.value = artifactKey(selected);
   }
@@ -327,7 +327,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
   const modal = openModal(root, {
     escCloses: false,
     closeButton: false,
-    doing: `screening ${host.workerName}’s cuts`,
+    doing: `screening ${host.workerName}\u2019s cuts`,
     onClose: () => {
       remember();
       window.clearInterval(poll);

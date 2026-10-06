@@ -64,9 +64,9 @@ export function screeningComments(d: CommentsDeps) {
   const atChip = h('button.sr-at', { type: 'button', title: 'At this moment, or about the whole cut' });
   const onText = h('span.rr-on-text');
   const on = h('div.rr-on', {}, atChip, onText);
-  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment…', 'aria-label': 'Note', maxlength: 1000 }) as HTMLTextAreaElement;
+  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment\u2026', 'aria-label': 'Note', maxlength: 1000 }) as HTMLTextAreaElement;
   const add = h('button.rr-add', { type: 'button' }, 'Comment');
-  const compose = h('div.rr-compose', {}, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add · N for a note at the moment'), add));
+  const compose = h('div.rr-compose', {}, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add \u00b7 N for a note at the moment'), add));
   const send = h('button.rr-send', { type: 'button' });
   const status = h('p.rr-status', { 'aria-live': 'polite' });
   const sendbar = h('div.rr-sendbar', {}, send, status);
@@ -103,7 +103,7 @@ export function screeningComments(d: CommentsDeps) {
     const text = input.value.trim();
     if (!text) return input.focus();
     if (drafts.length >= MAX_NOTES) {
-      status.textContent = `That’s ${MAX_NOTES} notes, as many as one review takes. Send these, then carry on.`;
+      status.textContent = `That\u2019s ${MAX_NOTES} notes, as many as one review takes. Send these, then carry on.`;
       return;
     }
     drafts = addNote(drafts, pinned ?? d.time(), text, aboutWhole);
@@ -131,7 +131,7 @@ export function screeningComments(d: CommentsDeps) {
     if (!drafts.length || busy) return;
     const going = drafts;
     busy = true;
-    status.textContent = 'Sending…';
+    status.textContent = 'Sending\u2026';
     paint();
     try {
       await d.send(going);
@@ -139,7 +139,7 @@ export function screeningComments(d: CommentsDeps) {
       keep();
       status.textContent = `Sent to ${d.workerName}. The next version comes back as a new file, here.`;
     } catch (e) {
-      status.textContent = e instanceof Error ? e.message : 'That couldn’t be sent. Try again.';
+      status.textContent = e instanceof Error ? e.message : 'That couldn\u2019t be sent. Try again.';
     } finally {
       busy = false;
       paint();
@@ -149,14 +149,14 @@ export function screeningComments(d: CommentsDeps) {
 
   // ---- The list ----
   function card(n: ReviewNote, state: 'draft' | 'open' | 'done', key: string, i: number, own: boolean): HTMLElement {
-    const chip = h('button.sr-stamp', { type: 'button', title: whole(n) ? 'About the whole cut' : own ? `Play from just before ${clock(n.at)}` : `Check ${clock(n.at)} in this cut` }, state === 'done' ? `✓ ${stamp(n)}` : stamp(n));
+    const chip = h('button.sr-stamp', { type: 'button', title: whole(n) ? 'About the whole cut' : own ? `Play from just before ${clock(n.at)}` : `Check ${clock(n.at)} in this cut` }, state === 'done' ? `\u2713 ${stamp(n)}` : stamp(n));
     chip.addEventListener('click', (e) => {
       e.stopPropagation();
       if (!whole(n)) d.seek(seekBefore(n.at), true);
     });
     const actions: HTMLElement[] = [];
     if (state === 'draft') {
-      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove the note at ${stamp(n)}` }, '✕');
+      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove the note at ${stamp(n)}` }, '\u2715');
       x.addEventListener('click', (e) => {
         e.stopPropagation();
         drafts = drafts.filter((_, j) => j !== i);
@@ -167,14 +167,14 @@ export function screeningComments(d: CommentsDeps) {
       actions.push(x);
     } else {
       const isDone = state === 'done';
-      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'}: ${n.text.slice(0, 40)}`, disabled: !d.canSend() }, '✓');
+      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'}: ${n.text.slice(0, 40)}`, disabled: !d.canSend() }, '\u2713');
       check.addEventListener('click', async (e) => {
         e.stopPropagation();
         check.disabled = true;
         try {
           await d.mark(key, !isDone);
         } catch (err) {
-          status.textContent = err instanceof Error ? err.message : 'That didn’t save';
+          status.textContent = err instanceof Error ? err.message : 'That didn\u2019t save';
           check.disabled = false;
         }
       });
@@ -201,8 +201,8 @@ export function screeningComments(d: CommentsDeps) {
         return shows(state) ? [card(n, state, key, i, own)] : [];
       });
       if (!cards.length) continue;
-      const when = g.at ? ` · ${fileTime(g.at)}` : '';
-      groups.push(h('section.rr-group', {}, h('h4', {}, own ? 'Sent' : `Sent on ${nameOf(g.file)}`, h('span', {}, own ? when : `${when} · check them in ${label}`)), ...cards));
+      const when = g.at ? ` \u00b7 ${fileTime(g.at)}` : '';
+      groups.push(h('section.rr-group', {}, h('h4', {}, own ? 'Sent' : `Sent on ${nameOf(g.file)}`, h('span', {}, own ? when : `${when} \u00b7 check them in ${label}`)), ...cards));
     }
     if (!groups.length) {
       groups.push(h('div.rr-none', {},
@@ -224,8 +224,8 @@ export function screeningComments(d: CommentsDeps) {
     const can = d.canSend();
     input.disabled = add.disabled = atChip.disabled = !can || !current;
     atChip.classList.toggle('whole', aboutWhole);
-    atChip.textContent = aboutWhole ? 'Whole cut' : `⏱ ${clock(pinned ?? d.time())}`;
-    onText.textContent = !can ? `You can watch here. Only an admin, or whoever hired ${d.workerName}, can send it notes.` : aboutWhole ? 'About the whole cut · click to pin it to the moment' : pinned !== undefined ? 'The cut waits while you write' : 'At this moment · click for the whole cut';
+    atChip.textContent = aboutWhole ? 'Whole cut' : `\u23f1 ${clock(pinned ?? d.time())}`;
+    onText.textContent = !can ? `You can watch here. Only an admin, or whoever hired ${d.workerName}, can send it notes.` : aboutWhole ? 'About the whole cut \u00b7 click to pin it to the moment' : pinned !== undefined ? 'The cut waits while you write' : 'At this moment \u00b7 click for the whole cut';
   }
 
   function paint() {
@@ -241,7 +241,7 @@ export function screeningComments(d: CommentsDeps) {
     else paintNotes();
     paintBox();
     compose.hidden = sendbar.hidden = tab !== 'notes';
-    send.textContent = busy ? 'Sending…' : drafts.length ? `Send ${drafts.length === 1 ? '1 note' : `${drafts.length} notes`} to ${d.workerName}` : `Send to ${d.workerName}`;
+    send.textContent = busy ? 'Sending\u2026' : drafts.length ? `Send ${drafts.length === 1 ? '1 note' : `${drafts.length} notes`} to ${d.workerName}` : `Send to ${d.workerName}`;
     send.disabled = busy || !drafts.length || !d.canSend();
   }
   notesTab.addEventListener('click', () => {
@@ -310,7 +310,7 @@ export function screeningComments(d: CommentsDeps) {
     cancel,
     /** As it plays: the moment in the box, and the notes and chapter it's at. */
     tick(t: number) {
-      if (pinned === undefined && !aboutWhole) atChip.textContent = `⏱ ${clock(t)}`;
+      if (pinned === undefined && !aboutWhole) atChip.textContent = `\u23f1 ${clock(t)}`;
       let near = '';
       for (const el of list.querySelectorAll<HTMLElement>('[data-at]')) {
         const at = Number(el.dataset.at);

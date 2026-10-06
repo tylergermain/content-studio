@@ -35,7 +35,7 @@ export function screeningRoom(host: WorkspaceHost): Panel {
   function paintTab() {
     if (!data || !files.length) {
       body.replaceChildren(h('div.sv-empty', {},
-        h('span.sv-icon', { 'aria-hidden': 'true' }, '▶'),
+        h('span.sv-icon', { 'aria-hidden': 'true' }, '\u25b6'),
         h('strong', {}, 'Nothing to watch yet'),
         h('p', {}, `When ${host.workerName} links a render in a reply, it opens here full screen, with your notes at their moments beside it.`)));
       return;
@@ -45,7 +45,7 @@ export function screeningRoom(host: WorkspaceHost): Panel {
     const notesSent = reviewsOf(latest, data).some((r) => r.kind === 'notes');
     const st = approved ? 'approved' : notesSent ? 'changes' : 'new';
     const unsent = files.reduce((n, f) => n + loadDraft(draftKey(host.workerId, f)).length, 0);
-    const start = h('button.btn.primary', { type: 'button' }, 'Open screening room ⤢');
+    const start = h('button.btn.primary', { type: 'button' }, 'Open screening room \u2922');
     start.addEventListener('click', () => openRoom());
     const list = h('div.sv-cuts');
     for (const s of sections(files, data, host.workerName)) {
@@ -54,7 +54,7 @@ export function screeningRoom(host: WorkspaceHost): Panel {
     }
     body.replaceChildren(h('div.sv-summary', {},
       h('span.rv-state.sv-state', { 'data-state': st }, STATUS_LABEL[st]),
-      h('strong.sv-title', {}, `${nameOf(latest)}${versionLabel(latest.path) ? ` · ${latest.name}` : ''}`),
+      h('strong.sv-title', {}, `${nameOf(latest)}${versionLabel(latest.path) ? ` \u00b7 ${latest.name}` : ''}`),
       unsent ? h('p', {}, `${unsent} note${unsent === 1 ? '' : 's'} not sent yet`) : null,
       start,
       h('p.sv-hint', {}, 'Opens full screen. Space plays, N writes a note at the moment, Esc comes back.')),

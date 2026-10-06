@@ -15,7 +15,7 @@ export { reviewTargets } from './targets';
 // app here. The page comes through the office's relay to the worker's server, which adds the small
 // script that makes pinning comments work (and does nothing else).
 
-/** What Ask … to run it puts in the message box. */
+/** What Ask \u2026 to run it puts in the message box. */
 const RUN_IT = 'Run the app you built on this machine and keep its server running (a dev server, or the built site served on a free port), so I can review it in the office.';
 
 export function softwareReview(host: WorkspaceHost): Panel {
@@ -41,7 +41,7 @@ export function softwareReview(host: WorkspaceHost): Panel {
       body.replaceChildren(h('div.rv-empty', {},
         h('span.rv-icon', { 'aria-hidden': 'true' }, '\u{1f9ea}'),
         h('strong', {}, 'No app running yet'),
-        h('p', {}, `When ${host.workerName} runs its app on this machine (npm run dev, or a built site served on a port), you review it here full screen: use it at any size, press C and click anything to pin a comment, and send them all back. A site published somewhere else doesn’t show here.`),
+        h('p', {}, `When ${host.workerName} runs its app on this machine (npm run dev, or a built site served on a port), you review it here full screen: use it at any size, press C and click anything to pin a comment, and send them all back. A site published somewhere else doesn\u2019t show here.`),
         ask));
       return;
     }
@@ -49,12 +49,12 @@ export function softwareReview(host: WorkspaceHost): Panel {
     const st = reviewStatus(s);
     const open = s.comments.filter((c) => !c.done).length;
     const drafts = loadDrafts(host.workerId).length;
-    const start = h('button.btn.primary', { type: 'button' }, 'Open review ⤢');
+    const start = h('button.btn.primary', { type: 'button' }, 'Open review \u2922');
     start.addEventListener('click', () => openRoom());
     body.replaceChildren(h('div.rv-summary', {},
       h('span.rv-state', { 'data-state': st }, STATUS_LABEL[st]),
       h('strong.rv-title', {}, targets.length === 1 ? targets[0].label : `${targets.length} apps running`),
-      h('p.rv-counts', {}, [drafts && `${drafts} not sent`, `${open} open`, `${s.comments.length - open} done`, s.rounds.length && `${s.rounds.length} round${s.rounds.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')),
+      h('p.rv-counts', {}, [drafts && `${drafts} not sent`, `${open} open`, `${s.comments.length - open} done`, s.rounds.length && `${s.rounds.length} round${s.rounds.length === 1 ? '' : 's'}`].filter(Boolean).join(' \u00b7 ')),
       start,
       targets.length > 1 ? h('ul.rv-apps', {}, ...targets.map((t) => {
         const b = h('button.link-button', { type: 'button' }, t.label);

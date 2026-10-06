@@ -75,21 +75,21 @@ export function notesSide(d: NotesSideDeps) {
   }));
   modes.hidden = !d.question;
   const onText = h('span.rr-on-text');
-  const unpin = h('button.rr-icon', { type: 'button', title: `Make it about ${d.whole}`, 'aria-label': 'Unpin' }, '✕');
+  const unpin = h('button.rr-icon', { type: 'button', title: `Make it about ${d.whole}`, 'aria-label': 'Unpin' }, '\u2715');
   unpin.addEventListener('click', () => {
     d.unpick();
     paint();
     d.changed();
   });
   const on = h('div.rr-on', {}, onText, unpin);
-  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment…', 'aria-label': 'Comment', maxlength: 1000 }) as HTMLTextAreaElement;
+  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment\u2026', 'aria-label': 'Comment', maxlength: 1000 }) as HTMLTextAreaElement;
   const add = h('button.rr-add', { type: 'button' }, 'Comment');
   const send = h('button.rr-send', { type: 'button' });
   const status = h('p.rr-status', { 'aria-live': 'polite' });
   const element = h('aside.rr-side', { 'aria-label': 'Comments' },
     h('div.rr-side-head', {}, h('strong', {}, 'Comments'), count, filters),
     list,
-    h('div.rr-compose', {}, modes, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add · Shift+Enter for a new line'), add)),
+    h('div.rr-compose', {}, modes, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add \u00b7 Shift+Enter for a new line'), add)),
     h('div.rr-sendbar', {}, send, status));
 
   const keep = () => saveDraft(draftKey, drafts);
@@ -116,7 +116,7 @@ export function notesSide(d: NotesSideDeps) {
     if (!text) return input.focus();
     if (mode === 'question') return void ask(text);
     if (drafts.length >= MAX_NOTES) {
-      status.textContent = `That’s ${MAX_NOTES} notes, as many as one review takes. Send these, then carry on.`;
+      status.textContent = `That\u2019s ${MAX_NOTES} notes, as many as one review takes. Send these, then carry on.`;
       return;
     }
     const p = d.pick();
@@ -131,14 +131,14 @@ export function notesSide(d: NotesSideDeps) {
   async function ask(text: string) {
     if (busy || !d.question) return;
     busy = true;
-    status.textContent = 'Sending…';
+    status.textContent = 'Sending\u2026';
     try {
       await d.question(text);
       input.value = '';
       mode = 'note';
       status.textContent = `Asked ${d.workerName}. The answer comes in the chat.`;
     } catch (e) {
-      status.textContent = e instanceof Error ? e.message : 'That couldn’t be sent. Try again.';
+      status.textContent = e instanceof Error ? e.message : 'That couldn\u2019t be sent. Try again.';
     } finally {
       busy = false;
       paint();
@@ -156,7 +156,7 @@ export function notesSide(d: NotesSideDeps) {
     if (!drafts.length || busy) return;
     const going = drafts;
     busy = true;
-    status.textContent = 'Sending…';
+    status.textContent = 'Sending\u2026';
     paint();
     try {
       await d.send(going.map(({ at, text, where }) => ({ at, text, ...(where ? { where } : {}) })));
@@ -164,7 +164,7 @@ export function notesSide(d: NotesSideDeps) {
       keep();
       status.textContent = `Sent to ${d.workerName}. The next version comes back as a new file, here.`;
     } catch (e) {
-      status.textContent = e instanceof Error ? e.message : 'That couldn’t be sent. Try again.';
+      status.textContent = e instanceof Error ? e.message : 'That couldn\u2019t be sent. Try again.';
     } finally {
       busy = false;
       paint();
@@ -177,7 +177,7 @@ export function notesSide(d: NotesSideDeps) {
     const whole = !s.note.where || s.note.where === d.whole;
     const actions: HTMLElement[] = [];
     if (s.state === 'draft') {
-      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove comment ${s.n}` }, '✕');
+      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove comment ${s.n}` }, '\u2715');
       x.addEventListener('click', (e) => {
         e.stopPropagation();
         drafts = drafts.filter((n) => n !== s.note);
@@ -188,21 +188,21 @@ export function notesSide(d: NotesSideDeps) {
       actions.push(x);
     } else {
       const isDone = s.state === 'done';
-      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'}: ${s.note.text.slice(0, 40)}`, disabled: !d.canSend() }, '✓');
+      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'}: ${s.note.text.slice(0, 40)}`, disabled: !d.canSend() }, '\u2713');
       check.addEventListener('click', async (e) => {
         e.stopPropagation();
         check.disabled = true;
         try {
           await d.mark(s.key, !isDone);
         } catch (err) {
-          status.textContent = err instanceof Error ? err.message : 'That didn’t save';
+          status.textContent = err instanceof Error ? err.message : 'That didn\u2019t save';
           check.disabled = false;
         }
       });
       actions.push(check);
     }
     const el = h('div.rr-card.ns-card', { 'data-state': s.state, 'data-key': s.key, tabindex: '0', role: 'button', title: whole ? '' : 'Show it' },
-      h('div.rr-card-head', {}, h('span.rr-pin', {}, s.state === 'done' ? '✓' : s.n ? String(s.n) : '↺'), h('span.ns-where', {}, whole ? cap(d.whole) : s.note.where!), h('span.rr-grow'), ...actions),
+      h('div.rr-card-head', {}, h('span.rr-pin', {}, s.state === 'done' ? '\u2713' : s.n ? String(s.n) : '\u21ba'), h('span.ns-where', {}, whole ? cap(d.whole) : s.note.where!), h('span.rr-grow'), ...actions),
       h('p.rr-text.ns-text', {}, s.note.text));
     el.addEventListener('mouseenter', () => d.focus(s));
     el.addEventListener('mouseleave', () => d.focus(undefined));
@@ -225,8 +225,8 @@ export function notesSide(d: NotesSideDeps) {
       const own = !!file && artifactKey(g.file) === artifactKey(file);
       const cards = notes.filter((s) => s.key.startsWith(`${g.id}#`) && shows(s.state)).map(card);
       if (!cards.length) continue;
-      const when = g.at ? ` · ${fileTime(g.at)}` : '';
-      groups.push(h('section.rr-group', {}, h('h4', {}, own ? 'Sent' : `Sent on ${nameOf(g.file)}`, h('span', {}, own ? when : `${when} · check them in ${label}`)), ...cards));
+      const when = g.at ? ` \u00b7 ${fileTime(g.at)}` : '';
+      groups.push(h('section.rr-group', {}, h('h4', {}, own ? 'Sent' : `Sent on ${nameOf(g.file)}`, h('span', {}, own ? when : `${when} \u00b7 check them in ${label}`)), ...cards));
     }
     if (!groups.length) groups.push(h('div.rr-none', {}, h('strong', {}, filter === 'done' ? 'Nothing done yet' : 'No open comments'), h('p', {}, filter === 'done' ? `Check a comment once ${d.workerName} has fixed it.` : d.hint)));
     list.replaceChildren(...groups);
@@ -237,9 +237,9 @@ export function notesSide(d: NotesSideDeps) {
     unpin.hidden = !p || mode === 'question';
     onText.textContent = !d.canSend() ? `You can look here. Only an admin, or whoever hired ${d.workerName}, can send it comments.`
       : mode === 'question' ? `A question about ${label}: the answer comes in the chat` : p ? `On ${p.label}` : `About ${d.whole}`;
-    input.placeholder = mode === 'question' ? `Ask ${d.workerName} about it…` : 'Leave a comment…';
+    input.placeholder = mode === 'question' ? `Ask ${d.workerName} about it\u2026` : 'Leave a comment\u2026';
     add.textContent = mode === 'question' ? 'Ask' : 'Comment';
-    send.textContent = busy ? 'Sending…' : drafts.length ? `Send ${drafts.length === 1 ? '1 comment' : `${drafts.length} comments`} to ${d.workerName}` : `Send to ${d.workerName}`;
+    send.textContent = busy ? 'Sending\u2026' : drafts.length ? `Send ${drafts.length === 1 ? '1 comment' : `${drafts.length} comments`} to ${d.workerName}` : `Send to ${d.workerName}`;
     send.disabled = busy || !drafts.length || !d.canSend();
   }
 

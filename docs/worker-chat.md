@@ -18,6 +18,16 @@ Notes on a cut, **Approve this cut**, **Pick this one**, **Ask for variations**,
 
 A review is sent the way a typed message is: it wakes an asleep worker, goes once however often the button is clicked, and stays in the conversation. The file then shows what was sent: **Approved**, **Picked**, **Notes sent · n**, or **Variations asked**. An approval also tells everyone on the floor. A review can name only files the window could open, one to four of them, with up to 50 notes of up to 1,000 characters. Only admins, and the worker's owner within their org-chart roles, may message a worker or send it reviews; anyone else who opens the window sees it read-only, and the composer says why.
 
+## The Agents panel
+
+**☰ › 🛰️ Agents** in the 3D office, or **🛰️ Agents** on the 2D and phone view's bar, opens every agent on every floor in one full-screen panel, with how many need you beside it. It asks the office every two seconds (`GET /api/agents`, `src/server/http/routes/agents-panel.ts`).
+
+- **The list** is by floor, the one you're on first, and within a floor the agents that need you first (the longest waiting first), then working, ready and asleep. Each row has its status, its model, its task, what it's doing right now, the web servers it's running (click one to open it), its pull request and branch, and how long it's been waiting. **All**, **Needs you**, **Working**, **Ready** and **Asleep** filter it (A, N, W, R, S), the floor menu narrows it to one floor, and the search (/) matches names, floors, tasks, models and branches. ↑ and ↓ (or J and K) move through it.
+- **The agent chosen** shows down the right: who hired it and when, what it's doing now, its task, what it's running, and the end of its conversation, kept up to date. The box under it messages it, as the chat does (⌘↩ sends), and wakes it if it's asleep. **Interrupt** stops what it's doing (Esc in its terminal), **Wake** starts its session again, and **Send home** (a second click to be sure) takes it from its desk with its branch and work kept. **Open window**, or Enter, opens its conversation and workspace; for an agent on another floor it takes you to that floor first and opens it once you're there.
+- **New task** hires someone on the floor the menu shows (or yours), and **+ New task here** on a floor's heading on that floor, going there first.
+
+Who may message, interrupt, wake or send an agent home is the same as in its chat: admins, and the agent's owner within their org-chart roles. Anyone else sees it all read-only.
+
 ## Content preview and links
 
 The **Files** tab is the preview as it always was: a strip of every file, the worker's first, then the newest supported files in its folder: images, video, audio, Markdown, text, PDF, and HTML. A specialist's folder for this is the floor's project; any other agent's is its worktree. The folder scan is bounded (five levels deep, 3,000 entries, the newest 60), so a render saved deep in a project may only appear because a message links it. With nothing chosen, Files opens the newest linked video, else the newest linked picture, else a picture or the newest file from the folder.

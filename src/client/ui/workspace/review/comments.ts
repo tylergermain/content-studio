@@ -63,14 +63,14 @@ export function reviewComments(d: CommentsDeps): Comments {
   }));
   const list = h('div.rr-list');
   const on = h('div.rr-on');
-  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment…', 'aria-label': 'Comment', maxlength: 1000 }) as HTMLTextAreaElement;
+  const input = h('textarea.rr-input', { rows: 3, placeholder: 'Leave a comment\u2026', 'aria-label': 'Comment', maxlength: 1000 }) as HTMLTextAreaElement;
   const add = h('button.rr-add', { type: 'button' }, 'Comment');
   const send = h('button.rr-send', { type: 'button' });
   const status = h('p.rr-status', { 'aria-live': 'polite' });
   const element = h('aside.rr-side', { 'aria-label': 'Comments' },
     h('div.rr-side-head', {}, h('strong', {}, 'Comments'), count, filters),
     list,
-    h('div.rr-compose', {}, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add · Shift+Enter for a new line'), add)),
+    h('div.rr-compose', {}, on, input, h('div.rr-compose-row', {}, h('span.rr-hint', {}, 'Enter to add \u00b7 Shift+Enter for a new line'), add)),
     h('div.rr-sendbar', {}, send, status));
 
   const nextN = () => state.comments.reduce((m, c) => Math.max(m, c.n), 0);
@@ -109,14 +109,14 @@ export function reviewComments(d: CommentsDeps): Comments {
     if (!going.length) return;
     send.disabled = true;
     error = '';
-    status.textContent = 'Sending…';
+    status.textContent = 'Sending\u2026';
     try {
       await d.send(going);
       drafts = drafts.filter((x) => !going.includes(x));
       keep();
       status.textContent = `Sent to ${d.workerName}. Its fixes show up here as the app reloads.`;
     } catch (e) {
-      error = e instanceof Error ? e.message : 'The comments couldn’t be sent';
+      error = e instanceof Error ? e.message : 'The comments couldn\u2019t be sent';
       status.textContent = error;
     }
     paint();
@@ -128,7 +128,7 @@ export function reviewComments(d: CommentsDeps): Comments {
     const by = draft ? d.me() : (c as SentComment).by;
     const actions: HTMLElement[] = [];
     if (draft) {
-      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove comment ${c.n}` }, '✕');
+      const x = h('button.rr-icon', { type: 'button', title: 'Remove', 'aria-label': `Remove comment ${c.n}` }, '\u2715');
       x.addEventListener('click', (e) => {
         e.stopPropagation();
         drafts = drafts.filter((y) => y.id !== c.id);
@@ -139,14 +139,14 @@ export function reviewComments(d: CommentsDeps): Comments {
       actions.push(x);
     } else {
       const isDone = st === 'done';
-      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'} comment ${c.n}`, disabled: !d.canSend() }, '✓');
+      const check = h('button.rr-check', { type: 'button', 'aria-pressed': String(isDone), title: isDone ? 'Reopen' : 'Mark done', 'aria-label': `${isDone ? 'Reopen' : 'Mark done'} comment ${c.n}`, disabled: !d.canSend() }, '\u2713');
       check.addEventListener('click', async (e) => {
         e.stopPropagation();
         check.disabled = true;
         try {
           await d.done(c.id, !isDone);
         } catch (err) {
-          status.textContent = err instanceof Error ? err.message : 'That didn’t save';
+          status.textContent = err instanceof Error ? err.message : 'That didn\u2019t save';
           check.disabled = false;
         }
       });
@@ -154,10 +154,10 @@ export function reviewComments(d: CommentsDeps): Comments {
     }
     const w = d.where();
     const spot: Spot = { app: c.app, page: c.page, selector: c.selector };
-    const whereText = `${w && c.app !== w.app ? `${shortApp(c.app)} · ` : ''}${c.page} · ${c.what}`;
+    const whereText = `${w && c.app !== w.app ? `${shortApp(c.app)} \u00b7 ` : ''}${c.page} \u00b7 ${c.what}`;
     const el = h('div.rr-card', { 'data-state': st, tabindex: '0', role: 'button', title: 'Show it in the app' },
       h('div.rr-card-head', {},
-        h('span.rr-pin', {}, st === 'done' ? '✓' : String(c.n)),
+        h('span.rr-pin', {}, st === 'done' ? '\u2713' : String(c.n)),
         h('span.rr-avatar', { 'aria-hidden': 'true' }, (by.trim()[0] ?? '?').toUpperCase()),
         h('strong.rr-by', {}, by),
         h('span.rr-time', {}, draft ? 'not sent' : timeAgo(c.at)),
@@ -179,7 +179,7 @@ export function reviewComments(d: CommentsDeps): Comments {
     for (const b of filters.querySelectorAll<HTMLElement>('button')) b.classList.toggle('on', b.dataset.filter === filter);
     const open = state.comments.filter((c) => !c.done).length;
     count.textContent = String(open + drafts.length);
-    count.title = `${drafts.length} not sent · ${open} open · ${state.comments.length - open} done`;
+    count.title = `${drafts.length} not sent \u00b7 ${open} open \u00b7 ${state.comments.length - open} done`;
     const groups: HTMLElement[] = [];
     const ds = numbered();
     if (ds.length && shows('draft')) groups.push(h('section.rr-group', {}, h('h4', {}, 'Not sent yet'), ...ds.map((x) => card(x, 'draft'))));
@@ -187,7 +187,7 @@ export function reviewComments(d: CommentsDeps): Comments {
       const cs = state.comments.filter((c) => c.round === r.n && shows(c.done ? 'done' : 'open')).sort((a, b) => a.n - b.n);
       if (!cs.length) continue;
       const when = new Date(r.at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
-      groups.push(h('section.rr-group', {}, h('h4', {}, `Round ${r.n}`, h('span', {}, ` · ${when} · ${r.size.label ?? `${r.size.w}×${r.size.h}`}`)), ...cs.map((c) => card(c, c.done ? 'done' : 'open'))));
+      groups.push(h('section.rr-group', {}, h('h4', {}, `Round ${r.n}`, h('span', {}, ` \u00b7 ${when} \u00b7 ${r.size.label ?? `${r.size.w}\u00d7${r.size.h}`}`)), ...cs.map((c) => card(c, c.done ? 'done' : 'open'))));
     }
     if (!groups.length) {
       groups.push(h('div.rr-none', {},
@@ -201,14 +201,14 @@ export function reviewComments(d: CommentsDeps): Comments {
     input.disabled = add.disabled = !can;
     if (!d.canSend()) on.replaceChildren(h('span', {}, 'You can watch this worker, but not direct it.'));
     else if (picked) {
-      const unpin = h('button.rr-icon', { type: 'button', title: 'Make it about the whole page', 'aria-label': 'Unpin' }, '✕');
+      const unpin = h('button.rr-icon', { type: 'button', title: 'Make it about the whole page', 'aria-label': 'Unpin' }, '\u2715');
       unpin.addEventListener('click', () => {
         picked = undefined;
         paint();
         d.changed();
       });
       on.replaceChildren(h('span.rr-pin.draft', {}, String(nextN() + drafts.length + 1)), h('span.rr-on-text', {}, h('strong', {}, picked.pick.what), ` on ${picked.page}`), unpin);
-    } else on.replaceChildren(h('span.rr-on-text', {}, w ? `About ${w.page} as a whole · press C and click to pin it to something` : 'Open an app to comment on it'));
+    } else on.replaceChildren(h('span.rr-on-text', {}, w ? `About ${w.page} as a whole \u00b7 press C and click to pin it to something` : 'Open an app to comment on it'));
     const n = here().length;
     send.textContent = n ? `Send ${n === 1 ? '1 comment' : `${n} comments`} to ${d.workerName}` : `Send to ${d.workerName}`;
     send.disabled = !n || !d.canSend();
