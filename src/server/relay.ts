@@ -34,6 +34,21 @@ export function tunneledPort(req: http.IncomingMessage, officePort: number, tail
   return port && port !== officePort ? port : undefined;
 }
 
+const LOOPBACK_ADDRESS = /^(127\.\d+\.\d+\.\d+|::1|::ffff:127\.\d+\.\d+\.\d+)$/;
+/** What a proxy in front of the office adds: a request with any of them came from somewhere else. */
+const FORWARDED = ['x-forwarded-for', 'forwarded', 'x-real-ip', 'tailscale-user-login', 'cf-connecting-ip'];
+
+/**
+ * Whether a request is a browser on the office's own machine reaching a worker's server at
+ * p<port>.localhost: straight to the office's port from a loopback address, through no proxy. Such a
+ * request needs no office sign-in, since the same browser reaches 127.0.0.1:<port> without one, and the
+ * office's cookie, kept for localhost, never goes to p<port>.localhost anyway.
+ */
+export function localBrowser(req: http.IncomingMessage, officePort: number): boolean {
+  const named = /^p\d{2,5}\.localhost:(\d{1,5})$/i.exec(req.headers.host ?? '');
+  return !!named && Number(named[1]) === officePort && LOOPBACK_ADDRESS.test(req.socket?.remoteAddress ?? '') && !req.headers[RELAYED] && !FORWARDED.some((h) => req.headers[h] !== undefined);
+}
+
 /** A request that came through a tunnel: the port it's for, and that worker's server ('gone' when nothing serves it). */
 export interface Tunneled {
   port: number;

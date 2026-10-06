@@ -11,7 +11,11 @@ import { REVIEW_SCRIPT, REVIEW_TAG } from '../../shared/software-review.js';
 /** The script, served at REVIEW_SCRIPT on each worker's server. Plain JavaScript: browsers run it as it is. */
 export const OVERLAY_JS = String.raw`(function () {
   var me = document.currentScript;
-  var office = me && me.getAttribute('data-office');
+  // The office's origin, or on its own machine both its names: the one framing this page, as the
+  // browser tells it (or the page that opened it), else the first.
+  var offices = ((me && me.getAttribute('data-office')) || '').split(' ').filter(Boolean);
+  var framer = (location.ancestorOrigins && location.ancestorOrigins[0]) || (document.referrer && (function () { try { return new URL(document.referrer).origin; } catch (e) { return ''; } })());
+  var office = offices.length > 1 && offices.indexOf(framer) >= 0 ? framer : offices[0];
   if (!office || window.parent === window || window.__agentOfficeReview) return;
   window.__agentOfficeReview = true;
   var TAG = '${REVIEW_TAG}';
@@ -23,11 +27,15 @@ export const OVERLAY_JS = String.raw`(function () {
   var css = document.createElement('style');
   css.textContent = '.box{position:fixed;box-sizing:border-box;border:2px solid #0a84ff;border-radius:2px;background:rgba(10,132,255,.08);display:none}' +
     '.sel{border-color:#ff9f0a;background:rgba(255,159,10,.1)}' +
-    '.pin{position:fixed;width:22px;height:22px;margin:-11px 0 0 -11px;border-radius:50% 50% 50% 2px;background:#0a84ff;color:#fff;font:700 11px/22px system-ui,sans-serif;text-align:center;box-shadow:0 2px 6px rgba(0,0,0,.3)}';
+    '.focus{border-color:#7c5cff;background:rgba(124,92,255,.12);box-shadow:0 0 0 4px rgba(124,92,255,.18)}' +
+    '.pin{position:fixed;min-width:24px;height:24px;margin:-12px 0 0 -12px;padding:0 4px;box-sizing:border-box;border-radius:12px 12px 12px 3px;background:#7c5cff;color:#fff;font:700 12px/24px system-ui,sans-serif;text-align:center;box-shadow:0 2px 8px rgba(0,0,0,.35);border:2px solid #fff}' +
+    '.pin.draft{background:#fff;color:#5b3fff;border-color:#7c5cff}.pin.done{background:#30d158}';
   var hoverBox = document.createElement('div'); hoverBox.className = 'box';
   var selBox = document.createElement('div'); selBox.className = 'box sel';
+  var focusBox = document.createElement('div'); focusBox.className = 'box focus';
   var pinLayer = document.createElement('div');
-  root.append(css, hoverBox, selBox, pinLayer);
+  root.append(css, focusBox, hoverBox, selBox, pinLayer);
+  var focused = '';
   var cursor = document.createElement('style');
   cursor.textContent = '*{cursor:crosshair!important}';
   function post(m) { m.tag = TAG; window.parent.postMessage(m, office); }
@@ -64,18 +72,20 @@ export const OVERLAY_JS = String.raw`(function () {
     if (el && el.closest) { var svg = el.closest('svg'); if (svg) el = svg; }
     return el && el.nodeType === 1 && el !== document.documentElement && el !== document.body ? el : null;
   }
+  function find(sel) { if (!sel) return null; try { return document.querySelector(sel); } catch (e) { return null; } }
   function drawPins() {
     pinLayer.textContent = '';
     pins.forEach(function (p) {
-      var el = null; try { el = document.querySelector(p.selector); } catch (e) {}
+      var el = find(p.selector);
       if (!el) return;
       var r = el.getBoundingClientRect();
       if (r.bottom < 0 || r.top > innerHeight) return;
-      var d = document.createElement('div'); d.className = 'pin'; d.textContent = String(p.n);
-      d.style.left = r.left + 'px'; d.style.top = r.top + 'px';
+      var d = document.createElement('div'); d.className = 'pin' + (p.state === 'draft' || p.state === 'done' ? ' ' + p.state : ''); d.textContent = p.state === 'done' ? '\u2713' : String(p.n);
+      d.style.left = Math.max(12, r.left) + 'px'; d.style.top = Math.max(12, r.top) + 'px';
       pinLayer.appendChild(d);
     });
     place(selBox, picked);
+    place(focusBox, find(focused));
   }
   function setCommenting(on) {
     commenting = on;
@@ -102,10 +112,18 @@ export const OVERLAY_JS = String.raw`(function () {
     if (e.origin !== office || !m || m.tag !== TAG) return;
     if (m.t === 'comment') setCommenting(!!m.on);
     else if (m.t === 'pins') { pins = Array.isArray(m.pins) ? m.pins : []; if (!m.keep) picked = null; drawPins(); }
+    else if (m.t === 'focus') { focused = typeof m.selector === 'string' ? m.selector : ''; place(focusBox, find(focused)); }
+    else if (m.t === 'reveal') { var el = find(m.selector); if (el) el.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
     else if (m.t === 'go' && typeof m.path === 'string' && m.path.charAt(0) === '/') location.assign(m.path);
     else if (m.t === 'reload') location.reload();
     else if (m.t === 'back') history.back();
   });
+  // Keys pressed in the page reach the office's window only this way: Esc, and C for comment mode
+  // when it isn't typed into something of the app's.
+  window.addEventListener('keydown', function (e) {
+    var t = e.target, typing = t && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    if (e.key === 'Escape' || (!typing && !e.metaKey && !e.ctrlKey && !e.altKey && (e.key === 'c' || e.key === 'C'))) post({ t: 'key', key: e.key === 'Escape' ? 'Escape' : 'c' });
+  }, true);
   var where = '';
   function tellWhere() {
     var now = location.pathname + location.search + location.hash;
@@ -124,6 +142,7 @@ export const OVERLAY_JS = String.raw`(function () {
 /** The page with the review script added: first thing in its head, so it's there before the app's own. */
 export function injectOverlay(html: string, office: string): string {
   const tag = `<script src="${REVIEW_SCRIPT}" data-office="${office.replace(/[&"<>]/g, '')}" defer></script>`;
+  // (`office` may be two origins with a space between them: see relay.ts reviewOffice.)
   const head = /<head(\s[^>]*)?>/i.exec(html);
   if (head) return html.slice(0, head.index + head[0].length) + tag + html.slice(head.index + head[0].length);
   const root = /<html(\s[^>]*)?>/i.exec(html);

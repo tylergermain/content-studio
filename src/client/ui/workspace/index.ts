@@ -7,7 +7,7 @@ import { appOn } from '../../../shared/apps';
 import { store } from '../../state';
 import { designBoard } from './board';
 import { designCanvas } from './canvas';
-import { reviewTargets, softwareReview } from './review';
+import { reviewTargets, softwareReview } from './review/index';
 import { filesPanel } from './files';
 import { reportReader } from './reader';
 import { screeningRoom } from './screening';
@@ -68,7 +68,7 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
 
   for (const tab of order) {
     const b = h('button.ws-tab', { type: 'button', role: 'tab', 'aria-selected': 'false', 'data-tab': tab }, TAB_LABELS[tab], h('span.ws-count'));
-    b.addEventListener('click', () => { chosen = true; select(tab); });
+    b.addEventListener('click', () => { chosen = true; select(tab).open?.(); });
     buttons.set(tab, b);
     tabBar.append(b);
   }

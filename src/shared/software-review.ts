@@ -29,13 +29,57 @@ export interface ReviewPick {
   rect: { x: number; y: number; w: number; h: number };
 }
 
-/** A comment pinned to an element of a page, as it's sent. */
+/** A comment pinned to an element of a page, as it's sent. With no `selector` it's about the page as a whole. */
 export interface SoftwareNote {
   text: string;
   /** The page it's on (its path and query on the worker's server, or a full address). */
   page: string;
   what: string;
   selector: string;
+}
+
+/** What a comment about a whole page says it's on. */
+export const WHOLE_PAGE = 'the page as a whole';
+
+/** A comment once it's sent, as the office keeps it: numbered across the review, with who wrote it and whether it's done. */
+export interface SentComment extends SoftwareNote {
+  id: string;
+  /** Its number across the whole review, the one its pin shows. */
+  n: number;
+  /** The round it was sent in (1, 2, …). */
+  round: number;
+  /** The app it's on (its address as the worker knows it). */
+  app: string;
+  by: string;
+  at: number;
+  done?: { by: string; at: number };
+}
+
+/** One Send: the comments that went to the worker together, the app and the size they were seen at. */
+export interface ReviewRound {
+  n: number;
+  at: number;
+  by: string;
+  app: string;
+  size: { w: number; h: number; label?: string };
+}
+
+/** A worker's software review as the office keeps it: every round sent, every comment, and whether it's approved. */
+export interface SoftwareReviewState {
+  rounds: ReviewRound[];
+  comments: SentComment[];
+  approved?: { by: string; at: number; app: string };
+}
+
+export const EMPTY_REVIEW: SoftwareReviewState = { rounds: [], comments: [] };
+
+export type ReviewStatus = 'new' | 'changes' | 'approved';
+export const STATUS_LABEL: Record<ReviewStatus, string> = { new: 'Needs review', changes: 'Changes requested', approved: 'Approved' };
+
+/** Where a review stands: approved, waiting on comments that aren't done yet, or waiting for someone to look. */
+export function reviewStatus(s: SoftwareReviewState): ReviewStatus {
+  if (s.approved) return 'approved';
+  return s.comments.some((c) => !c.done) ? 'changes' : 'new';
 }
 
 const MAX_NOTES = 50;
@@ -56,8 +100,10 @@ export function cleanSoftwareNotes(raw: unknown): SoftwareNote[] | string {
     const what = field(r.what, MAX_FIELD);
     const selector = field(r.selector, MAX_FIELD);
     if (!text) return `Write each comment in up to ${MAX_TEXT.toLocaleString('en-US')} characters`;
-    if (!page || !what || !selector) return 'Pin each comment to an element of the page';
-    out.push({ text, page, what, selector });
+    if (!page) return 'Say which page each comment is on';
+    // No selector: a comment on the page as a whole.
+    if (selector && !what) return 'Say what each comment is pinned to';
+    out.push({ text, page, what: selector ? what! : WHOLE_PAGE, selector: selector ?? '' });
   }
   return out;
 }
@@ -66,15 +112,16 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 
 /**
  * The request a review sends the worker: the app (`app`, its address), the size it was seen at, and
- * each comment with the page, the element and the selector that finds it. Never an em dash.
+ * each comment with the page, the element and the selector that finds it, by its number in the review (`n`) when it has
+ * one, so the worker's answer matches the pins. Never an em dash.
  */
-export function softwareReviewText(app: string, size: { w: number; h: number; label?: string }, notes: SoftwareNote[], text?: string): string {
+export function softwareReviewText(app: string, size: { w: number; h: number; label?: string }, notes: (SoftwareNote & { n?: number })[], text?: string): string {
   const seen = `${size.label ? `${size.label}, ` : ''}${size.w}x${size.h}`;
-  const lines = notes.map((n, i) => `${i + 1}. On ${oneLine(n.page)}, ${oneLine(n.what)} (\`${n.selector}\`): ${oneLine(n.text)}`);
+  const lines = notes.map((n, i) => `${n.n ?? i + 1}. On ${oneLine(n.page)}, ${n.selector ? `${oneLine(n.what)} (\`${n.selector}\`)` : WHOLE_PAGE}: ${oneLine(n.text)}`);
   return [
     `Review comments on the running app at ${app} (seen at ${seen}):`,
     lines.join('\n'),
     ...(text?.trim() ? [text.trim()] : []),
-    'Fix these in the code and keep the server running: I review the changes in the same app as they reload. Find each element by its selector, and when you are done, say what you changed for each comment.',
+    'Fix these in the code and keep the server running: I review the changes in the same app as they reload. Find each element by its selector, and when you are done, say what you changed for each comment by its number.',
   ].join('\n\n');
 }
