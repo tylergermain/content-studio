@@ -9,8 +9,10 @@ import { designBoard } from './board';
 import { openBoardRoom } from './board/room';
 import { withRoom } from './room-attach';
 import { designCanvas } from './canvas';
+import { openCanvasRoom } from './canvas/room';
 import { reviewTargets, softwareReview } from './review/index';
 import { filesPanel } from './files';
+import { openFilesRoom } from './files-room';
 import { reportReader } from './reader';
 import { openReaderRoom } from './reader/room';
 import { screeningRoom } from './screening';
@@ -21,12 +23,12 @@ import type { Panel, Workspace, WorkspaceHost } from './types';
 // here and a case in `tabOf`, and the Record fails the typecheck until the entry exists.
 
 export const PANELS: Record<WorkspaceTab, (host: WorkspaceHost) => Panel> = {
-  canvas: designCanvas,
+  canvas: (host) => withRoom(designCanvas(host), (o) => openCanvasRoom(host, o)),
   review: softwareReview,
   watch: screeningRoom,
   board: (host) => withRoom(designBoard(host), (o) => openBoardRoom(host, o)),
   read: (host) => withRoom(reportReader(host), (o) => openReaderRoom(host, o)),
-  files: filesPanel,
+  files: (host) => withRoom(filesPanel(host), (o) => openFilesRoom(host, o)),
 };
 
 const TAB_LABELS: Record<WorkspaceTab, string> = { canvas: 'Canvas', review: 'Review', watch: 'Watch', board: 'Board', read: 'Read', files: 'Files' };

@@ -42,12 +42,15 @@ The **Screening room** opens full screen when its **Watch** tab is clicked, or a
 
 If the browser can't play a file (ProRes, often HEVC or 10-bit), the room says so and offers to ask the worker for an H.264 review copy.
 
-The **Board** and **Read** tabs open full screen too, like the screening room, with the comments down the right (Open / Done / All, a check to mark one done, the ones not sent yet first) and the review's status and **Approve** along the top:
+The **Board**, **Read**, **Canvas** and **Files** tabs open full screen too, like the screening room, with the comments down the right (Open / Done / All, a check to mark one done, the ones not sent yet first) and the review's status and **Approve** along the top:
 
 - **The image board** shows the image as big as the room allows (click it for its actual pixels), every image along a filmstrip under it (← and → step through them), two to four side by side (⌘-click them in the strip, lettered A to D), or each at the size YouTube shows it (**Y**), on its light and dark pages. **C** turns on comment mode: a click on the image pins the next comment to that point, sent as “On the point 30% across and 40% down: …”. **Approve** picks it; **Ask for variations** sends the image, or the ones side by side, back with what to try.
 - **Reports** shows the page as a sheet of paper on the dark stage, with its contents and numbered **Sources** (**Copy sources**) beside it. Select any passage and **Comment** pins the next comment to it, sent as “On the passage “…”: …”, and the passages commented on are marked on the page. **Question** over the box asks the worker about the report instead. It opens links to other reports in place and keeps web links external; PDF and HTML stay in a sandboxed frame.
 
-Comments not sent yet stay in this browser for that worker and file; a comment with nothing picked is about the whole image or document.
+- **The design canvas** shows the design on the dark stage, live as the designer saves, with its own bar (zoom, **Export PNGs**, **Import from Paper**). A click on any element pins the next comment to it, as a numbered pin on the design; **Approve** tells the designer it's final. See [Design canvas](design-canvas.md).
+- **Files** shows everything the worker made or linked as a grid, its own first and then the floor's, with **Video**, **Images**, **Docs**, **Designs** and **Other** along the top and a search (/). The one chosen previews down the right; double-click it, press Enter, or **Open in …** to take it to its own room (a cut to the screening room, a picture to the image board, a document to Reports, a design to the canvas), and Esc comes back to the grid.
+
+Comments not sent yet stay in this browser for that worker and file; a comment with nothing picked is about the whole image, document or design.
 
 What you send from an interface is one message to the worker, written by the office with each file's full path, and it follows the same rule as typing in the chat: admins, or the worker's owner within their org-chart roles. Anyone else sees the interface read-only, with the reason under the conversation. An approval changes nothing: it tells the worker the file is final and not to publish, upload or send it anywhere without your explicit go-ahead, and the office never moves, renames or tags a file. What was sent shows on the file afterwards (**Approved**, **Picked**, **Notes sent · 3**). See [the workspace and reviews](worker-chat.md#the-workspace).
 
