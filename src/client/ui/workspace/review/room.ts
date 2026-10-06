@@ -3,7 +3,7 @@ import { h, openModal } from '../../dom';
 import { store } from '../../../state';
 import { DEVICES, REVIEW_START, REVIEW_TAG, STATUS_LABEL, reviewStatus, type DeviceId, type ReviewPick, type SoftwareReviewState } from '../../../../shared/software-review';
 import type { WorkspaceHost } from '../types';
-import { approve, loadReview, markDone, myName, sendRound } from './api';
+import { approve, loadReview, markDone, myName, sendRound, isTable, startTableApp } from './api';
 import { reviewComments, type Spot } from './comments';
 import { appAddress, plainUrl, relayBase, reviewTargets, type ReviewTarget } from './targets';
 import { roomDock } from '../room-dock';
@@ -69,9 +69,11 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   const banner = h('p.rr-banner.hidden');
   const stage = h('div.rr-stage', {}, banner, device, notice, modes);
 
+  // A table's review (a TABLE subject) goes to a new agent hired at the table, and has nobody to approve to.
+  const table = isTable(host.workerId);
   const comments = reviewComments({
     workerId: host.workerId,
-    workerName: host.workerName,
+    workerName: table ? `a new agent at ${host.workerName}` : host.workerName,
     me: myName,
     canSend: () => host.canSend(),
     where: () => (target ? { app: appAddress(target), page } : undefined),
@@ -234,9 +236,28 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     approveBtn.textContent = st === 'approved' ? '\u2713 Approved' : 'Approve';
     approveBtn.classList.toggle('on', st === 'approved');
     approveBtn.disabled = !target || !host.canSend() || (st !== 'approved' && waiting);
+    approveBtn.hidden = pill.hidden = table;
     approveBtn.title = st === 'approved' ? `Approved by ${state.approved!.by}. Click to take it back.` : waiting ? 'Send or remove the comments not sent yet first' : `Tell ${host.workerName} the app is good as it is`;
     back.disabled = reload.disabled = !target;
   }
+  /** A table's way to get its app running: a new agent hired at it to run it. */
+  function startButton(): HTMLElement {
+    const b = h('button.rr-send', { type: 'button', disabled: !host.canSend(), title: host.canSend() ? '' : 'Only someone who may hire agents can start one' }, 'Start the app');
+    const said = h('p.rr-status');
+    b.addEventListener('click', async () => {
+      b.disabled = true;
+      said.textContent = 'Hiring an agent to run it\u2026';
+      try {
+        const hired = await startTableApp(host.workerId);
+        said.textContent = `${hired?.name ?? 'An agent'} is getting it running. It shows here as soon as it answers.`;
+      } catch (e) {
+        said.textContent = e instanceof Error ? e.message : 'That didn\u2019t work';
+        b.disabled = false;
+      }
+    });
+    return h('div.rr-start', {}, b, said);
+  }
+
   approveBtn.addEventListener('click', async () => {
     if (!target) return;
     approveBtn.disabled = true;
@@ -264,7 +285,8 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       const t = targets.find((x) => x.key === opts.target) ?? targets[0];
       if (t) open(t);
       else {
-        notice.replaceChildren(h('strong', {}, 'No app running yet'), h('p', {}, `When ${host.workerName} runs its app on this machine, it shows here.`));
+        if (table) notice.replaceChildren(h('strong', {}, 'No app running at this table yet'), h('p', {}, `When an agent at ${host.workerName} runs its app, or the table has its app\u2019s address, it shows here.`), startButton());
+        else notice.replaceChildren(h('strong', {}, 'No app running yet'), h('p', {}, `When ${host.workerName} runs its app on this machine, it shows here.`));
         notice.classList.remove('hidden');
         device.hidden = true;
       }

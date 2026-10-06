@@ -10,6 +10,8 @@ export interface RoomView {
   dir?: string;
   /** Its folder is a git checkout: whoever's hired there works in a worktree of it. */
   git?: boolean;
+  /** Its app's address: what its screen shows while none of its workers runs the app. */
+  url?: string;
   /** Being set up for this repository now (cloning). */
   cloning?: string;
   /** Why setting it up last didn't work. */

@@ -32,6 +32,8 @@ export interface PieceView {
    * a painting's picture (features/hanging). It's a new one whenever the piece is built again (see rebuilt).
    */
   screen?: ScreenMesh;
+  /** The other face of a screen with two (a table screen): features/screens shows on it what the front shows. */
+  screenBack?: ScreenMesh;
   /** A stock ticker's faces (features/studio), and the part of a punching bag that swings (features/playthings). */
   ticker?: ScreenMesh[];
   swing?: THREE.Object3D;
@@ -145,7 +147,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     // What the office builder picks it up by.
     built.group.userData.piece = p.id;
     site.group.add(built.group);
-    const v: PieceView = { piece: { ...p }, group: built.group, screen: built.screen, ticker: built.ticker, swing: built.swing, away: false };
+    const v: PieceView = { piece: { ...p }, group: built.group, screen: built.screen, screenBack: built.screenBack, ticker: built.ticker, swing: built.swing, away: false };
     if (built.door) site.doors.push((v.door = { x: p.x, y: 0, z: p.z, open: 0, show: built.door.show }));
     views.set(p.id, v);
     return v;

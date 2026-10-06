@@ -25,7 +25,8 @@ export function cleanReview(raw: unknown): SoftwareReviewState {
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;
     const s = (o.size && typeof o.size === 'object' ? o.size : {}) as Record<string, unknown>;
     const n = num(o.n), at = num(o.at), by = str(o.by, 200), app = str(o.app, 300), w = num(s.w), h = num(s.h);
-    return n && at && by !== undefined && app && w && h ? [{ n, at, by, app, size: { w, h, ...(str(s.label, 20) ? { label: str(s.label, 20) } : {}) } }] : [];
+    const to = str(o.to, 80);
+    return n && at && by !== undefined && app && w && h ? [{ n, at, by, app, size: { w, h, ...(str(s.label, 20) ? { label: str(s.label, 20) } : {}) }, ...(to ? { to } : {}) }] : [];
   });
   const comments: SentComment[] = (Array.isArray(r.comments) ? r.comments : []).flatMap((x) => {
     const o = (x && typeof x === 'object' ? x : {}) as Record<string, unknown>;

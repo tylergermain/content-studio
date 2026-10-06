@@ -8,7 +8,7 @@ import { FloorPlanStore } from '../src/server/floorplan.js';
 import { deskProject } from '../src/server/project-rooms.js';
 import { Ledger } from '../src/server/usage.js';
 import { WorkerManager, type WorkerEvents } from '../src/server/workers.js';
-import { cleanFurniture, type Piece } from '../src/shared/furniture.js';
+import { ROOM_MEDIA, cleanFurniture, type Piece } from '../src/shared/furniture.js';
 import { DESKS, deskBuilt, nextFreeSeat } from '../src/shared/layout.js';
 import { deskPoint, officeNav } from '../src/shared/nav.js';
 import { layoutProblems, validateLayout } from '../src/shared/office-builder.js';
@@ -66,7 +66,7 @@ test('each table keeps its block of chairs, and a floor takes twelve at most', (
   assert.equal((kept as Piece[])[0].seats, 13);
 });
 
-test('the Software Factory is seven project rooms off the hallway, a table and a TV in each, with nothing in the way', () => {
+test('the Software Factory is seven open project tables off the main aisle, each with its screen and sign, and nothing in the way', () => {
   const f = factory();
   assert.equal(layoutProblems({ desks: {}, furniture: f }, FACTORY_ROOM).size, 0);
   assert.equal(typeof validateLayout({}, f, FACTORY_ROOM), 'object');
@@ -80,18 +80,14 @@ test('the Software Factory is seven project rooms off the hallway, a table and a
   for (const t of tables) for (const s of tableSeats(t)) assert.equal(roomOf(s.x, s.z), roomOf(t.x, t.z), s.id);
   // And the hallway between the rooms is no room's.
   assert.equal(roomOf(0, 1), undefined);
-  // Each room has its TV, and an automatic door onto the hallway with the room's name over it.
-  const doors = f.filter((p) => p.kind === 'glass-door');
+  // Each table has its screen showing its app in the middle of it, and its sign hung over it with its name; none is walled in.
   for (const r of rooms) {
-    assert.equal(f.filter((p) => p.kind === 'wall-screen' && roomOf(p.x, p.z) === r.id).length, 1, r.text);
-    const door = doors.find((d) => d.text === r.text);
-    assert.ok(door, `${r.text} has a door`);
-    assert.ok((door!.z === -1 || door!.z === 1.4) && Math.abs(door!.x - r.x) < 3.1, `${r.text}'s door is on the hallway`);
+    const table = tables.find((x) => roomOf(x.x, x.z) === r.id)!;
+    const screen = f.find((p) => p.kind === 'table-display' && roomOf(p.x, p.z) === r.id);
+    assert.ok(screen && screen.x === table.x && screen.z === table.z && screen.media === ROOM_MEDIA, `${r.text} has its screen`);
+    assert.equal(f.find((p) => p.kind === 'table-sign' && roomOf(p.x, p.z) === r.id)?.text, r.text);
   }
-  // Its walls go up to the ceiling, and each is as long as it's laid down.
-  const walls = f.filter((p) => p.kind === 'tall-wall' || p.kind === 'tall-glass');
-  assert.ok(walls.length > 20);
-  for (const w of walls) assert.ok(w.w! >= 0.3 && w.w! <= 18, `${w.id} is ${w.w} long`);
+  assert.equal(f.filter((p) => p.kind === 'glass-door' && p.text !== 'Focus booth').length, 0);
   // Its rooms are named as it's asked.
   const named = softwareFactory(['API', 'Web']).filter((p) => p.kind === 'project-room').map((p) => p.text);
   assert.deepEqual(named.slice(0, 2), ['API', 'Web']);
@@ -133,10 +129,10 @@ test('a room is named and set up for a repository, cleared again, and its table 
   const set = plan.setRoom(room.id, { name: '  API  ', project: { dir: repo, repo: 'acme/api', git: true } });
   assert.equal(typeof set, 'object', String(set));
   assert.equal((set as Piece).text, 'API');
-  // Its door's sign is renamed with it, and no other room's.
-  const signs = JSON.parse(readFileSync(path.join(data, 'floorplan.json'), 'utf8')).furniture.filter((p: Piece) => p.kind === 'glass-door').map((p: Piece) => p.text);
+  // Its sign is renamed with it, and no other table's.
+  const signs = JSON.parse(readFileSync(path.join(data, 'floorplan.json'), 'utf8')).furniture.filter((p: Piece) => p.kind === 'table-sign').map((p: Piece) => p.text);
   assert.deepEqual(signs.filter((s: string) => s === 'API').length, 1);
-  assert.ok(signs.includes('Room 2'), signs.join());
+  assert.ok(signs.includes('Table 2'), signs.join());
   assert.deepEqual(plan.deskProject(chair), { room: room.id, name: 'API', dir: repo, repo: 'acme/api' });
   // It's kept, and the builder's next save has to start from it.
   assert.equal(new FloorPlanStore(data, home).deskProject(chair)?.repo, 'acme/api');
@@ -171,8 +167,11 @@ test("a worker hired at a room's table works in a worktree of the room's reposit
   const git = (...args: string[]) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...args], { cwd: repo, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
   git('init', '-q', '-b', 'main');
   writeFileSync(path.join(repo, 'README.md'), 'api\n');
+  writeFileSync(path.join(repo, '.gitignore'), '.env*\n');
   git('add', '.');
   git('commit', '-q', '-m', 'first');
+  // Its local settings, which git leaves out: a fresh worktree needs them to run the app.
+  writeFileSync(path.join(repo, '.env.local'), 'API_KEY=local\n');
 
   const agent = path.join(root, 'codex');
   writeFileSync(agent, fakeAgent, { mode: 0o755 });
@@ -203,6 +202,7 @@ test("a worker hired at a room's table works in a worktree of the room's reposit
   assert.equal(w.worktree?.root, repo);
   const folder = path.join(repo, w.worktree!.path);
   assert.ok(existsSync(path.join(folder, 'README.md')), folder);
+  assert.equal(readFileSync(path.join(folder, '.env.local'), 'utf8'), 'API_KEY=local\n');
   assert.ok(git('worktree', 'list').includes(w.worktree!.branch));
   // The worktrees folder is out of the repository's git.
   assert.match(readFileSync(path.join(repo, '.git', 'info', 'exclude'), 'utf8'), /\.agent-office/);
@@ -216,7 +216,7 @@ test("a worker hired at a room's table works in a worktree of the room's reposit
   }
   assert.equal(realpathSync(starts[0].cwd), realpathSync(folder));
   const asked = starts[0].args.join(' ');
-  assert.ok(asked.includes(w.worktree!.branch) && asked.includes('pull request'), asked);
+  assert.ok(asked.includes(w.worktree!.branch) && asked.includes('pull request') && asked.includes('run its dev server yourself'), asked);
 });
 
 test("a room worker's pull request isn't mistaken for the floor's of the same number", () => {

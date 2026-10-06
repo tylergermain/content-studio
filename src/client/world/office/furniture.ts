@@ -18,6 +18,7 @@ export type { BuiltPiece } from './furniture-kit';
 import { coffeeTable, loungeCouch, plant, pouf, type PlantSpecies } from './props';
 import { chair } from './seats';
 import { TALL_BUILDERS } from './furniture-tall';
+import { TABLE_BUILDERS } from './furniture-tables';
 
 // The office's furniture as it looks: one builder for each kind the office builder has (see
 // shared/furniture.ts for what each is and how much floor it takes). The lounge's pieces and the plants
@@ -252,6 +253,7 @@ const BUILDERS: Builders = {
   ...PLAY_BUILDERS,
   ...WHISKY_BUILDERS,
   ...TALL_BUILDERS,
+  ...TABLE_BUILDERS,
 };
 
 /**
