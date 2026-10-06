@@ -17,7 +17,7 @@ import { LIST_AT_MOST_EVERY, LIST_EVERY, freeSlot, mediaFolder, mediaListUrl, ne
 import { openScreenWindow } from './ui';
 import { WatchScreens } from './watch';
 import { RoomTvs } from './room-tv';
-import { openTableReview } from '../../ui/workspace/review/table';
+import { openTablePanel, type TablePanelDeps } from '../../ui/table-info/panel';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -48,7 +48,7 @@ interface Screen {
 const fileKey = (f: MediaFile) => `${f.name}:${f.size}`;
 
 /** Registers the video screens' tick (what's on each, and whether it's playing) and what E does at one. */
-export function installScreens(ctx: Ctx) {
+export function installScreens(ctx: Ctx, deps: TablePanelDeps) {
   const { office, camera } = ctx;
   const screens = new Map<string, Screen>();
   /** The floor they're on, and what's in its media folder: null until the office has said. */
@@ -258,18 +258,18 @@ export function installScreens(ctx: Ctx) {
       const watching = watch.hint(it.pieceId);
       if (watching) return watching;
       const tv = it.pieceId ? roomTvs.hint([...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece) : undefined;
-      if (tv) return { k: `${tv.room}:${tv.status}`, parts: [hintTitle(`\u{1f5a5}\ufe0f ${tv.room}`), key('E', 'Review the app'), aside(tv.status)] };
+      if (tv) return { k: `${tv.room}:${tv.status}`, parts: [hintTitle(`\u{1f5a5}\ufe0f ${tv.room}`), key('E', 'Branches, PRs and its app'), aside(tv.status)] };
       const file = it.pieceId ? screens.get(it.pieceId)?.player.file : undefined;
       if (!file) return { k: 'idle', parts: [hintTitle('📺 Video screen'), aside('Nothing to play yet')] };
       return { k: file.name, parts: [hintTitle(`📺 ${file.name}`), key('E', file.kind === 'video' ? 'Watch with sound' : 'Look closer')] };
     },
     use: onE((it) => {
       if (watch.open(it.pieceId)) return;
-      // A table's screen: its app in Software review, where what's sent goes to a new agent at the table.
+      // A table's screen: its panel, with every branch and what's running on each, where its app is reviewed.
       const piece = it.pieceId ? [...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece : undefined;
       if (piece?.media === ROOM_MEDIA) {
         const room = roomTvs.roomOf(piece);
-        if (room) openTableReview(room);
+        if (room) openTablePanel(room, deps);
         return;
       }
       const player = it.pieceId ? screens.get(it.pieceId)?.player : undefined;

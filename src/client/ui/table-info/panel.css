@@ -1,0 +1,116 @@
+/* A project table's panel (panel.ts), in the review rooms' frame and colors (../workspace/room.css). */
+.table-room .rr-body { grid-template-columns:minmax(0,1fr) 420px; }
+.rr-stage.ti-stage-wrap { padding:0; align-items:stretch; justify-content:flex-start; background:var(--rr-bg); }
+.ti-stage { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:28px; padding:20px 24px 40px; }
+.ti-section-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+.ti-section-head h3 { margin:0; font-size:15px; }
+.ti-count { padding:2px 8px; border-radius:999px; background:var(--rr-raise); color:var(--rr-muted); font-size:12px; font-weight:600; }
+.ti-spacer { flex:1; }
+.ti-fetched { font-size:11.5px; color:var(--rr-muted); }
+.ti-toggle { padding:5px 11px; border:1px solid var(--rr-line-2); border-radius:8px; background:var(--rr-raise); color:var(--rr-ink); font:inherit; font-size:12px; cursor:pointer; }
+.ti-toggle:hover { border-color:var(--rr-accent); }
+.ti-subhead { margin:16px 0 8px; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--rr-muted); }
+.ti-problem { margin:0; padding:10px 12px; border-radius:10px; background:rgba(255,159,10,.1); color:#ffcf80; font-size:12.5px; line-height:1.45; }
+.ti-mono { font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px; }
+.ti-plus { color:var(--rr-ok); }
+.ti-minus { color:#ff6961; }
+.ti-link { text-decoration:none; font-size:12px; padding:5px 10px; }
+
+/* The branches, as cards with a picture of what's running on each */
+.ti-cards { display:grid; grid-template-columns:repeat(auto-fill, minmax(250px, 1fr)); gap:14px; }
+.ti-card { display:flex; flex-direction:column; min-width:0; padding:0; border:1px solid var(--rr-line-2); border-radius:12px; background:var(--rr-panel); color:var(--rr-ink); font:inherit; text-align:left; cursor:pointer; overflow:hidden; }
+.ti-card:hover { border-color:rgba(255,255,255,.24); }
+.ti-card[aria-pressed=true] { border-color:var(--rr-accent); box-shadow:0 0 0 1px var(--rr-accent) inset; }
+.ti-shot { position:relative; display:grid; place-items:center; aspect-ratio:16 / 9; background:#0f0f13; border-bottom:1px solid var(--rr-line); overflow:hidden; }
+.ti-shot img, .ti-big-shot img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
+.ti-noshot { color:var(--rr-muted); font-size:12px; }
+.ti-live { position:absolute; left:8px; top:8px; padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.66); color:#5be38a; font-size:11px; font-weight:700; }
+.ti-ontv { position:absolute; right:8px; top:6px; padding:1px 6px; border-radius:6px; background:rgba(0,0,0,.66); font-size:13px; }
+.ti-apps { position:absolute; right:8px; bottom:8px; padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.66); color:#fff; font-size:11px; font-weight:600; }
+.ti-card-body { display:flex; flex-direction:column; gap:5px; min-width:0; padding:10px 12px 12px; }
+.ti-card-name { display:flex; align-items:center; gap:6px; min-width:0; }
+.ti-card-name strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:600 12.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ti-branch-icon { flex:none; color:#b5a6ff; font-size:13px; }
+.ti-tag { flex:none; padding:1px 7px; border-radius:999px; background:var(--rr-raise); color:var(--rr-muted); font-size:10.5px; font-weight:700; }
+.ti-tag.pr[data-state=open] { background:rgba(48,209,88,.14); color:var(--rr-ok); }
+.ti-tag.pr[data-state=merged] { background:rgba(163,113,247,.18); color:#c9a6ff; }
+.ti-tag.pr[data-state=closed] { background:rgba(255,69,58,.14); color:#ff8a80; }
+.ti-card-sub { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; opacity:.88; }
+.ti-card-meta { font-size:11.5px; color:var(--rr-muted); }
+.ti-checks[data-checks=pass] { color:var(--rr-ok); }
+.ti-checks[data-checks=fail] { color:#ff6961; }
+.ti-checks[data-checks=pending] { color:var(--rr-warn); }
+.ti-card-agents { display:flex; flex-wrap:wrap; gap:6px; margin-top:2px; }
+.ti-agent { display:inline-flex; align-items:center; gap:5px; padding:2px 8px 2px 6px; border-radius:999px; background:var(--rr-raise); font-size:11.5px; }
+.ti-agent-status { color:var(--rr-muted); }
+.ti-more { align-self:center; font-size:11.5px; color:var(--rr-muted); }
+.ti-dot { width:7px; height:7px; border-radius:50%; background:#8e8e98; }
+.ti-agent[data-status=working] .ti-dot { background:#0a84ff; }
+.ti-agent[data-status=needs_input] .ti-dot { background:var(--rr-warn); }
+.ti-agent[data-status=done] .ti-dot { background:var(--rr-ok); }
+
+/* Pull requests, issues and commits, as rows */
+.ti-row { display:flex; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--rr-line); border-radius:10px; background:var(--rr-panel); }
+.ti-row + .ti-row { margin-top:6px; }
+.ti-row-main { flex:1; min-width:0; }
+.ti-row-title { display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--rr-ink); font-weight:600; text-decoration:none; }
+.ti-row-title:hover { text-decoration:underline; }
+.ti-row-meta { margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--rr-muted); }
+.ti-row-meta .link-button { padding:0; border:0; background:none; color:#b5a6ff; font:11.5px ui-monospace, SFMono-Regular, Menlo, monospace; cursor:pointer; }
+.ti-row-meta .link-button:hover:not(:disabled) { text-decoration:underline; }
+.ti-row-meta .link-button:disabled { color:var(--rr-muted); cursor:default; }
+.ti-row-side { flex:none; display:flex; align-items:center; gap:6px; }
+.ti-pr-state { flex:none; padding:2px 8px; border-radius:999px; background:var(--rr-raise); color:var(--rr-muted); font-size:11px; font-weight:700; }
+.ti-pr-state[data-state=open] { background:rgba(48,209,88,.14); color:var(--rr-ok); }
+.ti-pr-state[data-state=merged] { background:rgba(163,113,247,.18); color:#c9a6ff; }
+.ti-pr-state[data-state=closed] { background:rgba(255,69,58,.14); color:#ff8a80; }
+.ti-review { padding:2px 8px; border-radius:999px; background:var(--rr-raise); color:var(--rr-muted); font-size:11.5px; }
+.ti-review[data-review=APPROVED] { background:rgba(48,209,88,.14); color:var(--rr-ok); }
+.ti-review[data-review=CHANGES_REQUESTED] { background:rgba(255,159,10,.14); color:var(--rr-warn); }
+.ti-row-side .ti-checks { font-size:12px; font-weight:600; }
+.ti-issue-dot { flex:none; width:10px; height:10px; border:2px solid var(--rr-ok); border-radius:50%; }
+.ti-label { padding:1px 8px; border:1px solid var(--label); border-radius:999px; background:color-mix(in srgb, var(--label) 22%, transparent); font-size:11px; }
+.ti-commits { display:flex; flex-direction:column; }
+.ti-commit { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:baseline; gap:10px; padding:6px 2px; border-bottom:1px solid var(--rr-line); font-size:12.5px; }
+.ti-sha { color:#b5a6ff; font:11.5px ui-monospace, SFMono-Regular, Menlo, monospace; text-decoration:none; }
+a.ti-sha:hover { text-decoration:underline; }
+.ti-commit-subject { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.ti-commit-meta { white-space:nowrap; font-size:11.5px; color:var(--rr-muted); }
+
+/* The branch picked, down the right */
+.ti-side-head { flex-shrink:0; display:flex; flex-direction:column; gap:6px; padding:16px 18px 12px; border-bottom:1px solid var(--rr-line); }
+.ti-side-name { display:flex; align-items:center; gap:8px; min-width:0; }
+.ti-side-name strong { min-width:0; overflow-wrap:anywhere; font:600 14px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ti-copy { width:26px; height:26px; margin-left:auto; font-size:13px; }
+.ti-side-where { margin:0; font-size:12.5px; line-height:1.45; color:var(--rr-muted); }
+.ti-links { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.ti-side-body { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:18px; padding:14px 18px 18px; }
+.ti-side-section { display:flex; flex-direction:column; gap:8px; }
+.ti-side-section h4 { margin:0; font-size:11px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; color:var(--rr-muted); }
+.ti-app { display:flex; flex-direction:column; gap:8px; }
+.ti-big-shot { display:grid; place-items:center; aspect-ratio:16 / 9; padding:0; border:1px solid var(--rr-line-2); border-radius:10px; background:#0f0f13; overflow:hidden; cursor:pointer; }
+.ti-big-shot:hover:not(:disabled) { border-color:var(--rr-accent); }
+.ti-big-shot:disabled { cursor:default; }
+.ti-app-row { display:flex; align-items:center; gap:8px; }
+.ti-app-label { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12.5px; }
+.rr-send.ti-review-btn { width:auto; padding:7px 12px; font-size:12.5px; }
+.ti-agent-row .ti-agent-task { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:12px; color:var(--rr-muted); }
+.ti-pr { display:flex; flex-direction:column; gap:6px; padding:10px 12px; border:1px solid transparent; border-radius:10px; background:var(--rr-raise); color:var(--rr-ink); text-decoration:none; }
+.ti-pr:hover { border-color:var(--rr-accent); }
+.ti-pr-top { display:flex; align-items:flex-start; gap:8px; }
+.ti-pr-top strong { font-size:13px; line-height:1.35; }
+.ti-pr-meta { display:flex; flex-wrap:wrap; gap:6px 10px; font-size:12px; color:var(--rr-muted); }
+.ti-pr-open { font-size:12px; color:#b5a6ff; }
+.ti-files { display:flex; flex-direction:column; }
+.ti-file { display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:8px; padding:4px 2px; font-size:12px; }
+.ti-file-status { min-width:18px; padding:1px 5px; border-radius:4px; background:var(--rr-raise); color:var(--rr-muted); font:700 10.5px ui-monospace, SFMono-Regular, Menlo, monospace; text-align:center; }
+.ti-file-status[data-status=A], .ti-file-status[data-status='?'] { background:rgba(48,209,88,.14); color:var(--rr-ok); }
+.ti-file-status[data-status=D] { background:rgba(255,69,58,.14); color:#ff8a80; }
+.ti-file-status[data-status=R] { background:rgba(163,113,247,.18); color:#c9a6ff; }
+.ti-file-path { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font:11.5px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.ti-file-count { white-space:nowrap; font:11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+@media (max-width: 960px) {
+  .table-room .rr-body { grid-template-columns:minmax(0,1fr); grid-template-rows:minmax(0,1fr) minmax(320px,55%); }
+  .ti-stage { padding:12px; }
+  .ti-cards { grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); }
+}

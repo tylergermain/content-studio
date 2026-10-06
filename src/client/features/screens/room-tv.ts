@@ -6,8 +6,8 @@ import { store } from '../../state';
 import { roomCard } from './card';
 
 // The TVs in project rooms (a screen whose media is ROOM_MEDIA): each shows its room's app as the office last
-// photographed it (server/room-screens.ts), which it asks after every POLL_MS while one's on the floor, or a card
-// saying there's no app running there yet.
+// photographed it (server/room-screens.ts), which it asks after every POLL_MS while one's on the floor, with a caption
+// along the bottom saying whose it is and which branch, or a card saying there's no app running there yet.
 
 const POLL_MS = 8000;
 const W = 1280;
@@ -17,6 +17,28 @@ interface Shot {
   at: number;
   texture: THREE.CanvasTexture;
   ready: boolean;
+}
+
+/** What the office says of a TV's picture: when it was taken, and whose server it is, its branch and how many more apps the room has running. */
+interface Seen {
+  at: number;
+  who?: string;
+  branch?: string;
+  also?: number;
+}
+
+/** The caption along the bottom of a TV's picture: the branch and whose server it is, or that it's the room's own app address. */
+function caption(g: CanvasRenderingContext2D, s: Seen) {
+  const text = [s.branch ? `\u2387 ${s.branch}` : '', s.who ?? (s.branch ? '' : 'Its app address'), s.also ? `+${s.also} more running` : ''].filter(Boolean).join('   \u00b7   ');
+  g.font = '600 28px system-ui, -apple-system, "Segoe UI", sans-serif';
+  const w = Math.min(W - 48, g.measureText(text).width + 40);
+  g.fillStyle = 'rgba(14, 14, 20, 0.8)';
+  g.beginPath();
+  g.roundRect(24, H - 76, w, 52, 12);
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.textBaseline = 'middle';
+  g.fillText(text, 44, H - 50, w - 40);
 }
 
 export class RoomTvs {
@@ -76,11 +98,11 @@ export class RoomTvs {
     try {
       const res = await fetch(`/api/room-screens?${new URLSearchParams({ floor })}`, { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok || floor !== this.floor) return;
-      const { rooms } = (await res.json()) as { rooms: Record<string, { at: number }> };
+      const { rooms } = (await res.json()) as { rooms: Record<string, Seen> };
       for (const [room, shot] of Object.entries(rooms)) {
         const had = this.shots.get(room);
         if (had?.at === shot.at) continue;
-        this.load(floor, room, shot.at, had);
+        this.load(floor, room, shot, had);
       }
       for (const [room, s] of this.shots) if (!rooms[room]) (s.texture.dispose(), this.shots.delete(room));
     } catch {
@@ -90,8 +112,9 @@ export class RoomTvs {
     }
   }
 
-  /** The picture taken `at` of `room`, drawn onto its TV's canvas once it's in (the last one stays up till then). */
-  private load(floor: string, room: string, at: number, had: Shot | undefined) {
+  /** The picture `seen` of `room`, drawn onto its TV's canvas with its caption once it's in (the last one stays up till then). */
+  private load(floor: string, room: string, seen: Seen, had: Shot | undefined) {
+    const at = seen.at;
     let shot = had;
     if (!shot) {
       const canvas = document.createElement('canvas');
@@ -107,7 +130,9 @@ export class RoomTvs {
     img.addEventListener('load', () => {
       if (floor !== this.floor || this.shots.get(room) !== shot) return;
       const canvas = shot!.texture.image as HTMLCanvasElement;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, W, H);
+      const g = canvas.getContext('2d')!;
+      g.drawImage(img, 0, 0, W, H);
+      caption(g, seen);
       shot!.texture.needsUpdate = true;
       shot!.ready = true;
     });
