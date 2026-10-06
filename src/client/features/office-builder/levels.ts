@@ -99,6 +99,13 @@ export function createLevels(deps: LevelsDeps) {
         deps.say(why ?? 'Four rooms to start from. Pick a doorway to name its room, and move or remove any of it.', why ? 'warn' : 'info');
         deps.show();
       },
+      /** The Software Factory's rooms and tables in place of the floor's furniture (Undo brings it back). */
+      factory() {
+        if (deps.busy()) return;
+        const why = draft.factory();
+        deps.say(why ?? 'Seven rooms off one hallway, each round a conference table. Save it, then set each room up for a repository from \u2630 \u203a Rooms.', why ? 'warn' : 'info');
+        deps.show();
+      },
       /** Everything upstairs, gone (Undo brings it back). */
       clearUp() {
         if (deps.busy()) return;

@@ -18,6 +18,8 @@ export interface PromptOptions {
   allowEmpty?: boolean;
   /** Offer the "own git worktree" option (only when hiring a new worker). */
   worktreeOption?: boolean;
+  /** Start with the worktree box ticked, whatever was ticked last (a project room's repository). */
+  worktreeOn?: boolean;
   /** Offer the configured agent provider choice (only when hiring a new worker). */
   providerOption?: boolean;
   specialistOption?: boolean;
@@ -60,7 +62,7 @@ export function openPrompt(opts: PromptOptions) {
   const ta = h('textarea', { rows: 7, placeholder: opts.placeholder ?? 'What should the worker work on?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
   const wtBox = h('input', { type: 'checkbox', id: 'wt-toggle' }) as HTMLInputElement;
-  wtBox.checked = worktreePref();
+  wtBox.checked = opts.worktreeOn || worktreePref();
   const wtRow = opts.worktreeOption
     ? h(
         'label',

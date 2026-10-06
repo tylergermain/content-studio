@@ -112,8 +112,10 @@ export class WorkerPrs {
     const { info } = w;
     const same = (repo?: string) => repo?.toLowerCase() === pr.repo.toLowerCase();
     this.origin ??= { repo: originRepo(this.ctx.dir) };
-    const other = same(this.origin.repo) ? undefined : info.repos?.find((r) => same(r.repo));
-    if (!same(this.origin.repo) && !other) return;
+    // A worker in its project room's repository opens its pull requests there.
+    const home = info.worktree?.root ? originRepo(info.worktree.root) : this.origin.repo;
+    const other = same(home) ? undefined : info.repos?.find((r) => same(r.repo));
+    if (!same(home) && !other) return;
     if ((other ?? info).pr?.number === pr.number) return;
     // The one it had may still be open (a second task, a follow-up): it stays its own too.
     if (!other && info.pr) info.pastPrs = [...new Set([...(info.pastPrs ?? []), info.pr.number])].filter((n) => n !== pr.number).slice(-MAX_PAST_PRS);
@@ -157,7 +159,7 @@ export class WorkerPrs {
       return `${info.name} is still ${info.status === 'needs_input' ? 'waiting on input' : info.status} — wait until it's done`;
     }
     if (info.repos?.length) return this.openPrs(w, by, as);
-    const cwd = path.join(this.ctx.dir, wt.path);
+    const cwd = path.join(this.ctx.rootOf(wt), wt.path);
     if (!existsSync(cwd)) return `${info.name}'s worktree is gone (${wt.path})`;
     info.prOpening = true;
     this.ctx.emit(w);
@@ -175,7 +177,7 @@ export class WorkerPrs {
         return { prs: [{ ...open, existed: true, dirty }], failed: [] };
       }
       await run('git', ['push', '-u', 'origin', branch], cwd, 90_000, as?.env);
-      const base = await this.pushedBranch([wt.from, this.ctx.trees.currentBranch()], branch);
+      const base = await this.pushedBranch([wt.from, this.ctx.treesAt(wt).currentBranch()], branch, this.ctx.rootOf(wt));
       const { title, body } = draftPr(info, commits, by);
       const { number, url } = await createPr(branch, base, title, body, cwd, as);
       info.pr = { number, url };

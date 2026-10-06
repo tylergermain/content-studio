@@ -162,6 +162,10 @@ export interface WorkerContext {
   readonly dir: string;
   /** Git plumbing for it. */
   readonly trees: Worktrees;
+  /** Git plumbing for the checkout the worktree `wt` is of: its project room's repository (`root`), or this floor's. */
+  treesAt(wt?: { root?: string }): Worktrees;
+  /** That checkout's folder, which the worktree's `path` is from. */
+  rootOf(wt?: { root?: string }): string;
   readonly workers: Map<string, Worker>;
   readonly events: WorkerEvents;
   /** The office's prompts, as set in ⚙️ Settings (see prompts.ts). */

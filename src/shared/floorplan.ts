@@ -73,6 +73,8 @@ export interface RoomOptions {
   flights?: 1 | 2;
   /** Read only: false on a floor saved before `mezzanine` said 'none'. Never written again. */
   loft?: boolean;
+  /** Where its workers sit: at desks and bean bags, unless it says 'tables', a floor seated only round conference tables (shared/table-seats.ts). */
+  seating?: 'desks' | 'tables';
 }
 
 /** A floor's room worked out in full, every fitting said: what the office is built from (see roomOf). */
@@ -87,8 +89,9 @@ export interface FloorRoom {
   steps: boolean;
   ceiling: CeilingKind;
   flights: 1 | 2;
+  seating: 'desks' | 'tables';
 }
-export const ROOM_DEFAULTS: FloorRoom = { tees: 1, mezzanine: 'corner', boss: true, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1 };
+export const ROOM_DEFAULTS: FloorRoom = { tees: 1, mezzanine: 'corner', boss: true, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1, seating: 'desks' };
 
 /** Room options from somewhere they can't be trusted: only what's valid and isn't the default, in RoomOptions' order. */
 export function cleanRoom(raw: unknown): RoomOptions {
@@ -111,6 +114,7 @@ export function cleanRoom(raw: unknown): RoomOptions {
     ...(ceiling !== 'tiles' ? { ceiling } : {}),
     // The second flight is the big mezzanine's: nothing else has one to add.
     ...(mezzanine === 'big' && r.flights === 2 ? { flights: 2 as const } : {}),
+    ...(r.seating === 'tables' ? { seating: 'tables' as const } : {}),
   };
 }
 
@@ -128,6 +132,7 @@ export function roomOf(plan: { room?: RoomOptions } | undefined): FloorRoom {
     steps: hasSteps(c),
     ceiling: c.ceiling ?? ROOM_DEFAULTS.ceiling,
     flights: flightsOf(c),
+    seating: c.seating ?? 'desks',
   };
 }
 

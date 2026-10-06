@@ -195,7 +195,8 @@ function cleanDesks(raw: unknown): DeskLayout | string {
  */
 export function layoutProblems(layout: OfficeLayout, room: RoomOptions = {}): Map<string, string> {
   const problems = new Map<string, string>();
-  const desks = layoutDesks(layout.desks).map((d) => ({ id: d.id, s: standingDesk(d), solid: true, level: 0 }));
+  // A floor seated only at conference tables has no desks out to be anywhere.
+  const desks = room.seating === 'tables' ? [] : layoutDesks(layout.desks).map((d) => ({ id: d.id, s: standingDesk(d), solid: true, level: 0 }));
   const pieces = layout.furniture.map((p) => ({ id: p.id, s: standingPiece(p), solid: isSolid(p), level: p.level ?? 0, p }));
   const hung = layout.furniture.some((p) => kindDef(p.kind).hangs);
   const faces = hung ? [wallFaces(layout.furniture, 0, room), wallFaces(layout.furniture, 1, room)] : [[], []];
@@ -225,14 +226,15 @@ export function layoutProblems(layout: OfficeLayout, room: RoomOptions = {}): Ma
  * layoutProblems, for the one thing being dragged about.
  */
 export function problemAt(layout: OfficeLayout, id: string, room: RoomOptions = {}): string | undefined {
-  const desk = layoutDesks(layout.desks).find((d) => d.id === id);
+  const atDesks = room.seating !== 'tables';
+  const desk = atDesks ? layoutDesks(layout.desks).find((d) => d.id === id) : undefined;
   const piece = desk ? undefined : layout.furniture.find((p) => p.id === id);
   if (!desk && !piece) return undefined;
   const s = desk ? standingDesk(desk) : standingPiece(piece!);
   const level = piece?.level ?? 0;
   const why = piece ? pieceProblem(piece, s, room, kindDef(piece.kind).hangs ? wallFaces(layout.furniture, level, room) : []) : misplaced(s, room);
   if (why || (piece && !isSolid(piece))) return why;
-  const others = [...(level ? [] : layoutDesks(layout.desks).filter((d) => d.id !== id).map(standingDesk)), ...layout.furniture.filter((p) => p.id !== id && isSolid(p) && (p.level ?? 0) === level).map(standingPiece)];
+  const others = [...(level || !atDesks ? [] : layoutDesks(layout.desks).filter((d) => d.id !== id).map(standingDesk)), ...layout.furniture.filter((p) => p.id !== id && isSolid(p) && (p.level ?? 0) === level).map(standingPiece)];
   for (const other of others) if (touching(s, other)) return `${s.label} overlaps ${other.as}`;
   return undefined;
 }

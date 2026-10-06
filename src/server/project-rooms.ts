@@ -1,4 +1,5 @@
 import { existsSync, realpathSync, statSync } from 'node:fs';
+import { seatingOf } from '../shared/table-seats.js';
 import { homedir } from 'node:os';
 import path from 'node:path';
 import type { Piece } from '../shared/furniture.js';
@@ -46,14 +47,14 @@ function safeReal(dir: string): string | undefined {
   }
 }
 
-/** Where the desk or bean bag `deskId` stands on a floor laid out as `desks` (see layoutDesks). */
-function deskSpot(desks: DeskLayout, deskId: string): { x: number; z: number } | undefined {
-  return layoutDesks(desks).find((d) => d.id === deskId) ?? DESK_BY_ID.get(deskId);
+/** Where the desk, bean bag or chair at a conference table `deskId` stands on a floor laid out as `layout` (see layoutDesks, tableSeats). */
+function deskSpot(layout: { desks: DeskLayout; furniture: readonly Piece[] }, deskId: string): { x: number; z: number } | undefined {
+  return seatingOf({ furniture: layout.furniture }).tables.get(deskId) ?? layoutDesks(layout.desks).find((d) => d.id === deskId) ?? DESK_BY_ID.get(deskId);
 }
 
 /** The project room the desk `deskId` is in on a floor with this layout, as a worker hired there keeps it; nothing when it's in none. */
 export function deskProject(layout: { desks: DeskLayout; furniture: readonly Piece[] }, deskId: string): WorkerProject | undefined {
-  const spot = deskSpot(layout.desks, deskId);
+  const spot = deskSpot(layout, deskId);
   const room = spot && projectRoomAt(layout.furniture, spot.x, spot.z);
   return room ? workerProject(room) : undefined;
 }

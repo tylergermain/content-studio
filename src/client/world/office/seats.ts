@@ -213,11 +213,14 @@ declare module '../types' {
      * just came out, in case someone is standing there.
      */
     setBeanbags(out: Set<string>): Collider[];
+    /** Puts the desks out, or away on a floor seated only at its conference tables (RoomOptions.seating). */
+    setDesksOut(out: boolean): void;
   }
 }
 
 /** The desks, each with its chair, and what's on it. */
-export const desks: Fixture = (site) => {
+export const desks: Fixture<'setDesksOut'> = (site) => {
+  const views: DeskView[] = [];
   DESKS.forEach((def, i) => {
     const view = buildDesk(def, i, site.looks.trim);
     site.group.add(view.group);
@@ -230,8 +233,21 @@ export const desks: Fixture = (site) => {
     const it: Interactable = { kind: 'desk', deskId: def.id, x: seat.x, z: seat.z, radius: 1.3 };
     site.interactables.push(it);
     view.group.userData.interact = view.interact = it;
+    views.push(view);
   });
-  return {};
+  let out = true;
+  const setDesksOut = (want: boolean) => {
+    if (want === out) return;
+    out = want;
+    for (const view of views) {
+      view.group.visible = want;
+      if (view.interact) view.interact.off = !want;
+      const at = site.colliders.indexOf(view.collider!);
+      if (want && at < 0) site.colliders.push(view.collider!);
+      else if (!want && at >= 0) site.colliders.splice(at, 1);
+    }
+  };
+  return { handle: { setDesksOut } };
 };
 
 /** Bean bags, put away until every desk is taken. */

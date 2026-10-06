@@ -29,7 +29,7 @@ Down the left, in groups. Click a card to drop one in the middle of the view, or
 
 | Group | What's in it |
 | --- | --- |
-| **Work** | Team desk, long table, podcast desk (two boom arms with mics, and a mixer), video screen and wall screen, stock ticker and market board, softbox light, camera on a tripod, backdrop |
+| **Work** | Team desk, conference table, long table, podcast desk (two boom arms with mics, and a mixer), video screen and wall screen, stock ticker and market board, softbox light, camera on a tripod, backdrop |
 | **Rooms** | Wall, glass wall and wood slat panel, each full length or short, a doorway, and a ceiling panel |
 | **Seating** | Sofa, armchair, pouf, lounge chair, stool, floor cushion |
 | **Tables** | Table, standing table, coffee table, credenza, side table |
@@ -43,6 +43,7 @@ A few notes on particular pieces:
 - **Doorway.** A frame to walk through, as long as a short wall and as tall as the others, with the room's name over the opening on both sides. Leave a gap for it in a row of walls; nothing bumps into it. *The room's name* in the panel on the right sets what it says.
 - **Ceiling panel.** A 2.4 m square of timber slats hung low (2.6 m up) on four rods from the office's ceiling, with a flat light in its middle. A few side by side make a soffit over a way in or a row of desks: the slats carry on from one panel to the next. It takes paint, and nothing bumps into it, so it hangs over desks and walkways. It only hangs over the office floor, with a clear run up to the ceiling: not upstairs, not under the big mezzanine or the corner loft, where a floor is between it and the ceiling, not over a flight of stairs and not through the elevator's shaft.
 - **Project room.** One project's room, marked out on the floor: a pale wash of its paint with a band of the paint round the edge and the room's name lying on the floor at its front. Lay it under the desks of one project; nothing bumps into it, and it stays downstairs with the desks. See [Project rooms](#project-rooms).
+- **Conference table.** A 3.6 m table with six chairs round it, two down each side and one at each end. Workers sit at it as they would at desks: each chair is a seat to hire at, with a laptop in front of it. A floor takes up to 12, and one with a worker at it can't be taken away until that worker goes home (moving it takes them with it). See [Seating](#seating).
 - **Painting.** One of the floor's own pictures in a frame, on any wall: see [Paintings](#paintings).
 - **Plants.** Every plant but the planter box comes in sizes. You bump into the planter, not the leaves. The planter box is planted end to end, with vines over its front only: its back is clear, so it can stand against a wall.
 - **Neon sign.** It hangs at head height at the front of its footprint, so on the same spot as a wall or a wood panel it lies on that wall's face. Its words and its color are the piece's.
@@ -140,6 +141,12 @@ The ceiling changes nothing about where things may stand, so it's never refused.
 
 **Kitchen** is the counter, the fridge and the coffee machine in the south-west corner. **No kitchen** takes them away, with the fridge's hum and the coffee to drink, and that corner is floor like any other. Bringing it back is refused while something stands where it goes (*Clear the floor for the kitchen first: …*).
 
+### Seating
+
+**Desks** is how the office comes: workers sit at its desks, and at the bean bags once those are all taken, plus any [conference tables](#the-catalog) on the floor. **Conference tables** seats them only round the floor's conference tables: the desks and bean bags are put away (with their signs and lamps), the hire window and the 2D view's **New task** offer the next free chair, and the floor's dog and Marc walk round the tables instead. Switching to tables is refused while anyone's at a desk or bean bag.
+
+**🏭 Software Factory layout**, under the seating choice, lays the floor out as a software factory in one go: seven project rooms, four along the north and three along the south, each walled in with a doorway onto the hallway between them and a conference table inside, the floor seated at the tables, one level, no kitchen and the lighting grid overhead. It replaces the floor's furniture (Undo brings it back) and applies when you save. Then set each room up for a repository from the [Rooms panel](#rooms-for-github-repositories).
+
 ### Wood walls
 
 Any of the room's four outside walls can be panelled in wood slats from the baseboard to the ceiling: pick **N**, **E**, **S** or **W** (north is the wall with the boards and the elevator), and **Oak** or **Walnut** for all of them. The slats run round that wall's windows and doors and behind its boards, the TV and any pictures. On the north wall they leave out the elevator, and stop where the back office opens (the last 4.6 m, east of the gong).
@@ -167,10 +174,23 @@ Whoever's hired at a desk or bean bag on a project room works in that room's pro
 - A general worker starts in the project's folder, and its first request starts with where it is: the room, the folder, the app, and not to switch branches, stash, reset or commit there unless asked, since others in the room share the folder.
 - A specialist keeps its role's own folder (so its role's instructions apply) and is told the project's folder and app the same way, even when it's hired without a task.
 - The hire window says so before you hire: *📁 The Kenna room works in /Users/you/Workspaces/kenna*, and *✨ New worker · Desk 1 · 📁 Kenna* in the 2D view's **New task**.
-- A worker in a project room with a folder can't have a worktree of the floor's own repository (the room's project is another one), so the hire window leaves that option out there.
+- A worker in a project room with a folder can't have a worktree of the floor's own repository (the room's project is another one). When the room's folder is a git checkout, the worktree option is a worktree of *that* instead, ticked to start with: see below.
 - The worker keeps its room across restarts. Moving the room later doesn't move the workers already in it; it's where their desk was when they were hired that counts.
 
 A desk in two project rooms is in the smaller one, so a room marked out inside a bigger one is its own.
+
+### Rooms for GitHub repositories
+
+**☰ › 🏭 Rooms** (and **🏭 Rooms** on the 2D view's bar) shows the floor's project rooms full screen, once it has any: each room's name, its GitHub repository, who's at its table and how many chairs are free. Choose one to see it down the right.
+
+- **Set up for a repository…** (admins) picks one of your GitHub repositories, or takes one typed as `owner/name`. The office clones it as `<owner>/<name>` into the folder new floors are cloned into (the **Workspace folder**, see [Configuration](configuration.md)), or uses a floor's checkout of it when there is one, then gives the room the repository and the folder, and names it after the repository unless you name it. The card says *Cloning…* meanwhile.
+- **Name** renames the room: what it says on the floor and over its doorway (when the doorway was named for the room, as the Software Factory's are).
+- **Clear repository** takes the repository away again (once nobody's at its table). The clone stays where it is.
+- **+ New task in this room** opens the hire window at the room's next free chair.
+
+A worker hired in a room with a repository works in a git worktree of its own of that repository, on its own branch `office/<name>`, kept in the repository's `.agent-office/worktrees` (which the office adds to that clone's `.git/info/exclude`). Its first request says which room and repository it's in, where its worktree is, and to commit there, push its branch and open a pull request with `gh` when it's ready. The office fetches the repository's branch before making the worktree, so it starts from what's on GitHub. Sending it home takes the worktree and branch away unless they hold work that isn't on GitHub, as on the floor's own repository.
+
+**🏠 Go home by themselves** (⚙️ Settings), for workers whose pull request merged, watches the floor's own repository's pull requests, so a worker in a room's repository stays until you send it home.
 
 ## Upstairs
 

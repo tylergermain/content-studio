@@ -11,7 +11,7 @@ test('the plan has every seat the office has, by the same ids', () => {
   assert.deepEqual(new Set(plan.byId.keys()), new Set(DESK_BY_ID.keys()));
   for (const [id, d] of plan.byId) assert.equal(d, DESK_BY_ID.get(id), `${id} is the office's own`);
   // Each kind of seat is in its own list, and nowhere else.
-  const lists = [plan.desks, plan.overflow, plan.stations, plan.meeting];
+  const lists = [plan.desks, plan.overflow, plan.stations, plan.meeting, plan.tables];
   assert.equal(lists.flat().length, plan.byId.size);
   assert.deepEqual(plan.overflow, BEANBAGS);
   assert.deepEqual(plan.stations, STATIONS);

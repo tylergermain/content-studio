@@ -1,4 +1,5 @@
 import { prepareSpecialist, specialistFolder } from '../specialists/profiles.js';
+import { RoomRepos } from './rooms.js';
 import { specialistLaunch } from '../specialists/launch.js';
 import { randomBytes } from 'node:crypto';
 import path from 'node:path';
@@ -6,6 +7,7 @@ import type { AgentChoice, AgentEffort, AgentProvider, TerminalHit, WorkerInfo, 
 import { AGENT_PROVIDERS, takesEffort, takesModel } from '../../shared/providers.js';
 import { Worktrees, workspaceOf, type WorktreeCleanup, type WorktreeState } from '../worktrees.js';
 import { DESK_BY_ID, STATION_AGENT, deskBuilt } from '../../shared/layout.js';
+import type { Seating } from '../../shared/table-seats.js';
 import { stationBrief } from '../stations.js';
 import type { PromptSource } from '../prompts.js';
 import type { GhAs } from '../signins.js';
@@ -72,6 +74,9 @@ export class WorkerManager {
   /** The project room a desk is in (see shared/project-rooms.ts): who's hired there works in its project. */
   projectAt?: (deskId: string) => WorkerProject | undefined;
   wing: () => number = () => 0;
+  /** The floor's seating: its conference tables' chairs, and whether those are all it has (see shared/table-seats.ts). */
+  seating: () => Seating | undefined = () => undefined;
+  private rooms: RoomRepos;
 
   constructor(
     private dir: string,
@@ -92,6 +97,7 @@ export class WorkerManager {
   ) {
     this.defaultProvider = configuredProvider(agentCmd);
     this.trees = new Worktrees(dir);
+    this.rooms = new RoomRepos(this.trees);
     this.statePath = path.join(dataDir, 'workers.json');
     // bin/office-workers.js is also the office's MCP server, for the agents that take one.
     const floor: ProviderFloor = { dataDir, mcpScript: binScript('office-workers.js'), dshProfile };
@@ -113,6 +119,8 @@ export class WorkerManager {
       setStatus: (w, status) => this.setStatus(w, status),
       resume: (id, prompt) => this.resume(id, prompt),
       cwd: (info) => this.cwd(info),
+      treesAt: (wt) => this.rooms.treesAt(wt),
+      rootOf: (wt) => wt?.root ?? this.dir,
       command: (info) => this.command(info),
       notePrompt: (w, prompt) => this.tasks.notePrompt(w, prompt),
       syncBranch: (w) => this.worktrees.syncBranch(w),
@@ -211,6 +219,9 @@ export class WorkerManager {
     return this.trees.fetch();
   }
 
+  /** Fetches the branch the project room at `deskId` has as its repository, as fetchBase does this floor's (see workers/rooms.ts). */
+  fetchRoom = (deskId: string): Promise<void> | undefined => this.rooms.fetch(this.projectAt?.(deskId));
+
   deskOccupied(deskId: string): boolean {
     for (const w of this.workers.values()) if (w.info.deskId === deskId) return true;
     return false;
@@ -232,9 +243,10 @@ export class WorkerManager {
     if (effortError) return effortError;
     const seat = DESK_BY_ID.get(deskId);
     if (!seat) return 'Unknown desk';
-    if (!deskBuilt(seat, this.wing())) return `${seat.label} isn't built yet: expand the back office first`;
+    if (!deskBuilt(seat, this.wing(), this.seating())) return seat.table ? `${seat.label} isn't at a table on this floor` : this.seating()?.only ? 'This floor seats its workers at its conference tables' : `${seat.label} isn't built yet: expand the back office first`;
     const project = seat.station || meeting ? undefined : this.projectAt?.(deskId);
-    const problem = seatProblem(seat, { kind, prompt, worktree, meeting: !!meeting, repos, provider, configured: this.defaultProvider, occupied: this.deskOccupied(deskId), stationName: seat.station && this.prompts?.stationName?.(seat.station), project });
+    const roomRepo = this.rooms.repoOf(project);
+    const problem = seatProblem(seat, { kind, prompt, worktree, meeting: !!meeting, repos, provider, configured: this.defaultProvider, occupied: this.deskOccupied(deskId), stationName: seat.station && this.prompts?.stationName?.(seat.station), project, projectGit: !!roomRepo });
     if (problem) return problem;
     if (kind === 'agent') {
       const paused = this.ledger.hiringPaused;
@@ -253,17 +265,9 @@ export class WorkerManager {
     let wt: WorkerInfo['worktree'] = meeting?.worktree;
     let others: WorkerRepo[] | undefined;
     if (worktree) {
-      const slug = `${name.toLowerCase()}-${id.slice(0, 4)}`;
-      const made = repos.length ? this.makeWorkspace(slug, repos) : this.trees.create(slug);
+      const made = this.worktrees.make(name, `${name.toLowerCase()}-${id.slice(0, 4)}`, repos, roomRepo);
       if (typeof made === 'string') return made;
-      if ('repos' in made) {
-        ({ worktree: wt, repos: others } = made);
-        for (const note of made.notes) this.events.toast(`🌿 ${name}'s worktree of ${note}`, 'info');
-      } else {
-        const { note, ...ref } = made;
-        wt = ref;
-        if (note) this.events.toast(`🌿 ${name}'s worktree ${note}`, 'info');
-      }
+      ({ worktree: wt, repos: others } = made);
     }
     const info: WorkerInfo = {
       id,
@@ -295,16 +299,12 @@ export class WorkerManager {
     this.workers.set(id, w);
     if (info.prompt) this.tasks.notePrompt(w, info.prompt);
     // A board agent is told what it's there for ahead of its first request (which is what shows).
-    const brief = seat.station && info.prompt ? stationBrief(seat.station, this.prompts) : project && (info.prompt || specialist) ? projectBrief(project, !specialist) : undefined;
+    const brief = seat.station && info.prompt ? stationBrief(seat.station, this.prompts) : project && (info.prompt || specialist) ? projectBrief(project, !specialist, wt?.root ? { folder: path.join(wt.root, wt.path), branch: wt.branch } : undefined) : undefined;
     this.launch(w, brief ? [brief, info.prompt].filter(Boolean).join('\n\n') : info.prompt, undefined);
     this.persist();
     return info;
   }
 
-  /** The workspace of a worker across repositories (see WorkerTrees.makeWorkspace). */
-  private makeWorkspace(slug: string, repos: RepoSource[]): { worktree: NonNullable<WorkerInfo['worktree']>; repos: WorkerRepo[]; notes: string[] } | string {
-    return this.worktrees.makeWorkspace(slug, repos);
-  }
 
   /** Starts a worker that isn't running again, carrying on its session, with `prompt` as its next message. */
   resume(id: string, prompt?: string): string | undefined {
@@ -690,7 +690,7 @@ export class WorkerManager {
         this.startFailed(w, `whoever hired ${info.name} (${info.createdBy}) isn't signed in to Claude — they can sign in under ☰ → 🔐 Your sign-ins, then press R here`);
         return;
       }
-      this.runAs.apply(w.owner, env, [this.dir, cwd]);
+      this.runAs.apply(w.owner, env, [this.dir, ...(info.worktree?.root ? [info.worktree.root] : []), cwd]);
     }
     adapter?.usage?.locate?.(this.handleOf(w), cwd, env);
 
@@ -855,7 +855,7 @@ export class WorkerManager {
   private cwd(info: WorkerInfo): string {
     if(info.specialist) return specialistFolder(this.dir,info.specialist);
     const rel = workspaceOf(info);
-    return rel ? path.join(this.dir, rel) : (info.project?.dir ?? this.dir);
+    return rel ? path.join(info.worktree?.root ?? this.dir, rel) : (info.project?.dir ?? this.dir);
   }
 
   private scheduleScan(w: Worker) {

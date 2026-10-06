@@ -70,8 +70,8 @@ test('a room worked out in full says every fitting, the office as it comes when 
   assert.deepEqual(roomOf(undefined), ROOM_DEFAULTS);
   assert.deepEqual(roomOf({}), ROOM_DEFAULTS);
   assert.deepEqual(roomOf({ room: { tees: 2 } }), { ...ROOM_DEFAULTS, tees: 2 });
-  assert.equal(JSON.stringify(ROOM_DEFAULTS), JSON.stringify({ tees: 1, mezzanine: 'corner', boss: true, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1 }));
-  assert.equal(JSON.stringify(roomOf({ room: { loft: false } })), JSON.stringify({ tees: 1, mezzanine: 'none', boss: false, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1 }));
+  assert.equal(JSON.stringify(ROOM_DEFAULTS), JSON.stringify({ tees: 1, mezzanine: 'corner', boss: true, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1, seating: 'desks' }));
+  assert.equal(JSON.stringify(roomOf({ room: { loft: false } })), JSON.stringify({ tees: 1, mezzanine: 'none', boss: false, kitchen: true, panels: [], wood: 'oak', meeting: 'room', steps: false, ceiling: 'tiles', flights: 1, seating: 'desks' }));
   assert.deepEqual(roomOf({ room: { mezzanine: 'big', kitchen: false, panels: ['south'], wood: 'walnut' } }), { ...ROOM_DEFAULTS, mezzanine: 'big', boss: false, kitchen: false, panels: ['south'], wood: 'walnut' });
   assert.deepEqual(roomOf({ room: { boss: false } }), { ...ROOM_DEFAULTS, boss: false });
   assert.deepEqual(roomOf({ room: { mezzanine: 'none', kitchen: false, meeting: 'forum', steps: true, ceiling: 'banners' } }), { ...ROOM_DEFAULTS, mezzanine: 'none', boss: false, kitchen: false, meeting: 'forum', steps: true, ceiling: 'banners' });

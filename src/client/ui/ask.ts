@@ -29,6 +29,8 @@ export interface AskOptions {
   workers: AskWorker[];
   /** Offer the "own git worktree" option for a new worker. */
   worktreeOption: boolean;
+  /** Its own worktree ticked to start with: a project room's repository is worked on in one (see roomWorktree). */
+  worktreeOn?: boolean;
   /** Offer the configured provider choice for a new worker. */
   providerOption?: boolean;
   /** Other floors' projects a new worker in its own worktree can work in too (see WorkerInfo.repos). */
@@ -45,8 +47,9 @@ export function openAsk(opts: AskOptions) {
   const ta = h('textarea', { rows: opts.initial ? 9 : 5, placeholder: opts.placeholder ?? 'What should the worker do?', 'aria-label': 'Prompt' }) as HTMLTextAreaElement;
   ta.value = opts.initial ?? '';
   const wtBox = h('input', { type: 'checkbox', id: 'ask-wt' }) as HTMLInputElement;
+  wtBox.checked = !!opts.worktreeOn;
   try {
-    wtBox.checked = localStorage.getItem(WT_KEY) === '1';
+    wtBox.checked ||= localStorage.getItem(WT_KEY) === '1';
   } catch {
     // storage blocked
   }

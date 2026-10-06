@@ -1,4 +1,5 @@
 import { BEANBAGS, BOARDS, DESKS, ELEVATOR, ELEVATOR_CAR, EXIT_DOOR, FLOOR, MEETING_SEATS, SEATING, SEATING_BY_ID, STATIONS, WALL_HEIGHT, WING_DESKS, seatPlace, type DeskDef, type SeatPlace } from '../layout.js';
+import { TABLE_SEATS } from '../table-seats.js';
 import { BOARD_KEYS, type BoardDef, type BoardKey, type MapPlan } from './types.js';
 
 export * from './types.js';
@@ -10,7 +11,7 @@ export * from './types.js';
 const OFFICE_DESKS: DeskDef[] = [...DESKS, ...WING_DESKS];
 
 function officePlan(): MapPlan {
-  const byId = new Map([...OFFICE_DESKS, ...BEANBAGS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
+  const byId = new Map([...OFFICE_DESKS, ...BEANBAGS, ...STATIONS, ...MEETING_SEATS, ...TABLE_SEATS].map((d) => [d.id, d]));
   const boards = {} as Record<BoardKey, BoardDef>;
   for (const k of BOARD_KEYS) boards[k] = { ...BOARDS[k] };
   return {
@@ -25,6 +26,7 @@ function officePlan(): MapPlan {
     overflow: BEANBAGS,
     stations: STATIONS,
     meeting: MEETING_SEATS,
+    tables: TABLE_SEATS,
     byId,
     seating: SEATING,
     // The office's own map of them, which follows the floor's furniture (see setFloorSeats in shared/furniture.ts).

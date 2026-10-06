@@ -3,6 +3,7 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { isAgentProvider, type AgentChoice, type AgentEffort, type AgentProvider, type GhPull, type QueueState, type QueueTask, type WorkerInfo, type WorkerStatus } from '../shared/protocol.js';
 import { DESK_BY_ID, SEATS, nextFreeSeat } from '../shared/layout.js';
+import type { Seating } from '../shared/table-seats.js';
 import { validateWorkerEffort, validateWorkerModel } from './agents.js';
 import { savedEffort, savedModel, takesEffort, takesModel } from '../shared/providers.js';
 import { PROMPTS } from '../shared/prompts.js';
@@ -16,6 +17,8 @@ export interface QueueWorkers {
   deskOccupied(deskId: string): boolean;
   /** How many rows the floor's back office is built out, for its desks (see WING). */
   wing?(): number;
+  /** The floor's seating: its conference tables' chairs, and whether those are all it has (see shared/table-seats.ts). */
+  seating?(): Seating | undefined;
   spawn(deskId: string, by: string, prompt: string, worktree: boolean, kind: 'agent', provider: AgentProvider, model?: string, effort?: AgentEffort, meeting?: undefined, owner?: string): WorkerInfo | string;
   /** Resolves with a line about what became of the worker's worktree. */
   kill(id: string): Promise<{ note?: string; error?: string }>;
@@ -281,7 +284,7 @@ export class TaskQueue {
 
   /** A free desk (in the back office too, as far as it's built), else a free bean bag. */
   private freeDesk(): string | undefined {
-    return nextFreeSeat((id) => this.workers.deskOccupied(id), this.workers.wing?.() ?? 0)?.id;
+    return nextFreeSeat((id) => this.workers.deskOccupied(id), this.workers.wing?.() ?? 0, this.workers.seating?.())?.id;
   }
 
   /**
