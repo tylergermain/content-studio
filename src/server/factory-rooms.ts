@@ -87,6 +87,7 @@ export function roomsOf(floor: Floor): RoomView[] {
       ...(p.project?.repo ? { repo: p.project.repo } : {}),
       ...(p.project?.dir ? { dir: p.project.dir } : {}),
       ...(p.project?.git ? { git: true } : {}),
+      ...(p.project?.url ? { url: p.project.url } : {}),
       ...(state && !state.error ? { cloning: state.repo } : {}),
       ...(state?.error ? { error: state.error } : {}),
       seats: seats.length,
@@ -99,11 +100,13 @@ export function roomsOf(floor: Floor): RoomView[] {
 const announce = (ctx: Ctx, floor: Floor) => ctx.toFloor(floor, { t: 'plan', plan: floor.plan.state() });
 
 /** Names a room and, with `repo`, sets it up for that repository (cloning it first). Why not, now; a clone that fails says so later. */
-export function setUpRoom(ctx: Ctx, floor: Floor, room: string, ask: { name?: string; repo?: string }, by: string): string | undefined {
+export function setUpRoom(ctx: Ctx, floor: Floor, room: string, ask: { name?: string; repo?: string; url?: string | null }, by: string): string | undefined {
   const piece = layoutFurniture(floor.plan.state()).find((p) => p.id === room && p.kind === 'project-room');
   if (!piece) return 'There is no such room on this floor';
-  if (ask.name !== undefined && !ask.repo) {
-    const r = floor.plan.setRoom(room, { name: ask.name });
+  // A new name or app address (null takes it away), with no new repository: saved as it is.
+  if ((ask.name !== undefined || ask.url !== undefined) && !ask.repo) {
+    const project = ask.url === undefined ? undefined : { ...piece.project, url: ask.url ?? undefined };
+    const r = floor.plan.setRoom(room, { ...(ask.name !== undefined ? { name: ask.name } : {}), ...(project ? { project } : {}) });
     if (typeof r === 'string') return r;
     announce(ctx, floor);
     return undefined;

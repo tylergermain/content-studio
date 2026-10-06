@@ -24,8 +24,8 @@ test("a room's TV shows the newest app a worker in the room runs, else the room'
   assert.equal(roomApp(none.ctx, none.floor, 'dojo'), undefined);
 });
 
-test("the Software Factory's rooms each have a TV set to show their app, and a screen keeps that setting", () => {
-  const tvs = softwareFactory().filter((p) => p.kind === 'wall-screen');
+test("the Software Factory's tables each have a screen set to show their app, and a screen keeps that setting", () => {
+  const tvs = softwareFactory().filter((p) => p.kind === 'table-display');
   assert.equal(tvs.length, 7);
   assert.ok(tvs.every((p) => p.media === ROOM_MEDIA));
   const kept = cleanFurniture([{ id: 'tv', kind: 'wall-screen', x: 0, z: 0, rotY: 0, media: ROOM_MEDIA }, { id: 'bad', kind: 'wall-screen', x: 3, z: 0, rotY: 0, media: '@nope' }]) as Piece[];

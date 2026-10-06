@@ -1,5 +1,5 @@
 import { releaseRoom, roomsOf, setUpRoom } from '../../factory-rooms.js';
-import { REPO_NAME } from '../../../shared/project-rooms.js';
+import { REPO_NAME, cleanProjectUrl } from '../../../shared/project-rooms.js';
 import { readBody, sameOrigin, send } from '../util.js';
 import { floorParam } from './files.js';
 import type { Route } from '../router.js';
@@ -44,7 +44,10 @@ export const roomsRoute = {
     const name = typeof b.name === 'string' && b.name.length <= 60 && !CONTROL.test(b.name) ? b.name.trim() : undefined;
     const repo = typeof b.repo === 'string' && REPO_NAME.test(b.repo.trim()) ? b.repo.trim() : undefined;
     if (b.repo !== undefined && b.repo !== '' && !repo) return send(res, 400, { error: 'Pick a repository as owner/name' });
-    const err = setUpRoom(ctx, floor, room, { name, repo }, by);
+    // An app's address, as a project room keeps one; empty takes it away.
+    const app = b.url === '' ? null : b.url === undefined ? undefined : cleanProjectUrl(b.url);
+    if (app === undefined && b.url !== undefined) return send(res, 400, { error: 'Use an http or https address for the app' });
+    const err = setUpRoom(ctx, floor, room, { name, repo, ...(app !== undefined ? { url: app } : {}) }, by);
     return err ? send(res, 400, { error: err }) : send(res, 200, { rooms: roomsOf(floor) });
   },
 } satisfies Route;

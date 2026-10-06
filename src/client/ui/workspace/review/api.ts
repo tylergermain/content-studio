@@ -2,11 +2,16 @@ import { store } from '../../../state';
 import type { SoftwareNote, SoftwareReviewState } from '../../../../shared/software-review';
 
 // Software review's requests (server/http/routes/review.ts), and the comments not sent yet, which
-// this browser keeps per floor and worker so closing the review doesn't lose them.
+// this browser keeps per floor and worker so closing the review doesn't lose them. A project table's review
+// (a subject of TABLE and its project room's id) goes to server/http/routes/table-review.ts instead.
 
-async function call(action: string, workerId: string, body?: unknown): Promise<{ state: SoftwareReviewState }> {
-  const params = new URLSearchParams({ floor: store.floor ?? '', worker: workerId });
-  const res = await fetch(`/api/review/${action}?${params}`, body === undefined
+/** A table's review is of `${TABLE}<project room id>` where a worker's is of its id. */
+export const TABLE = 'table:';
+export const isTable = (subject: string) => subject.startsWith(TABLE);
+
+async function call(action: string, workerId: string, body?: unknown): Promise<{ state: SoftwareReviewState; hired?: { id: string; name: string } }> {
+  const params = new URLSearchParams(isTable(workerId) ? { floor: store.floor ?? '', room: workerId.slice(TABLE.length) } : { floor: store.floor ?? '', worker: workerId });
+  const res = await fetch(`/api/${isTable(workerId) ? 'table-review' : 'review'}/${action}?${params}`, body === undefined
     ? { credentials: 'same-origin' }
     : { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...(body as object), by: myName() }) });
   const out = await res.json().catch(() => undefined);
@@ -24,6 +29,8 @@ export const sendRound = (workerId: string, app: string, size: { w: number; h: n
   call('notes', workerId, { requestId: messageId(), app, size, notes }).then((r) => r.state);
 export const markDone = (workerId: string, id: string, done: boolean) => call('done', workerId, { id, done }).then((r) => r.state);
 export const approve = (workerId: string, app: string, on: boolean) => call('approve', workerId, { requestId: messageId(), app, on }).then((r) => r.state);
+/** Hires a new agent at a table to get its app running: who. */
+export const startTableApp = (subject: string) => call('start', subject, { requestId: messageId() }).then((r) => r.hired);
 
 /** A comment written but not sent yet. */
 export interface Draft extends SoftwareNote {

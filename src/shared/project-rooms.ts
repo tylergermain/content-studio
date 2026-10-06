@@ -131,7 +131,11 @@ export function workerProject(p: Piece): WorkerProject {
 export function projectBrief(project: WorkerProject, inFolder: boolean, worktree?: { folder: string; branch: string }): string {
   const lines = [`You're working in the ${project.name} room of the office${project.repo ? `, on ${project.repo}` : ''}.`];
   // In a worktree of the room's repository: its own folder and branch, which nobody else works in.
-  if (worktree) lines.push(`Your working folder is your own git worktree of the project, on the branch ${worktree.branch}: ${worktree.folder}. Commit your work there, push the branch, and open a pull request with gh when it's ready.`);
+  if (worktree) {
+    lines.push(`Your working folder is your own git worktree of the project, on the branch ${worktree.branch}: ${worktree.folder}. Commit your work there, push the branch, and open a pull request with gh when it's ready.`);
+    // What the table's screen and Software review show is what its workers run: an app someone else has open isn't it.
+    lines.push("When you're asked to show, pull up or try the app, run its dev server yourself from your worktree on a free port (install its packages there first), and leave it running: that's what the table's screen and Software review show. Don't just open a server that's already running somewhere else. The project's local settings files (.env.local and the like) are copied into your worktree when there are any; never commit them.");
+  }
   else if (project.dir) lines.push(inFolder ? `Your working folder is the project itself: ${project.dir}` : `Its project is in ${project.dir}: do this task's work there, and keep any notes you make for it there too.`);
   else lines.push('The room has no project folder set yet, so ask before you assume one.');
   if (project.url) lines.push(`The project's app runs at ${project.url}.`);

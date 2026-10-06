@@ -36,12 +36,19 @@ export class RoomTvs {
     return shot?.ready ? shot.texture : this.card(room.text ?? '');
   }
 
-  /** What looking at the TV `piece` says: whose app it shows, or that there's none yet. Nothing for a screen that isn't a room's TV. */
-  hint(piece: Piece | undefined): string | undefined {
+  /** The project room (its table) the screen `piece` is in: whose app it shows, and E reviews. */
+  roomOf(piece: Piece | undefined): { id: string; name: string } | undefined {
     if (piece?.media !== ROOM_MEDIA) return undefined;
     const room = projectRoomAt(layoutFurniture(store.floorPlan), piece.x, piece.z);
-    if (!room) return 'Not in a project room';
-    return this.shots.get(room.id)?.ready ? `${room.text || 'This room'}\u2019s app, live` : `No app running in ${room.text || 'this room'} yet`;
+    return room ? { id: room.id, name: room.text || 'This table' } : undefined;
+  }
+
+  /** What looking at the screen `piece` says: whose app it shows, or that there's none yet. Nothing for a screen that isn't a table's. */
+  hint(piece: Piece | undefined): { room: string; status: string } | undefined {
+    if (piece?.media !== ROOM_MEDIA) return undefined;
+    const room = this.roomOf(piece);
+    if (!room) return { room: 'Room TV', status: 'Not in a project room' };
+    return { room: room.name, status: this.shots.get(room.id)?.ready ? 'its app, live' : 'no app running yet' };
   }
 
   private card(room: string, why?: string): THREE.CanvasTexture {

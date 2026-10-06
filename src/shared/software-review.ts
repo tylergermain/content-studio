@@ -62,6 +62,8 @@ export interface ReviewRound {
   by: string;
   app: string;
   size: { w: number; h: number; label?: string };
+  /** Who it went to, for a table's review: the new agent hired at the table to do it. */
+  to?: string;
 }
 
 /** A worker's software review as the office keeps it: every round sent, every comment, and whether it's approved. */
@@ -115,13 +117,16 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
  * each comment with the page, the element and the selector that finds it, by its number in the review (`n`) when it has
  * one, so the worker's answer matches the pins. Never an em dash.
  */
-export function softwareReviewText(app: string, size: { w: number; h: number; label?: string }, notes: (SoftwareNote & { n?: number })[], text?: string): string {
+export function softwareReviewText(app: string, size: { w: number; h: number; label?: string }, notes: (SoftwareNote & { n?: number })[], text?: string, fresh = false): string {
   const seen = `${size.label ? `${size.label}, ` : ''}${size.w}x${size.h}`;
   const lines = notes.map((n, i) => `${n.n ?? i + 1}. On ${oneLine(n.page)}, ${n.selector ? `${oneLine(n.what)} (\`${n.selector}\`)` : WHOLE_PAGE}: ${oneLine(n.text)}`);
   return [
     `Review comments on the running app at ${app} (seen at ${seen}):`,
     lines.join('\n'),
     ...(text?.trim() ? [text.trim()] : []),
-    'Fix these in the code and keep the server running: I review the changes in the same app as they reload. Find each element by its selector, and when you are done, say what you changed for each comment by its number.',
+    // A new agent at a table (fresh) has its own worktree: the app above is someone else's copy, so it runs its own.
+    fresh
+      ? 'You are new at this table, in your own worktree of the project: the app above runs from another copy of it. Make these changes in your worktree, then run its dev server from there on a free port and leave it running, so they can be reviewed at the table. Find each element by its selector, and when you are done, say what you changed for each comment by its number, then commit, push your branch and open a pull request.'
+      : 'Fix these in the code and keep the server running: I review the changes in the same app as they reload. Find each element by its selector, and when you are done, say what you changed for each comment by its number.',
   ].join('\n\n');
 }

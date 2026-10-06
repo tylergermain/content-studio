@@ -114,6 +114,10 @@ export const FURNITURE = {
   'glass-short': { label: 'Short glass wall', icon: '🔲', group: 'Rooms', w: 1.2, d: 0.1, top: 2.6, color: '#3d405b' },
   'wood-wall': { label: 'Wood slat panel', icon: '🪵', group: 'Rooms', w: 2.4, d: 0.12, top: 2.6, color: '#b98554', wall: true },
   'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554', wall: true },
+  // A screen on a post in the middle of a conference table, a face to each side of it: the table's app, live (see ROOM_MEDIA). Nothing's in the way of it.
+  'table-display': { label: 'Table screen', icon: '\u{1f5a5}\ufe0f', group: 'Work', w: 1.7, d: 0.2, top: 0, color: '#2b2d42', plays: true, use: { z: 1.4, radius: 2.6 } },
+  // A sign hung from the ceiling on two cables, its words lit on both faces: what a table's for. Nothing's in the way under it.
+  'table-sign': { label: 'Hanging sign', icon: '\u{1faa7}', group: 'Rooms', w: 2.6, d: 0.1, top: 0, color: '#ffd166', overhead: true, text: 'Project' },
   // From the floor to the ceiling, each as long as it's laid down (Piece.w): a room that's a room, with nothing over its walls.
   'tall-wall': { label: 'Wall to the ceiling', icon: '\u{1f9f1}', group: 'Rooms', w: 2.4, d: 0.14, top: WALL_HEIGHT, color: '#f1ede6', wall: true, long: [0.3, 18] },
   'tall-glass': { label: 'Glass to the ceiling', icon: '\u{1f533}', group: 'Rooms', w: 2.4, d: 0.1, top: WALL_HEIGHT, color: '#2b2d42', long: [0.3, 18] },

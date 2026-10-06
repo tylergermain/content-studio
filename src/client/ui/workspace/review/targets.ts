@@ -1,5 +1,6 @@
 import { store } from '../../../state';
 import { serviceUrl } from '../../services';
+import { layoutFurniture } from '../../../../shared/office-builder';
 
 // What a worker has to review in Software review, and where this browser reaches it.
 
@@ -14,8 +15,30 @@ export interface ReviewTarget {
 
 const LOCAL = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::(\d{1,5}))?(\/.*)?$/i;
 
+/**
+ * What a project table has to review (its subject `table:<project room id>`): the servers the workers at it run, and
+ * its app's address when that's somewhere else or a server the office knows; one on this machine it doesn't know
+ * isn't relayed (server/relay.ts), so it isn't offered.
+ */
+function tableTargets(room: string): ReviewTarget[] {
+  const out: ReviewTarget[] = store.services.items
+    .filter((s) => store.workers.get(s.workerId)?.project?.room === room)
+    .sort((a, b) => b.since - a.since)
+    .map((s) => ({ key: `port:${s.port}`, label: `${store.workers.get(s.workerId)?.name ?? 'An agent'}\u2019s · port ${s.port}`, port: s.port }));
+  const piece = layoutFurniture(store.floorPlan).find((p) => p.id === room);
+  const url = piece?.project?.url;
+  if (url) {
+    const local = LOCAL.exec(url);
+    const port = local ? Number(local[1] || 80) : undefined;
+    if (port && !out.some((t) => t.port === port) && store.services.items.some((s) => s.port === port)) out.push({ key: `port:${port}`, label: `${piece?.text ?? 'Its'} app · port ${port}`, port });
+    else if (!local) out.push({ key: `url:${url}`, label: `${piece?.text ?? 'Its'} app`, direct: url });
+  }
+  return out;
+}
+
 /** What a worker has to review: the servers it started, and its project room's app when that's somewhere else. */
 export function reviewTargets(workerId: string): ReviewTarget[] {
+  if (workerId.startsWith('table:')) return tableTargets(workerId.slice('table:'.length));
   const out: ReviewTarget[] = store.services.items
     .filter((s) => s.workerId === workerId)
     .sort((a, b) => a.port - b.port)

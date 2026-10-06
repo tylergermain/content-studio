@@ -2,7 +2,7 @@
 // of them in workers.json, making them, keeping each worker's branch up to date, noticing one deleted
 // from under a worker and putting it back, and what becomes of them when the worker goes home.
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
+import { copyFileSync, existsSync, readdirSync, rmdirSync, unlinkSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import type { WorkerInfo, WorkerRepo } from '../../shared/protocol.js';
 import { normalizeRepo } from '../../shared/floors.js';
@@ -64,6 +64,24 @@ export function lostMessage(info: WorkerInfo): string {
   return `${info.name}'s worktree ${workspaceOf(info)} was deleted outside agent-office — rebuild it or send ${info.name} home from its desk`;
 }
 
+/** A project's local settings files, which git leaves out (its keys), as a fresh worktree of it needs them to run. */
+const LOCAL_SETTINGS = ['.env', '.env.local', '.env.development', '.env.development.local'];
+
+/** Copies the room repository `root`'s local settings files into its new worktree `to`, those that are there and aren't in git. */
+export function copyLocalSettings(root: string, to: string) {
+  for (const name of LOCAL_SETTINGS) {
+    const from = path.join(root, name);
+    if (!existsSync(from) || existsSync(path.join(to, name))) continue;
+    try {
+      // Only what git ignores: a tracked .env is in the worktree already.
+      execFileSync('git', ['check-ignore', '-q', name], { cwd: root, stdio: 'ignore' });
+      copyFileSync(from, path.join(to, name));
+    } catch {
+      // not ignored (so it's in git), or it couldn't be copied: the worker's told to look
+    }
+  }
+}
+
 /** The worktrees of one floor's workers (see WorkerContext). */
 export class WorkerTrees {
   constructor(private ctx: WorkerContext) {}
@@ -81,6 +99,7 @@ export class WorkerTrees {
     }
     const { note, ...ref } = made;
     if (note) this.ctx.events.toast(`\u{1f33f} ${name}'s worktree ${note}`, 'info');
+    if (room) copyLocalSettings(room, path.join(room, ref.path));
     return { worktree: room ? { ...ref, root: room } : ref };
   }
 

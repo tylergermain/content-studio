@@ -12,6 +12,8 @@ export interface BuiltPiece {
   group: THREE.Group;
   /** A screen on it: a team desk's monitor (features/workstation), a video screen's face (features/screens). */
   screen?: ScreenMesh;
+  /** The face on the other side of a screen that has two (a table screen), showing what the front does. */
+  screenBack?: ScreenMesh;
   /** The faces of a stock ticker, which the market's prices slide along (features/studio). UV 0 to 1 across each. */
   ticker?: ScreenMesh[];
   /** The part of it that swings when it's hit (a punching bag), about its own origin (features/playthings). */

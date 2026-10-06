@@ -17,6 +17,7 @@ import { LIST_AT_MOST_EVERY, LIST_EVERY, freeSlot, mediaFolder, mediaListUrl, ne
 import { openScreenWindow } from './ui';
 import { WatchScreens } from './watch';
 import { RoomTvs } from './room-tv';
+import { openTableReview } from '../../ui/workspace/review/table';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -170,6 +171,14 @@ export function installScreens(ctx: Ctx) {
   }
 
   const roomTvs = new RoomTvs();
+  /** Puts `texture` on a face as it is, in place of its dark glass. */
+  const showOn = (face: THREE.Mesh, texture: THREE.Texture) => {
+    const mat = face.material as THREE.MeshBasicMaterial;
+    if (mat.map === texture) return;
+    mat.map = texture;
+    mat.color.set('#ffffff');
+    mat.needsUpdate = true;
+  };
   const frustum = new THREE.Frustum();
   const m = new THREE.Matrix4();
 
@@ -201,7 +210,10 @@ export function installScreens(ctx: Ctx) {
       if (v.piece.media === ROOM_MEDIA) {
         // A project room's TV: its app as it is now, or a card saying there's none (room-tv.ts).
         s.named = ROOM_MEDIA;
-        s.player.idle(roomTvs.texture(v.piece));
+        const shown = roomTvs.texture(v.piece);
+        s.player.idle(shown);
+        // A table screen's other face shows the same.
+        if (v.screenBack) showOn(v.screenBack, shown);
         s.player.tick(dt, false);
         continue;
       }
@@ -246,14 +258,20 @@ export function installScreens(ctx: Ctx) {
       const watching = watch.hint(it.pieceId);
       if (watching) return watching;
       const tv = it.pieceId ? roomTvs.hint([...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece) : undefined;
-      if (tv) return { k: tv, parts: [hintTitle('\u{1f4fa} Room TV'), aside(tv)] };
+      if (tv) return { k: `${tv.room}:${tv.status}`, parts: [hintTitle(`\u{1f5a5}\ufe0f ${tv.room}`), key('E', 'Review the app'), aside(tv.status)] };
       const file = it.pieceId ? screens.get(it.pieceId)?.player.file : undefined;
       if (!file) return { k: 'idle', parts: [hintTitle('📺 Video screen'), aside('Nothing to play yet')] };
       return { k: file.name, parts: [hintTitle(`📺 ${file.name}`), key('E', file.kind === 'video' ? 'Watch with sound' : 'Look closer')] };
     },
     use: onE((it) => {
       if (watch.open(it.pieceId)) return;
-      if (it.pieceId && [...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece.media === ROOM_MEDIA) return;
+      // A table's screen: its app in Software review, where what's sent goes to a new agent at the table.
+      const piece = it.pieceId ? [...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece : undefined;
+      if (piece?.media === ROOM_MEDIA) {
+        const room = roomTvs.roomOf(piece);
+        if (room) openTableReview(room);
+        return;
+      }
       const player = it.pieceId ? screens.get(it.pieceId)?.player : undefined;
       const file = player?.file;
       if (!floor || !player || !file) return void toast(`📺 Drop videos in ${folder()}`);

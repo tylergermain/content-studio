@@ -157,7 +157,7 @@ export class FloorPlanStore {
       // Its door's sign, when it was named for the room (as the Software Factory's are), goes by the new name too.
       const b = pieceBox(room);
       for (const d of furniture) {
-        if ((d.kind !== 'doorway' && d.kind !== 'glass-door') || !was || d.text !== was) continue;
+        if ((d.kind !== 'doorway' && d.kind !== 'glass-door' && d.kind !== 'table-sign') || !was || d.text !== was) continue;
         const db = pieceBox(d);
         if (db.maxX > b.minX - 0.5 && db.minX < b.maxX + 0.5 && db.maxZ > b.minZ - 0.5 && db.minZ < b.maxZ + 0.5) d.text = room.text;
       }

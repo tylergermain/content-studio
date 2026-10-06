@@ -1,6 +1,7 @@
 import './panel.css';
 import { h, timeAgo, STATUS_LABEL } from '../dom';
 import { openRoomShell } from '../workspace/room-shell';
+import { openTableReview } from '../workspace/review/table';
 import { store } from '../../state';
 import type { RoomView } from '../../../shared/factory';
 import type { RepoChoice } from '../../../shared/protocol';
@@ -97,8 +98,14 @@ export function openRoomsPanel(d: RoomsDeps): { close(): void } {
     if (picking) return paintPicker(r);
     const name = h('input.rr-address.rm-name', { value: r.name, maxlength: 28, 'aria-label': 'Room name', disabled: !admin }) as HTMLInputElement;
     name.addEventListener('change', () => void act('/api/rooms/setup', { room: r.id, name: name.value.trim() }, `Renamed to ${name.value.trim()}.`));
+    // Its app's address: what its screen shows while none of its workers runs the app.
+    const app = h('input.rr-address.rm-app', { value: r.url ?? '', placeholder: 'http://localhost:3000', 'aria-label': 'Its app\u2019s address', disabled: !admin }) as HTMLInputElement;
+    app.addEventListener('change', () => void act('/api/rooms/setup', { room: r.id, url: app.value.trim() }, app.value.trim() ? `Its screen shows ${app.value.trim()} while nobody here runs the app.` : 'Its screen shows only what its workers run.'));
     const task = h('button.rr-send', { type: 'button', disabled: !r.free }, r.free ? '+ New task in this room' : 'No free chair at its table');
     task.addEventListener('click', () => r.free && d.hireAt(r.free));
+    // Its app in Software review: what's sent from there goes to a new agent at the table.
+    const review = h('button.rr-ghost', { type: 'button', title: 'Review its app at any size and comment on it: a new agent here does what you send' }, '\u{1f9ea} Review the app');
+    review.addEventListener('click', () => openTableReview({ id: r.id, name: r.name }));
     const setUp = h('button.rr-ghost', { type: 'button', disabled: !admin || !!r.cloning }, r.repo ? 'Change repository\u2026' : 'Set up for a repository\u2026');
     setUp.addEventListener('click', () => {
       picking = true;
@@ -107,7 +114,7 @@ export function openRoomsPanel(d: RoomsDeps): { close(): void } {
     const clear = h('button.rr-ghost.rm-danger', { type: 'button', disabled: !admin || !r.repo || r.agents.length > 0, title: r.agents.length ? 'Send its workers home first' : 'The room keeps its name; its clone stays where it is' }, 'Clear repository');
     clear.addEventListener('click', () => void act('/api/rooms/release', { room: r.id }, `${r.name} is empty again.`));
     side.replaceChildren(
-      h('div.rm-side-head', {}, h('label.rm-label', {}, 'Name'), name, h('p.rm-repo-line', {}, r.repo ? h('a', { href: `https://github.com/${r.repo}`, target: '_blank', rel: 'noopener' }, r.repo) : 'No repository yet'), r.dir ? h('p.rm-dir', {}, r.dir) : ''),
+      h('div.rm-side-head', {}, h('label.rm-label', {}, 'Name'), name, h('label.rm-label', {}, 'App address'), app, h('p.rm-repo-line', {}, r.repo ? h('a', { href: `https://github.com/${r.repo}`, target: '_blank', rel: 'noopener' }, r.repo) : 'No repository yet'), r.dir ? h('p.rm-dir', {}, r.dir) : ''),
       h('div.rm-side-body', {},
         h('h4', {}, 'At its table'),
         r.agents.length ? h('div.rm-agents', {}, ...r.agents.map((a) => {
@@ -116,7 +123,7 @@ export function openRoomsPanel(d: RoomsDeps): { close(): void } {
           return b;
         })) : h('p.rm-muted', {}, r.repo ? 'Nobody yet. A new task here gets a worktree of its own of the repository.' : 'Nobody yet.'),
         h('div.rm-actions', {}, setUp, clear)),
-      h('div.rm-side-foot', {}, task, status));
+      h('div.rm-side-foot', {}, h('div.rm-row', {}, task, review), status));
   }
 
   function paintPicker(r: RoomView) {
