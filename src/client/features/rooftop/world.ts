@@ -288,8 +288,7 @@ export function buildRooftop(night: NightParts, floors: number): Rooftop {
       const pz = alongX ? ez : z0 + a;
       statics.add(mesh(new THREE.BoxGeometry(0.06, 0.75, 0.06), steel, px, 0.8, pz, false));
     }
-    // As high as the rail: it keeps you up here unless you jump up onto it, and off it by parachute (see features/parachute).
-    colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: ROOF_RAIL });
+    colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: ROOF_RAIL }); // As high as the rail: over it by parachute (see features/parachute).
   }
 
   // The elevator, in its housing: a back wall and a roof over the shaft (as tall as a floor), and the light on top of its mast (mast.ts).
