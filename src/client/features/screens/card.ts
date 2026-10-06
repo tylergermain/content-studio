@@ -101,6 +101,11 @@ export function idleCard(folder: string): THREE.CanvasTexture {
   return draw({ title: 'Nothing to play yet', lead: 'Drop videos in', boxed: wrapPath(folder, 54), foot: 'MP4 or WebM · they loop here, a different one on each screen' });
 }
 
+/** A project room's TV while there's no picture of its app: none's running there yet (see room-tv.ts). */
+export function roomCard(room: string, why?: string): THREE.CanvasTexture {
+  return draw({ title: room || 'This room', lead: why ?? 'No app running here yet', boxed: ['Start the app’s dev server in this room,', 'or give the room its app’s address'], foot: 'This TV shows the room’s app as it is now' });
+}
+
 /** There are files, but none of them plays in this browser. */
 export function troubleCard(names: readonly string[], folder: string): THREE.CanvasTexture {
   const shown = names.slice(0, 4);

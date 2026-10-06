@@ -12,6 +12,7 @@ import { agentsPanelRoute } from './agents-panel.js';
 import { assistantRoute } from './assistant.js';
 import { roomsRoute } from './rooms.js';
 import { reviewQueueRoute } from './review-queue.js';
+import { roomScreensRoute } from './room-screens.js';
 import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
@@ -49,6 +50,7 @@ export const routes: readonly Route[] = [
   assistantRoute,
   roomsRoute,
   reviewQueueRoute,
+  roomScreensRoute,
   sharesRoute,
   specialistRoute,
   skillLibraryRoute,

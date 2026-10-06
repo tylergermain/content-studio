@@ -16,6 +16,8 @@ export interface BuiltPiece {
   ticker?: ScreenMesh[];
   /** The part of it that swings when it's hit (a punching bag), about its own origin (features/playthings). */
   swing?: THREE.Object3D;
+  /** It's a door that opens by itself for anyone who comes up to it (an automatic door): how open it looks, 0 shut to 1 open. */
+  door?: { show(open: number): void };
 }
 
 /**
