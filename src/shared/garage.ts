@@ -1,10 +1,12 @@
+import { SURFACES, groundAt, type Surface } from './car-ground.js';
 import { FLOOR, ROAD, WALL_T } from './layout.js';
 import { STREET_END, onLoop } from './scenic.js';
 
-// The Lambos and Ferraris in the garage, which anyone can drive: where they're parked, where you can
-// take them (the garage, the lots round it, the street and the scenic loop off either end of it), and
-// the arcade physics a driver's own page runs. Everyone else on the floor sees the car where its
-// driver says it is.
+// The Lambos and Ferraris in the garage, which anyone can drive: where they're parked, where the road
+// is (the garage, the lots round it, the street and the scenic loop off either end of it) and where
+// else they go (off it, across the grass, see shared/car-ground.ts), and the arcade physics a driver's
+// own page runs: flat out at well over 200 km/h, sliding when it turns harder than the tyres hold, and
+// drifting on the handbrake. Everyone else on the floor sees the car where its driver says it is.
 
 export type CarKind = 'lambo' | 'ferrari';
 
@@ -83,12 +85,18 @@ export interface CarPose {
   rotY: number;
   speed: number;
   steer: number;
+  /** How fast it's sliding sideways (m/s, + toward its left): in a drift, or knocked from the side. */
+  slip?: number;
+  /** How fast it's turning (radians a second, + to the left): its own steering, or spun round in a crash. */
+  spin?: number;
 }
 
 /** A car as the office has it: where it is, and who's in it (PeerInfo ids). */
 export interface CarState extends CarPose {
   driver?: string;
   passenger?: string;
+  /** Whose page drives it when nobody's in it (a PeerInfo id): a racer it's put on the grid (see shared/race.ts). */
+  bot?: string;
 }
 
 /** Every car in its spot, as the office starts. */
@@ -96,60 +104,118 @@ export function parked(): CarState[] {
   return CARS.map((c) => ({ x: c.x, z: c.z, rotY: c.rotY, speed: 0, steer: 0 }));
 }
 
-/** The pedals and the wheel: `gas` 1 forward, -1 back (braking first if you're going the other way), `turn` +1 hard left. */
+/**
+ * The pedals and the wheel: `gas` 1 forward, -1 back (braking first if you're going the other way),
+ * `turn` +1 hard left, `brake` the handbrake (it slows the car, and with the wheel turned the back
+ * comes round in a drift), and `boost` the nitro, for a higher top speed while the gas is down.
+ */
 export interface Pedals {
   gas: number;
   turn: number;
   brake: boolean;
+  boost?: boolean;
 }
 
 export const DRIVE = {
-  /** Flat out, forward and in reverse (m/s). */
-  top: 20,
-  reverse: 7,
-  /** Speeding up, forward and back, and slowing down on the brake or rolling (m/s²). */
-  accel: 8,
-  reverseAccel: 5,
-  brake: 20,
-  coast: 2.5,
+  /** Flat out on the road, and with the boost (m/s): 223 and 310 km/h. Off the road it's less (see Surface.top). */
+  top: 62,
+  boostTop: 86,
+  reverse: 12,
+  /** Off the line on the gas, and with the boost (m/s²): less and less as it nears its top speed. */
+  accel: 15,
+  boostAccel: 24,
+  reverseAccel: 7,
+  /** The brakes (S going forward), the handbrake, and rolling with nothing pressed (m/s²). */
+  brake: 32,
+  handbrake: 11,
+  coast: 3,
   /** Between the axles (m): how tight it turns. */
   wheelbase: 2.8,
-  /** How far the front wheels turn at a crawl (radians): less the faster you go, so it doesn't spin out. */
+  /** How far the front wheels turn at a crawl (radians): less the faster you go. */
   steer: 0.6,
   /** How fast they turn (radians a second). */
-  steerRate: 2.8,
+  steerRate: 3.2,
+  /** The most the tyres hold sideways on the road (m/s²): turn harder than that and the car runs wide. */
+  grip: 28,
+  /** How fast a slide sideways dies away while the tyres hold (m/s²), and on the handbrake. */
+  hold: 45,
+  drift: 6,
+  /** How quickly its turning follows the wheel (1/s). */
+  yawRate: 9,
+  /** The fastest it spins on the handbrake (radians a second). */
+  driftSpin: 2.4,
 } as const;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
 /** How far the front wheels can turn at `speed`. */
 export function steerLimit(speed: number): number {
-  return DRIVE.steer / (1 + Math.abs(speed) / 9);
+  return DRIVE.steer / (1 + Math.abs(speed) / 14);
 }
 
-/** The car `dt` seconds on, with these pedals: a bicycle model, no sliding. */
-export function drive(p: CarPose, pedals: Pedals, dt: number): CarPose {
+/** The tightest a car corners at `speed` on `ground` without sliding (m): the tyres' grip, or the wheel's lock. */
+export function turnRadius(speed: number, ground: Surface = SURFACES.road): number {
+  const v = Math.max(0.1, Math.abs(speed));
+  return Math.max(DRIVE.wheelbase / Math.tan(steerLimit(v)), (v * v) / (DRIVE.grip * ground.grip));
+}
+
+/**
+ * The car `dt` seconds on, with these pedals, on `ground`: a bicycle model whose turning is as much as
+ * the tyres hold. The way the car's going in the world doesn't turn with it by itself, so what it turns
+ * out from under becomes a slide sideways, which the tyres then pull back into line: quickly when they
+ * grip, hardly at all on the handbrake. A knock (slip and spin from a crash) dies away the same way.
+ */
+export function drive(p: CarPose, pedals: Pedals, dt: number, ground: Surface = SURFACES.road): CarPose {
   const want = clamp(pedals.turn, -1, 1) * steerLimit(p.speed);
   const steer = p.steer + clamp(want - p.steer, -DRIVE.steerRate * dt, DRIVE.steerRate * dt);
   let v = p.speed;
+  let slip = p.slip ?? 0;
+  let spin = p.spin ?? 0;
   const toward = (target: number, rate: number) => (v += clamp(target - v, -rate * dt, rate * dt));
   const gas = clamp(pedals.gas, -1, 1);
-  if (pedals.brake) toward(0, DRIVE.brake);
-  else if (gas > 0) {
-    if (v < 0) toward(0, DRIVE.brake);
-    else v = Math.min(DRIVE.top, v + DRIVE.accel * gas * dt);
+  const boost = !!pedals.boost && gas > 0;
+  const top = (boost ? DRIVE.boostTop : DRIVE.top) * ground.top;
+  const back = DRIVE.reverse * ground.top;
+  const roll = DRIVE.coast + ground.drag;
+  if (gas > 0) {
+    if (v < 0) toward(0, DRIVE.brake * ground.grip);
+    else if (v < top) v = Math.min(top, v + (boost ? DRIVE.boostAccel : DRIVE.accel) * gas * (1 - 0.65 * (v / top)) * dt);
+    // Faster than it can go here (run off the road, the boost let go): it eases down to it.
+    else toward(top, roll + 4);
   } else if (gas < 0) {
-    if (v > 0) toward(0, DRIVE.brake);
-    else v = Math.max(-DRIVE.reverse, v + DRIVE.reverseAccel * gas * dt);
-  } else toward(0, DRIVE.coast);
-  const yaw = (v * Math.tan(steer)) / DRIVE.wheelbase;
-  const mid = p.rotY + (yaw * dt) / 2;
+    if (v > 0) toward(0, DRIVE.brake * ground.grip);
+    else if (v > -back) v = Math.max(-back, v + DRIVE.reverseAccel * gas * dt);
+    else toward(-back, roll + 4);
+  } else toward(0, roll);
+  const sliding = pedals.brake && Math.abs(v) > 4;
+  if (pedals.brake) toward(0, DRIVE.handbrake * Math.max(0.5, ground.grip));
+  // Turning: as the wheel says, as far as the tyres hold; on the handbrake the back comes round past that.
+  const bike = (v * Math.tan(steer)) / DRIVE.wheelbase;
+  const most = (DRIVE.grip * ground.grip) / Math.max(4, Math.abs(v));
+  const target = sliding ? clamp(bike * 1.3, -DRIVE.driftSpin, DRIVE.driftSpin) : clamp(bike, -most, most);
+  spin += (target - spin) * Math.min(1, DRIVE.yawRate * ground.grip * dt);
+  if (Math.abs(spin) < 1e-4 && !target) spin = 0;
+  const heading = p.rotY + spin * dt;
+  // Its velocity in the world (along its nose, and sideways to its left), seen from where its nose points now.
+  const s0 = Math.sin(p.rotY), c0 = Math.cos(p.rotY);
+  const vx = s0 * v + c0 * slip;
+  const vz = c0 * v - s0 * slip;
+  const s1 = Math.sin(heading), c1 = Math.cos(heading);
+  v = vx * s1 + vz * c1;
+  slip = vx * c1 - vz * s1;
+  const hold = (sliding ? DRIVE.drift : DRIVE.hold) * ground.grip;
+  slip -= clamp(slip, -hold * dt, hold * dt);
+  if (Math.abs(slip) < 1e-3) slip = 0;
+  if (Math.abs(v) < 1e-3 && gas === 0) v = 0;
   return {
-    x: p.x + Math.sin(mid) * v * dt,
-    z: p.z + Math.cos(mid) * v * dt,
-    rotY: Math.atan2(Math.sin(p.rotY + yaw * dt), Math.cos(p.rotY + yaw * dt)),
+    x: p.x + (s1 * v + c1 * slip) * dt,
+    z: p.z + (c1 * v - s1 * slip) * dt,
+    rotY: wrap(heading),
     speed: v,
     steer,
+    slip,
+    spin,
   };
 }
 
@@ -185,6 +251,50 @@ export function onPavement(p: { x: number; z: number; rotY: number }): boolean {
   return true;
 }
 
+/** Whether (x, z) is somewhere a car can be at all: the road, or the ground off it (not the sea, the lake, or off the map). */
+export function drivable(x: number, z: number): boolean {
+  return groundAt(x, z, paved(x, z)) !== null;
+}
+
+/** Whether the whole car is somewhere it can be: its corners, and halfway along each side, on the road or the ground. */
+export function onGround(p: { x: number; z: number; rotY: number }): boolean {
+  const w = CAR.width / 2;
+  const l = CAR.length / 2;
+  for (const [lx, lz] of [
+    [w, l],
+    [-w, l],
+    [w, -l],
+    [-w, -l],
+    [w, 0],
+    [-w, 0],
+  ]) {
+    const at = carPoint(p, lx, lz);
+    if (!drivable(at.x, at.z)) return false;
+  }
+  return true;
+}
+
+/** What's under the car's wheels, between them: half off the road, it has half the road's grip. Null where it can't be. */
+export function groundUnder(p: { x: number; z: number; rotY: number }): Surface | null {
+  let grip = 0, top = 0, drag = 0;
+  let worst: Surface | null = null;
+  for (const [lx, lz] of [
+    [0.8, 1.4],
+    [-0.8, 1.4],
+    [0.8, -1.4],
+    [-0.8, -1.4],
+  ]) {
+    const at = carPoint(p, lx, lz);
+    const g = groundAt(at.x, at.z, paved(at.x, at.z));
+    if (!g) return null;
+    grip += g.grip / 4;
+    top += g.top / 4;
+    drag += g.drag / 4;
+    if (!worst || g.grip < worst.grip) worst = g;
+  }
+  return { name: worst!.name, grip, top, drag };
+}
+
 /** Whether the car's footprint (a rectangle turned by rotY) overlaps box `b` (separating axes). */
 export function overlaps(p: { x: number; z: number; rotY: number }, b: Box): boolean {
   const hx = CAR.width / 2;
@@ -205,9 +315,9 @@ export function overlaps(p: { x: number; z: number; rotY: number }, b: Box): boo
   return true;
 }
 
-/** Whether the car can be at `p`: on the pavement, clear of all of `solids`. */
+/** Whether the car can be at `p`: on the road or the ground off it, clear of all of `solids`. */
 export function carFits(p: { x: number; z: number; rotY: number }, solids: Iterable<Box>): boolean {
-  if (!onPavement(p)) return false;
+  if (!onGround(p)) return false;
   for (const b of solids) if (overlaps(p, b)) return false;
   return true;
 }

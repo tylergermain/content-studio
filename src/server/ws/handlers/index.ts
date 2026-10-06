@@ -5,6 +5,7 @@ import { accountsHandlers } from './accounts.js';
 import { ballHandlers, ballHooks, ballView } from './ball.js';
 import { cabinetHandlers, cabinetHooks, cabinetView } from './cabinet.js';
 import { carHandlers, carHooks, carsView } from './car.js';
+import { raceView } from './race.js';
 import { changesHandlers, changesHooks } from './changes.js';
 import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
@@ -92,6 +93,7 @@ export const views: ViewPieces = {
   ball: ballView,
   hoop: hoopView,
   cars: carsView,
+  race: raceView,
   jukebox: jukeboxView,
   whiteboard: whiteboardView,
   meeting: meetingView,

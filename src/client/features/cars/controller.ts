@@ -1,25 +1,28 @@
-import { CAR, SEATS, carFits, carPoint, drive, onPavement, type Box, type CarPose, type CarSeat, type Pedals } from '../../../shared/garage';
-import { LOOP_PAVED, nearLoop } from '../../../shared/scenic';
+import { CAR, SEATS, carPoint, groundUnder, type CarPose, type CarSeat, type Pedals } from '../../../shared/garage';
 import type { PlayerController } from '../../player';
+import { stepCar, type StepEvents, type StepWorld } from './physics';
 import type { Fleet } from './world';
 
 // Driving the cars in the garage: E at one gets you in (behind the wheel, or beside whoever's
 // there), and it takes hold of you (PlayerController.rig) until you get out. The driver's page runs
-// the car (shared/garage.ts) and tells the office where it's got to; everyone else's follows it.
+// the car (shared/garage.ts, features/cars/physics.ts) and tells the office where it's got to;
+// everyone else's follows it. Shift is the boost while there's any left in it, Space the handbrake.
 
 export interface DriveHooks {
   /** The car you're driving has got to `pose`: tell the office, for everyone else on the floor. */
   moved(car: number, pose: CarPose): void;
-  /** You ran into something at `speed` m/s, at (x, z). */
-  bump(at: { x: number; z: number }, speed: number): void;
+  /** What it runs into, and what happens when it does (traffic.ts). */
+  world(): StepWorld;
+  events(car: number): StepEvents;
+  /** Held where it is, brakes on, till a race's lights go out. */
+  held(): boolean;
 }
 
 /** How often the office hears where your car is, at most (seconds). */
 const SEND_EVERY = 0.066;
-/** How soon after one crunch another can sound (seconds). */
-const BUMP_EVERY = 0.35;
-/** The longest step a car takes in one go (m), so it never jumps a lamp post between two frames. */
-const STEP = 0.25;
+/** How long a full boost lasts (seconds), and how long it takes to fill up again off it. */
+const BOOST_LASTS = 4;
+const BOOST_FILLS = 12;
 
 const wrap = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -29,10 +32,13 @@ export class Driver {
   seat: CarSeat | null = null;
   /** How hard you're on the gas (-1 in reverse), for the engine. */
   gas = 0;
+  /** How much boost is left (0 to 1), whether it's on now, and what's under the wheels. */
+  nitro = 1;
+  boosting = false;
+  ground = 'road';
   /** Seconds behind the wheel (or beside it), for how often things happen. */
   private clock = 0;
   private sent = { at: -Infinity, x: 0, z: 0, rotY: 0, speed: 0, steer: 0 };
-  private bumpedAt = -Infinity;
   /** The way the car pointed last frame, to turn a first-person view along with it. */
   private yaw = 0;
   /** How the third-person camera was before you got in: it pulls back to see the car. */
@@ -154,90 +160,46 @@ export class Driver {
     this.clock += dt;
     if (this.driving) {
       const p = this.player;
+      const held = this.hooks.held();
+      const gas = held ? 0 : (p.holding('KeyW', 'ArrowUp') ? 1 : 0) - (p.holding('KeyS', 'ArrowDown') ? 1 : 0);
+      this.boosting = gas > 0 && this.nitro > 0 && p.holding('ShiftLeft', 'ShiftRight');
+      this.nitro = Math.min(1, Math.max(0, this.nitro + (this.boosting ? -dt / BOOST_LASTS : dt / BOOST_FILLS)));
       const pedals: Pedals = {
-        gas: (p.holding('KeyW', 'ArrowUp') ? 1 : 0) - (p.holding('KeyS', 'ArrowDown') ? 1 : 0),
+        gas,
         turn: (p.holding('KeyA', 'ArrowLeft') ? 1 : 0) - (p.holding('KeyD', 'ArrowRight') ? 1 : 0),
-        brake: p.holding('Space'),
+        brake: held || p.holding('Space'),
+        boost: this.boosting,
       };
-      this.gas = pedals.gas;
+      this.gas = gas;
       const from = this.fleet.cars[car].pose;
-      const pose = this.move(from, pedals, dt, this.fleet.solids(car, { x: from.x, z: from.z, r: CAR.length + Math.abs(from.speed) * dt + 1 }));
+      const pose = stepCar(car, from, pedals, dt, this.hooks.world(), this.hooks.events(car));
+      this.ground = groundUnder(pose)?.name ?? 'grass';
       this.fleet.place(car, pose);
       this.send(car, pose);
     }
     this.sit(dt);
   }
 
-  /**
-   * The car `dt` on from `from`: in short steps, stopping at whatever's in the way. At an angle to
-   * it, the car slides along it (along the scenic loop's edge, the way the road curves); head on,
-   * it bounces back off.
-   */
-  private move(from: CarPose, pedals: Pedals, dt: number, solids: Box[]): CarPose {
-    const n = Math.max(1, Math.ceil((Math.abs(from.speed) * dt) / STEP));
-    const h = dt / n;
-    // Already in something (someone parked on top of you): drive out of it any way you like.
-    const stuck = !carFits(from, solids);
-    let pose = from;
-    for (let i = 0; i < n; i++) {
-      const next = drive(pose, pedals, h);
-      if (stuck ? onPavement(next) : carFits(next, solids)) {
-        pose = next;
-        continue;
-      }
-      // Sliding keeps only the part of the move along what's in the way (the town's things are all
-      // square to the street; the loop's edge goes the way the road does), and only that much of the
-      // speed; the car swings round to run along it. `off` is the way off what it's run into.
-      const dx = next.x - pose.x;
-      const dz = next.z - pose.z;
-      const want = Math.hypot(dx, dz) || 1;
-      const slides: { to: CarPose; keep: number; heading: number; off: { x: number; z: number } }[] = [
-        { to: { ...next, z: pose.z }, keep: Math.abs(dx) / want, heading: Math.sign(dx) * (Math.PI / 2), off: { x: 0, z: -Math.sign(dz) } },
-        { to: { ...next, x: pose.x }, keep: Math.abs(dz) / want, heading: dz > 0 ? 0 : Math.PI, off: { x: -Math.sign(dx), z: 0 } },
-      ].filter((q) => q.keep > 0.25 && carFits(q.to, solids));
-      const road = nearLoop(pose.x, pose.z);
-      if (road && road.off < LOOP_PAVED + 2) {
-        // Along the road here, and in off its edge toward the middle: round the outside of a bend,
-        // going straight on along it runs a little off, so it's nudged back in as it goes.
-        const run = dx * road.tx + dz * road.tz;
-        const inward = road.off > 1e-6 ? { x: (road.x - pose.x) / road.off, z: (road.z - pose.z) / road.off } : { x: 0, z: 0 };
-        const base = { ...next, x: pose.x + road.tx * run, z: pose.z + road.tz * run };
-        const to = [0, 0.04, 0.12, 0.25].map((d) => ({ ...base, x: base.x + inward.x * d, z: base.z + inward.z * d })).find((q) => carFits(q, solids));
-        const keep = Math.abs(run) / want;
-        if (to && keep > 0.25) slides.push({ to, keep, heading: Math.atan2(road.tx * Math.sign(run), road.tz * Math.sign(run)), off: inward });
-      }
-      const along = slides.sort((a, b) => b.keep - a.keep)[0];
-      if (along) {
-        this.bumped(pose, Math.abs(next.speed) * (1 - along.keep));
-        const slid = { ...along.to, speed: next.speed * along.keep };
-        // Backing along it, it's the tail that leads.
-        const heading = along.heading + (next.speed < 0 ? Math.PI : 0);
-        const rotY = wrap(slid.rotY + wrap(heading - slid.rotY) * 0.3);
-        // Swinging round about its middle takes its far end into it: a nudge off it, the way it came.
-        const off = along.off;
-        const turned = [0, 0.03, 0.08].map((d) => ({ ...slid, rotY, x: slid.x + off.x * d, z: slid.z + off.z * d })).find((q) => carFits(q, solids));
-        pose = turned ?? slid;
-        continue;
-      }
-      this.bumped(pose, Math.abs(pose.speed));
-      pose = { ...pose, steer: next.steer, speed: -pose.speed * 0.3 };
-      break;
-    }
-    return pose;
+  /** The car you're driving knocked (by another car) to `pose`. */
+  knocked(pose: CarPose) {
+    if (this.car === null || !this.driving) return;
+    this.fleet.place(this.car, pose);
+    this.send(this.car, pose, true);
   }
 
-  /** Ran into something, losing `speed` m/s of the car's: a crunch, if it's enough to hear. */
-  private bumped(pose: CarPose, speed: number) {
-    if (speed < 2 || this.clock - this.bumpedAt < BUMP_EVERY) return;
-    this.bumpedAt = this.clock;
-    this.hooks.bump(carPoint(pose, 0, (Math.sign(pose.speed) * CAR.length) / 2), speed);
+  /** The car you're driving set down at `at`, stopped: lined up on a race's grid. */
+  teleport(at: { x: number; z: number; rotY: number }) {
+    if (this.car === null || !this.driving) return;
+    const pose: CarPose = { ...at, speed: 0, steer: 0, slip: 0, spin: 0 };
+    this.fleet.place(this.car, pose);
+    this.send(this.car, pose, true);
   }
 
-  /** Tells the office where the car is, every so often while it's going (and once more when it stops). */
-  private send(car: number, pose: CarPose) {
+  /** Tells the office where the car is, every so often while it's going (and once more when it stops); `now`, straight away. */
+  private send(car: number, pose: CarPose, now = false) {
     const s = this.sent;
     const changed = Math.abs(pose.x - s.x) + Math.abs(pose.z - s.z) > 0.01 || Math.abs(wrap(pose.rotY - s.rotY)) > 0.004 || pose.speed !== s.speed || Math.abs(pose.steer - s.steer) > 0.02;
-    if (!changed || this.clock - s.at < SEND_EVERY) return;
+    if (!now && (!changed || this.clock - s.at < SEND_EVERY)) return;
     this.sent = { at: this.clock, x: pose.x, z: pose.z, rotY: pose.rotY, speed: pose.speed, steer: pose.steer };
     this.hooks.moved(car, pose);
   }

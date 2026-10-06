@@ -27,6 +27,7 @@ import { meeting } from './meeting';
 import { minigolf } from './minigolf';
 import { notify } from './notify';
 import { prompts } from './prompts';
+import { race } from './race';
 import { services } from './services';
 import { signins } from './signins';
 import { sky } from './sky';
@@ -75,4 +76,5 @@ export const SLICES: readonly Slice[] = [
   minigolf,
   heli,
   fridayProxy,
+  race,
 ];

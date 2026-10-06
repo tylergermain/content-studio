@@ -74,10 +74,10 @@ const welcome = () =>
   });
 
 /** What a floor you arrive on fires, in order. */
-const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'heli'];
+const FLOOR_TOPICS = ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'meeting', 'decor', 'floorPlan', 'services', 'dog', 'jukebox', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'heli', 'race'];
 
 /** Every topic, to listen for them all. */
-const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'puttRolled', 'heli', 'fridayProxy', 'proxyQuota'] as const;
+const TOPICS = ['peers', 'workers', 'issues', 'pulls', 'chat', 'project', 'screens', 'team', 'upgrade', 'services', 'decor', 'floorPlan', 'usage', 'limits', 'queue', 'me', 'accounts', 'signins', 'notify', 'machine', 'floors', 'floor', 'projectsDir', 'repos', 'dog', 'jukebox', 'sky', 'theme', 'leaveOnMerge', 'whiteboard', 'drawing', 'cabinet', 'cabinetFrame', 'meeting', 'prompts', 'ball', 'cars', 'goat', 'hoopBoard', 'pig', 'whisky', 'street', 'putt', 'puttBoard', 'puttRolled', 'heli', 'fridayProxy', 'proxyQuota', 'race'] as const;
 
 /** Every message the store takes in (and one it doesn't), and the topics it fires, in the order it has always fired them. */
 const RUN: [ServerMsg, string[]][] = [
@@ -127,6 +127,7 @@ const RUN: [ServerMsg, string[]][] = [
   [msg({ t: 'hoop.board', board: { shots: [{ name: 'Ann', color: '#fff', dist: 7.2, at: 1 }], wins: [] }, latest: { name: 'Ann', dist: 7.2, rank: 1, first: true } }), ['hoopBoard']],
   [msg({ t: 'pig', pig: null }), ['pig']],
   [msg({ t: 'cars', cars: [{ x: 0, z: 0, rotY: 0, speed: 0, steer: 0 }] }), ['cars']],
+  [msg({ t: 'race', race: null }), ['race']],
   [msg({ t: 'street', street: { cards: [{ id: 'acme', name: 'Acme', plot: 'P3', accent: '#ff8800', skin: 'brick', stage: 'site', home: 'hosted', storeys: [] }] } }), ['street']],
   [msg({ t: 'putt', rounds: [{ id: 'r1', stage: 'forming', hole: 0, turn: 0, players: [], starter: 'p-a', since: 1, until: 2 }] }), ['putt']],
   [msg({ t: 'putt.rolled', round: 'r1', id: 'p-a', hole: 0, path: [0, 0, 0], events: [], startAt: 1, power: 0.5, rest: { x: 0, y: 0, z: 0 }, holed: false, out: null, taken: 1 }), ['puttRolled']],
@@ -239,7 +240,7 @@ test('what the browser remembers keeps its keys and shapes', () => {
 
 test("the store's keys are its state, as window.__office shows them", () => {
   // As the office had them before its store was split into slices: methods and the slices aren't among them.
-  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drams', 'drawing', 'floor', 'floorPlan', 'floors', 'fridayProxy', 'goat', 'goatStart', 'heli', 'heliPose', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'proxyQuota', 'pulls', 'puttBoard', 'puttLatest', 'puttRolls', 'puttRounds', 'queue', 'repos', 'screens', 'services', 'signins', 'sky', 'street', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
+  assert.deepEqual(Object.keys(store).sort(), ['accounts', 'ball', 'cabinet', 'cabinetFrame', 'cars', 'carsAt', 'chat', 'clock', 'decor', 'dog', 'dogStart', 'drams', 'drawing', 'floor', 'floorPlan', 'floors', 'fridayProxy', 'goat', 'goatStart', 'heli', 'heliPose', 'hoopBoard', 'hoopLatest', 'ice', 'integrations', 'invites', 'issues', 'jukebox', 'leaveOnMerge', 'limits', 'machine', 'me', 'meeting', 'notify', 'peers', 'pig', 'profile', 'project', 'projectsDir', 'prompts', 'proxyQuota', 'pulls', 'puttBoard', 'puttLatest', 'puttRolls', 'puttRounds', 'queue', 'race', 'raceAt', 'repos', 'screens', 'services', 'signins', 'sky', 'street', 'studio', 'subs', 'team', 'theme', 'ticker', 'upgrade', 'usage', 'watch', 'whiteboard', 'workers', 'you']);
 });
 
 test('a new store starts every field where it always has', async () => {
@@ -273,6 +274,7 @@ test('a new store starts every field where it always has', async () => {
       street: { cards: [] },
       puttRounds: [], puttBoard: { record: null, best: [null, null, null, null, null, null, null, null, null], aces: [], rounds: [] }, puttLatest: null, puttRolls: [],
       heli: { pose: HOME, landed: true, stage: 'parked', pad: 'park', crew: [] }, heliPose: { pose: HOME, at: 0 },
+      race: null, raceAt: 0,
     },
   );
 });

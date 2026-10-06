@@ -275,7 +275,7 @@ test('welcomes a browser and dispatches what it sends', async () => {
   assert.equal(ada?.name, 'Ada');
   assert.equal(ada?.color, '#ff8a5b');
   assert.equal(ada?.floor, floor.id);
-  assert.deepEqual(Object.keys(welcome).slice(-25), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'hoop', 'cars', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch', 'whisky', 'street', 'putt', 'heli']);
+  assert.deepEqual(Object.keys(welcome).slice(-26), ['floor', 'project', 'workers', 'issues', 'pulls', 'queue', 'decor', 'plan', 'services', 'dog', 'goat', 'ball', 'hoop', 'cars', 'race', 'jukebox', 'whiteboard', 'meeting', 'cabinet', 'studio', 'ticker', 'watch', 'whisky', 'street', 'putt', 'heli']);
   assert.deepEqual(welcome.whisky, [], 'nobody has a dram yet');
   // Main Street, Putt Street and Friday One are the building's: nobody has claimed a plot or teed off yet, and Friday One is on its pad.
   assert.deepEqual(welcome.street, { cards: [] });

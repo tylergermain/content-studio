@@ -3,13 +3,15 @@
  * horn, laps of the scenic loop, and a car shoving you out of its way. Placing you anywhere gets you
  * out first: see the driver's activity, and placeAt in core/place.ts.
  */
-import { CARS, SEAT_HIPS, type CarSeat } from '../../../shared/garage';
+import { CARS, SEAT_HIPS, type CarPose, type CarSeat } from '../../../shared/garage';
 import { PLACES, placeAt as loopPlace } from '../../../shared/scenic';
 import type { Ctx, Hint } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { Driver } from './controller';
 import { DESK_KEYS } from '../../interaction';
 import { LapTimer, lapTime } from './laps';
+import { raceControls } from './race';
+import { Traffic } from './traffic';
 import { store } from '../../state';
 import { clip, h, toast } from '../../ui/dom';
 
@@ -30,12 +32,40 @@ export interface CarsDeps {
 /** Registers the office's first message router (a floor's cars snap to where they are): install it before any other `onAny`. */
 export function installCars(ctx: Ctx, deps: CarsDeps) {
   const { office } = ctx;
+  const send = (t: 'car.drive' | 'car.push', car: number, p: CarPose) => ctx.net.send({ t, car, x: p.x, z: p.z, rotY: p.rotY, speed: p.speed, steer: p.steer, slip: p.slip ?? 0, spin: p.spin ?? 0 });
+  /** When the last crunch sounded, by car: a scrape along a wall is one crunch, not sixty a second. */
+  const crunchedAt = new Map<number, number>();
+  // The other cars this page moves (bots, cars you knocked rolling), and what happens when cars meet.
+  const traffic: Traffic = new Traffic(office.cars, {
+    drive: (car, p) => send('car.drive', car, p),
+    push: (car, p) => send('car.push', car, p),
+    hit: (car, by, k) => ctx.net.send({ t: 'car.hit', car, by, dvx: k.x, dvz: k.z, dspin: k.spin }),
+    crunch: (car, at, speed) => {
+      const now = performance.now();
+      if (speed < 2 || now - (crunchedAt.get(car) ?? -Infinity) < 350) return;
+      crunchedAt.set(car, now);
+      ctx.sound.crash({ x: at.x, y: ctx.player.street + 0.5, z: at.z }, speed);
+      if (car === driver.car) ctx.shake(Math.min(0.9, speed / 18));
+    },
+    knocked: (pose) => driver.knocked(pose),
+    mine: () => (driver.driving ? driver.car : null),
+    go: () => race.go(),
+    finished: (car) => race.finished(car),
+  });
   // Behind the wheel of one of the garage's cars.
   const driver = new Driver(ctx.player, office.cars, {
-    moved: (car, p) => ctx.net.send({ t: 'car.drive', car, x: p.x, z: p.z, rotY: p.rotY, speed: p.speed, steer: p.steer }),
-    bump: (at, speed) => {
-      ctx.sound.crash({ x: at.x, y: ctx.player.street + 0.5, z: at.z }, speed);
-      ctx.shake(Math.min(0.8, speed / 15));
+    moved: (car, p) => send('car.drive', car, p),
+    world: () => traffic.world(),
+    events: (car) => traffic.events(car),
+    held: () => race.held(),
+  });
+  const race = raceControls(ctx, driver);
+  // Faster, the view widens: the road rushing by at the edges, more so on the boost.
+  ctx.view.add({
+    fov: (fov) => {
+      if (!driver.driving || !driver.pose) return fov;
+      const kick = Math.min(16, Math.max(0, (Math.abs(driver.pose.speed) - 18) * 0.28));
+      return fov + kick + (driver.boosting ? 6 : 0);
     },
   });
   /** car.enter and car.leave of yours the office hasn't answered yet: until it has, you're where you say you are. */
@@ -124,10 +154,11 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
     },
     // In a car, E gets you out and H honks (W A S D and Space drive, see Driver); nothing else is in reach.
     key: (e) => {
-      if (e.code !== 'KeyE' && e.code !== 'KeyH' && e.code !== 'KeyF' && !(e.code in DESK_KEYS)) return false;
+      if (e.code !== 'KeyE' && e.code !== 'KeyH' && e.code !== 'KeyF' && e.code !== 'KeyR' && !(e.code in DESK_KEYS)) return false;
       if (e.repeat) return true;
       if (e.code === 'KeyE') getOut();
       else if (e.code === 'KeyH') honk();
+      else if (e.code === 'KeyR') race.key();
       return true;
     },
     hint: (el) => renderDriveHint(el),
@@ -172,14 +203,15 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
   }
 
   ctx.ticks.add('vehicles', ({ dt, now }) => {
-    // The cars first, so whoever's riding in one sits in it where it's got to.
-    office.cars.update(dt, store.cars, store.carsAt, now, driver.active ? { car: driver.car!, driving: driver.driving } : null, ctx.camera.position);
+    // The bots and rolling cars this page moves, then every car where it is, so whoever's riding in one sits in it where it's got to.
+    traffic.update(dt);
+    office.cars.update(dt, store.cars, store.carsAt, now, driver.active ? { car: driver.car!, driving: driver.driving } : null, traffic.local(), ctx.camera.position);
   });
   /** When a car last shoved you out of its way. */
   let shovedAt = 0;
   ctx.ticks.add('moved', ({ now }) => {
-    // Timing a lap of the scenic loop, behind the wheel.
-    if (driver.driving && driver.pose) {
+    // Timing a lap of the scenic loop, behind the wheel (not while racing: the race keeps the time).
+    if (driver.driving && driver.pose && !race.racing()) {
       const lap = laps.update(driver.pose.x, driver.pose.z, now / 1000);
       if (lap !== null) lapDone(lap);
     } else laps.reset();
@@ -200,9 +232,9 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
     if (!ctx.upTop()) {
       for (const [i, c] of store.cars.entries()) {
         const mine = driver.car === i && driver.driving;
-        if (!c.driver && !mine) continue;
+        if (!c.driver && !c.bot && !mine) continue;
         const pose = office.cars.cars[i]?.pose ?? c;
-        engines.push({ car: i, at: { x: pose.x, y: ctx.player.street + 0.5, z: pose.z }, speed: pose.speed, gas: mine ? driver.gas : Math.min(1, Math.abs(pose.speed) / 10) });
+        engines.push({ car: i, at: { x: pose.x, y: ctx.player.street + 0.5, z: pose.z }, speed: pose.speed, gas: mine ? driver.gas : Math.min(1, Math.abs(pose.speed) / 30), skid: Math.min(1, Math.abs(pose.slip ?? 0) / 7) });
       }
     }
     ctx.sound.setEngines(engines);
@@ -229,13 +261,17 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
   }
 
   ctx.messages.on('cars', (msg) => carNews(!!msg.answer));
+  // Someone's car ran into yours (or a bot of yours): its knock.
+  ctx.messages.on('car.hit', (msg) => traffic.kicked(msg.car, msg.by, { x: msg.dvx, z: msg.dvz, spin: msg.dspin }));
   ctx.messages.on('car.honk', (msg) => {
     if (msg.car >= 0 && msg.car < CARS.length) ctx.sound.honk(carAt(msg.car), CARS[msg.car].kind === 'lambo');
   });
   // A floor's cars where they are before anything asks if there's room to stand beside one (see welcome):
   // right after the store has them, before any other message handler.
   ctx.messages.onAny((msg) => {
-    if (msg.t === 'welcome' || msg.t === 'floor.enter') office.cars.snap(store.cars);
+    if (msg.t !== 'welcome' && msg.t !== 'floor.enter') return;
+    traffic.clear();
+    office.cars.snap(store.cars);
   });
 
   /** Back after a reconnect, which let go of your seat for you: back into it if it's still free. */
@@ -278,9 +314,12 @@ export function installCars(ctx: Ctx, deps: CarsDeps) {
       const done = laps.done && now - laps.done.at < 6 ? laps.done : null;
       const running = laps.running(now);
       const lap = done ? ` · 🏁 ${lapTime(done.time)}${done.best ? ' best!' : ''}` : running !== null ? ` · ⏱ ${lapTime(running)}` : '';
+      const nitro = Math.round(driver.nitro * 100);
+      const off = driver.ground === 'road' ? '' : ` · on the ${driver.ground}`;
+      const r = race.rKey();
       hint = {
-        k: `drive|${kmh}|${other}|${where}|${lap}`,
-        parts: [h('span.title', {}, `🏎️ ${CARS[i].name}`), aside(`${kmh} km/h${where}${lap}${other ? ` · with ${clip(other, 20)}` : ''}`), key('W A S D', 'Drive'), key('Space', 'Brake'), key('H', 'Honk'), key('E', 'Get out')],
+        k: `drive|${kmh}|${other}|${where}|${lap}|${nitro}|${off}|${r}`,
+        parts: [h('span.title', {}, `🏎️ ${CARS[i].name}`), aside(`${kmh} km/h${off}${where}${lap}${other ? ` · with ${clip(other, 20)}` : ''}`), key('W A S D', 'Drive'), key('Shift', `Boost ${nitro}%`), key('Space', 'Handbrake'), ...(r ? [key('R', r)] : []), key('H', 'Honk'), key('E', 'Get out')],
       };
     } else {
       const at = name(c?.driver);
