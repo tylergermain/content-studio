@@ -16,6 +16,7 @@ import { cars } from './cars';
 import { decor } from './decor';
 import { dog } from './dog';
 import { floorPlan } from './floor-plan';
+import { fridayProxy } from './friday-proxy';
 import { goat } from './goat';
 import { heli } from './heli';
 import { hoop } from './hoop';
@@ -73,4 +74,5 @@ export const SLICES: readonly Slice[] = [
   street,
   minigolf,
   heli,
+  fridayProxy,
 ];

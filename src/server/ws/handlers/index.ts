@@ -9,6 +9,7 @@ import { changesHandlers, changesHooks } from './changes.js';
 import { decorHandlers, decorView } from './decor.js';
 import { dogHandlers, dogView } from './dog.js';
 import { floorHandlers, projectView } from './floors.js';
+import { fridayProxyHandlers } from './friday-proxy.js';
 import { githubHandlers, issuesView, pullsView } from './github.js';
 import { goatHandlers, goatView } from './goat.js';
 import { heliHandlers, heliHooks, heliView } from './heli.js';
@@ -44,6 +45,7 @@ export const handlers: HandlerMap<ClientMsg> = {
   ...decorHandlers,
   ...dogHandlers,
   ...floorHandlers,
+  ...fridayProxyHandlers,
   ...githubHandlers,
   ...goatHandlers,
   ...heliHandlers,

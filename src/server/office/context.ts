@@ -24,6 +24,7 @@ import type { Feeds } from '../feeds.js';
 import type { Watch } from '../watch.js';
 import type { OfficePrompts } from '../prompts.js';
 import type { LeaveOnMerge } from '../leave-on-merge.js';
+import type { FridayProxy } from '../friday-proxy/service.js';
 import type { ChatLog } from '../history.js';
 import type { Arcade, HighScores } from '../cabinet.js';
 import type { LongShots } from '../longshots.js';
@@ -71,6 +72,8 @@ export interface BuildingServices {
   themes: Themes;
   prompts: OfficePrompts;
   leaveOnMerge: LeaveOnMerge;
+  /** Friday Proxy: where Codex and Claude workers' inference goes, and its accounts' quota. */
+  fridayProxy: FridayProxy;
   ledger: Ledger;
   signins: SignIns;
   /** The office's own Claude plan limits. */

@@ -1,0 +1,61 @@
+/* ⚡ Inference usage: Friday Proxy accounts' quota. */
+.fp-panel { width: min(860px, 100%); }
+.fp-body { display: flex; flex-direction: column; gap: 14px; }
+.fp-routes { margin: 0; color: var(--muted); font-size: 13px; }
+.fp-error { padding: 10px 12px; border-radius: var(--r-md); background: var(--warn-tint); color: var(--warn-ink); font-size: 13px; }
+.fp-note { color: var(--muted); font-size: 13px; }
+.fp-note.bad { color: var(--bad-ink); }
+
+.fp-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+.fp-card { padding: 12px 14px; border-radius: var(--r-lg); background: var(--wash); border: 1px solid var(--hairline); min-width: 0; }
+.fp-card-head { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+.fp-count { margin-left: auto; color: var(--muted); font-size: 12px; white-space: nowrap; }
+.fp-card-label { color: var(--muted); font-size: 12px; }
+.fp-big { margin: 2px 0 8px; font-variant-numeric: tabular-nums; }
+.fp-big b { font-size: 26px; font-weight: 700; letter-spacing: -.01em; }
+.fp-big span { color: var(--muted); font-size: 13px; }
+.fp-segs { display: flex; gap: 8px; margin-bottom: 8px; padding: 0 2px; }
+.fp-segs .fp-meter { flex: 1; }
+
+.fp-group { display: flex; align-items: baseline; gap: 6px; margin: 6px 0 -4px; font-size: 14px; }
+.fp-group span { color: var(--muted); font-weight: 400; font-size: 12px; }
+.fp-account { padding: 10px 0 12px; border-bottom: 1px solid var(--hairline); display: flex; flex-direction: column; gap: 8px; }
+.fp-account-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.fp-name { font-family: var(--mono); font-weight: 600; font-size: 13px; }
+.fp-plan { color: var(--muted); font-size: 12px; }
+.fp-flag { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 999px; font-size: 11px; font-weight: 600; white-space: nowrap; border: 1px solid var(--hairline-2); color: var(--muted); }
+.fp-flag.ok { background: var(--good-tint); color: var(--good-ink); border-color: transparent; }
+.fp-flag.bad { background: var(--bad-tint); color: var(--bad-ink); border-color: transparent; }
+.fp-wins { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px 20px; }
+.fp-win-top { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; margin-bottom: 5px; }
+.fp-win-top span { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-win-top b { font-variant-numeric: tabular-nums; }
+.fp-win-foot { color: var(--muted); font-size: 11.5px; margin-top: 5px; }
+.fp-asof { margin-right: auto; color: var(--muted); font-size: 12px; }
+
+/* Slanted tick meter: skewed like the Friday Labs mark, cut into ticks, lit at its leading edge. */
+.fp-meter {
+  --tick: 8px;
+  --gap: 3px;
+  --c0: #2a2d3a; --c1: #2a2d3a; --c2: #2a2d3a;
+  position: relative;
+  height: 9px;
+  margin: 0 3px;
+  transform: skewX(-34deg);
+  background: rgba(127, 127, 140, .22);
+  -webkit-mask: repeating-linear-gradient(90deg, #000 0 var(--tick), transparent var(--tick) calc(var(--tick) + var(--gap)));
+          mask: repeating-linear-gradient(90deg, #000 0 var(--tick), transparent var(--tick) calc(var(--tick) + var(--gap)));
+}
+.fp-meter.small { height: 7px; --tick: 5px; --gap: 2px; }
+.fp-meter i { position: absolute; inset: 0 auto 0 0; width: calc(var(--v) * 1%); background: linear-gradient(90deg, var(--c0), var(--c1) 72%, var(--c2)); transition: width .7s cubic-bezier(.2, .8, .2, 1); }
+.fp-meter i::after { content: ""; position: absolute; right: 0; top: 0; bottom: 0; width: var(--tick); background: var(--c2); opacity: .9; }
+.fp-meter.tone-none i::after { display: none; }
+.fp-meter.tone-g { --c0: #04512a; --c1: #09ca59; --c2: #5ee99b; }
+.fp-meter.tone-a { --c0: #5a4510; --c1: #f2c94c; --c2: #ffe9a3; }
+.fp-meter.tone-r { --c0: #4d1517; --c1: #e5484d; --c2: #ff9b9e; }
+@media (prefers-reduced-motion: reduce) { .fp-meter i { transition: none; } }
+
+/* ⚙️ Settings → Workers → Friday Proxy */
+.fp-fields { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.fp-fields label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; color: var(--muted); }
+.fp-fields input { font: inherit; font-size: 13px; }

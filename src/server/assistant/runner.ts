@@ -8,6 +8,7 @@ import type { Ctx } from '../office/context.js';
 import { ASSISTANT_BRIEF, BRIEF_VERSION } from './brief.js';
 import { codexPlanUsage } from './codex-limits.js';
 import { writeOfficeCommands } from '../workers/process.js';
+import { CODEX_KEY_ENV, codexRouteArgs, inferenceRoute } from '../friday-proxy/route.js';
 
 // The executive assistant: an agent with no desk and no body, in the Agents panel. Each question is one turn of a
 // Codex conversation run headless (`codex exec --json`, then `codex exec resume <thread>` for the next), in its own
@@ -128,7 +129,11 @@ export class Assistant {
     const env: NodeJS.ProcessEnv = { ...process.env, PATH: [bin, process.env.PATH].filter(Boolean).join(path.delimiter), AGENT_OFFICE_HOOK_URL: hookUrl, AGENT_OFFICE_ASSISTANT_TOKEN: this.token };
     for (const k of ['AGENT_OFFICE_WORKER_ID', 'AGENT_OFFICE_HOOK_TOKEN']) delete env[k];
     const flags = ['--json', '--skip-git-repo-check', '--dangerously-bypass-approvals-and-sandbox'];
-    const args = this.saved.thread ? ['exec', 'resume', ...flags, this.saved.thread, '-'] : ['exec', ...flags, '-C', this.dir, '-'];
+    // Friday Proxy on for Codex: the assistant's inference goes through it too (see friday-proxy/route.ts).
+    const route = inferenceRoute('codex');
+    if (route) env[CODEX_KEY_ENV] = route.apiKey;
+    const routeArgs = route ? codexRouteArgs(route) : [];
+    const args = this.saved.thread ? [...routeArgs, 'exec', 'resume', ...flags, this.saved.thread, '-'] : [...routeArgs, 'exec', ...flags, '-C', this.dir, '-'];
     const when = new Date().toLocaleString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
     const prompt = `[${when} \u00b7 ${q.by}]\n${q.text}`;
     this.doing = [];
