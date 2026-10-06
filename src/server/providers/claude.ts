@@ -6,6 +6,7 @@ import path from 'node:path';
 import { FAILS_TO_DESPAIR, outputFailed, toolAction } from '../../shared/actions.js';
 import { MCP_READ_ONLY, writeClaudeMcpConfig } from '../office-workers.js';
 import { QUEUE_AGENT_DISALLOWED_TOOLS } from '../stations.js';
+import { claudeRouteEnv, inferenceRoute } from '../friday-proxy/route.js';
 import { answered, notified, wantsPermission } from '../workers/lifecycle.js';
 import { shq } from '../workers/process.js';
 import type { WorkerHandle } from '../workers/types.js';
@@ -199,7 +200,7 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     settings: writeHookSettings(dataDir),
     mcp: mcpScript ? writeClaudeMcpConfig(dataDir, mcpScript) : undefined,
   }),
-  launch({ h: { info }, args, prompt, resumeSessionId, station, setup }) {
+  launch({ h: { info }, args, prompt, resumeSessionId, station, cwd, setup }) {
     args = studioPermissionArgs('claude', args); args.unshift('--settings', setup.settings);
     // The office's MCP server: its workers, to list, hire, send home and tell (see office-workers.ts).
     // Ahead of --settings, which ends the list --mcp-config takes.
@@ -212,9 +213,14 @@ export const claude: ProviderAdapter<undefined, ClaudeSetup> = {
     if (resumeSessionId) args.push('--resume', resumeSessionId);
     // `--` so a prompt like "- fix login" is never parsed as a CLI option.
     if (prompt) args.push('--', prompt);
-    return { args };
+    // Friday Proxy on: its inference goes through the proxy. Last of all, so an account's sign-in can't undo it.
+    const route = inferenceRoute('claude');
+    return route ? { args, finishEnv: (env) => claudeRouteEnv(env, route, cwd) } : { args };
   },
-  signIn: 'claude',
+  // Through Friday Proxy, a worker needs no Claude sign-in of its own (hiring and starting check this).
+  get signIn() {
+    return inferenceRoute('claude') ? undefined : ('claude' as const);
+  },
   // SessionStart fires as soon as Claude can take input: still silent, it's blocked on a human.
   bootHint: 'Waiting on a setup prompt (trust / login) — open the terminal',
   titleNoise: /^claude( code)?$/i,

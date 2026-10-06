@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import path from 'node:path';
 import { codexHookArgs, codexModelArgs, normalizeCodexHook, writeCodexHook } from '../codex.js';
 import { CodexUsageReader } from '../codex-usage.js';
+import { CODEX_KEY_ENV, codexRouteArgs, inferenceRoute } from '../friday-proxy/route.js';
 import { codexMcpArgs } from '../office-workers.js';
 import { reduceLifecycle, type ToolTracker } from '../workers/lifecycle.js';
 import type { WorkerHandle } from '../workers/types.js';
@@ -94,11 +95,14 @@ export const codex: ProviderAdapter<CodexState, CodexSetup> = {
   launch({ h, args, prompt, resumeSessionId, setup }) {
     // Resumed too: Codex resumes on whatever its config says now, not on the model the session ran on.
     args = codexModelArgs(studioPermissionArgs('codex', args), h.info.model, h.info.effort);
+    // Friday Proxy on: its inference goes through the proxy (key in the environment, not on the command line).
+    const route = inferenceRoute('codex');
+    if (route) args.push(...codexRouteArgs(route));
     args.push(...codexHookArgs(setup.hook), ...(setup.mcpScript ? codexMcpArgs(setup.mcpScript) : []), '--no-alt-screen');
     if (resumeSessionId) args.push('resume', resumeSessionId);
     if (prompt) args.push('--', prompt);
     tracker(h.state).clear();
-    return { args, rotateToken: true };
+    return { args, rotateToken: true, ...(route ? { env: { [CODEX_KEY_ENV]: route.apiKey } } : {}) };
   },
   bootHint: 'Open the terminal: complete login and review Office hooks in /hooks',
   hook: { strictJson: true, handle: codexHook },

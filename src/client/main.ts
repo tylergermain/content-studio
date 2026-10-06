@@ -76,6 +76,7 @@ import { installWorkstation } from './features/workstation';
 import { installWhiteboard } from './features/whiteboard';
 import { installWhisky } from './features/whisky';
 import { installWebcam } from './features/webcam';
+import { installFridayProxy } from './features/friday-proxy';
 import { installWorkerActions } from './features/workers/actions';
 import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
@@ -209,6 +210,7 @@ parts.talk = installVoice(ctx, { tv: parts.tv });
 installDictation(ctx);
 parts.hud = installHud(ctx, core, parts);
 installWebcam(ctx, { remotes: parts.peers.remotes });
+installFridayProxy(ctx);
 
 // ---- Main loop ---------------------------------------------------------------------------------------
 fitWindow(ctx);

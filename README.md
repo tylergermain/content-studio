@@ -422,6 +422,7 @@ Every change to the app that lands on `main` is published as a GitHub release by
 - [Putt Street](docs/mini-golf.md): the nine-hole mini golf course on Main Street, its rules, its meter and its records
 - [Friday One](docs/helicopter.md): the helicopter: who flies it, the keys, where it lands and where it never will
 - [Agents](docs/agents.md): Claude Code, Codex and OpenCode, models and effort, and the office's prompts
+- [Friday Proxy](docs/friday-proxy.md): sending Codex and Claude workers' inference through a local CLIProxyAPI that pools several subscriptions, and ⚡ Inference usage for every account's quota
 - [Configuration](docs/configuration.md): every command-line option, and where the office keeps its data
 - [Workers' servers on your own computer](docs/tunnel.md): `agent-office tunnel`, which opens every worker's web server on your computer by itself
 - [AWS reference](docs/aws.md): Tailscale, service tunnels, upgrades, and everything `deploy/aws.sh` does

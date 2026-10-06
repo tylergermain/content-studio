@@ -21,6 +21,7 @@ import type { StreetClientMsg, StreetServerMsg } from './protocol/street.js';
 import type { StudioClientMsg, StudioServerMsg } from './protocol/studio.js';
 import type { BallClientMsg, CabinetClientMsg, CarClientMsg, DecorClientMsg, DogClientMsg, JukeboxClientMsg, ToysServerMsg, WhiteboardClientMsg } from './protocol/toys.js';
 import type { UsageClientMsg, UsageServerMsg } from './protocol/usage.js';
+import type { FridayProxyClientMsg, FridayProxyServerMsg } from './protocol/friday-proxy.js';
 import type { VrClientMsg, VrServerMsg } from './protocol/vr.js';
 import type { WatchServerMsg } from './protocol/watch.js';
 import type { WebcamClientMsg } from './protocol/webcam.js';
@@ -45,6 +46,7 @@ export * from './protocol/street.js';
 export * from './protocol/studio.js';
 export * from './protocol/toys.js';
 export * from './protocol/usage.js';
+export * from './protocol/friday-proxy.js';
 export * from './protocol/vr.js';
 export * from './protocol/watch.js';
 export * from './protocol/webcam.js';
@@ -66,6 +68,7 @@ export type ClientMsg =
   | SignInsClientMsg
   | SettingsClientMsg
   | UsageClientMsg
+  | FridayProxyClientMsg
   | VrClientMsg
   | DecorClientMsg
   | JukeboxClientMsg
@@ -95,6 +98,7 @@ export type ServerMsg =
   | AccountsServerMsg
   | SettingsServerMsg
   | UsageServerMsg
+  | FridayProxyServerMsg
   | VrServerMsg
   | ToysServerMsg
   | GoatServerMsg

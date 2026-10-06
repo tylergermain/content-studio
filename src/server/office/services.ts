@@ -17,6 +17,7 @@ import { Feeds } from '../feeds.js';
 import { Watch } from '../watch.js';
 import { OfficePrompts } from '../prompts.js';
 import { LeaveOnMerge } from '../leave-on-merge.js';
+import { FridayProxy } from '../friday-proxy/service.js';
 import type { ServiceInfo, ServicesState } from '../../shared/protocol.js';
 import type { BuildingServices, Ctx, LateServices } from './context.js';
 import type { Client } from './client.js';
@@ -51,6 +52,9 @@ export function createServices(ctx: Ctx): BuildingServices {
   const prompts = new OfficePrompts(cfg.dataDir, { list: agentProviders(configured), configured }, (state) => ctx.broadcast({ t: 'prompts', state }));
   // Whether a worker whose pull request merged goes home by itself, on every floor (⚙️ Settings).
   const leaveOnMerge = new LeaveOnMerge(cfg.dataDir, (state) => ctx.broadcast({ t: 'leaveOnMerge', state }));
+  // Whether Codex and Claude workers run through Friday Proxy, and its accounts' quota (⚙️ Settings, ⚡).
+  const fridayProxy = new FridayProxy(cfg.dataDir, (state) => ctx.broadcast({ t: 'fridayProxy', state }), (quota) => ctx.broadcast({ t: 'fridayProxy.quota', quota }), () => clients.size > 0);
+  fridayProxy.start();
 
   // What the workers spend, all time and today, with the optional daily budget.
   const ledger = new Ledger(
@@ -138,7 +142,7 @@ export function createServices(ctx: Ctx): BuildingServices {
     });
   };
 
-  return { sky, feeds, watch, themes, prompts, leaveOnMerge, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
+  return { sky, feeds, watch, themes, prompts, leaveOnMerge, fridayProxy, ledger, signins, limits, accountLimits, webhook, machine, limitsOf, pumpQueues };
 }
 
 /** What's made once the floors are open: the SSH team, the tailnet, workers' web servers, pictures and upgrades. */
