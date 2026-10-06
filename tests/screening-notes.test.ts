@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import type { ChatMessage, ReviewNote } from '../src/shared/worker-chat.js';
-import { MAX_NOTE, MAX_NOTES, addNote, cleanNote, draftKey, loadDraft, saveDraft, seekBefore, sentNotes, seriesKey, sortNotes, withoutNotes } from '../src/client/ui/workspace/notes.js';
+import { MAX_NOTE, MAX_NOTES, WHOLE_CUT, addNote, cleanNote, draftKey, loadDraft, saveDraft, seekBefore, sentNotes, seriesKey, sortNotes, withoutNotes } from '../src/client/ui/workspace/notes.js';
 
 const V01 = 'youtube/jev-creator-workflows/edit/jev-v01/renders/Jev-for-Creators-v01-4K60.mp4';
 const V02 = 'youtube/jev-creator-workflows/edit/jev-v02/renders/Jev-for-Creators-v02-4K60.mp4';
@@ -114,6 +114,8 @@ test('the notes sent on a cut, and on the versions before it, come back newest f
   const onV01 = sentNotes(messages, { root: share, path: V01 });
   assert.equal(onV01.length, 2);
   assert.deepEqual(sentNotes(messages, { path: 'renders/unrelated.mp4' }), []);
+  // Each group says which message sent it, for its notes' done marks.
+  assert.ok(onV02.every((g) => typeof g.id === 'string' && g.id.length > 0));
 });
 
 test('sending takes away only the notes that went: one written meanwhile stays', () => {
@@ -121,4 +123,22 @@ test('sending takes away only the notes that went: one written meanwhile stays',
   const now = [...sent, { at: 120, text: 'written while sending' }];
   assert.deepEqual(withoutNotes(now, sent), [{ at: 120, text: 'written while sending' }]);
   assert.deepEqual(withoutNotes(sent, []), sent);
+});
+
+test('a note about the whole cut keeps saying so, kept and read back', () => {
+  const store = memory();
+  const key = draftKey('w1', { path: V02 });
+  const notes = addNote(addNote([], 12, 'logo late'), 40, 'pacing is great', true);
+  assert.deepEqual(notes, [{ at: 0, text: 'pacing is great', where: WHOLE_CUT }, { at: 12, text: 'logo late' }]);
+  saveDraft(key, notes, store);
+  assert.deepEqual(loadDraft(key, store), notes);
+});
+
+test('a comment on an image or a passage keeps where it is and its pin, and a pin keeps only short values', () => {
+  const store = memory();
+  const key = draftKey('w1', { path: 'art/thumb-v01.png' });
+  const notes = addNote([], 0, 'bigger title', 'the point 30% across and 40% down', { x: 30, y: 40 });
+  assert.deepEqual(notes, [{ at: 0, text: 'bigger title', where: 'the point 30% across and 40% down', pin: { x: 30, y: 40 } }]);
+  saveDraft(key, [...notes, { at: 0, text: 'odd pin', where: 'the passage “x”', pin: { q: 'x', bad: { deep: 1 } as unknown as string } }], store);
+  assert.deepEqual(loadDraft(key, store), [...notes, { at: 0, text: 'odd pin', where: 'the passage “x”', pin: { q: 'x' } }]);
 });

@@ -6,6 +6,7 @@ import { artifactKey, type ChatArtifact } from '../../../shared/worker-chat';
 import { fileTime, latestLinked } from './files';
 import { artboardOf, artboardsOf, describe, elementAt, findAgain, layOut, pathTo, whereOf } from './canvas-dom';
 import { paperPicker, type PaperFile } from './canvas-paper';
+import type { NotePin } from './notes-side';
 import type { Panel, WorkspaceHost } from './types';
 
 // The design canvas (the Canvas tab, first on the Design board): a designer's design (a `.design.html`
@@ -30,6 +31,16 @@ interface Note {
   fy: number;
 }
 
+/**
+ * A room built around the canvas (canvas/room.ts) keeps the notes itself, in its comments down the right: a click on
+ * an element is handed to it (`pick`), the pins come from it (`pins`), and it hears which design is open.
+ */
+export interface CanvasNotes {
+  pick(p: NotePin | undefined): void;
+  pins(): { n?: number; state: string; text: string; pin?: Record<string, string | number> }[];
+  opened(f: ChatArtifact | undefined): void;
+}
+
 const POLL_MS = 1500;
 const ZOOM = { min: 0.02, max: 4 } as const;
 const MARGIN = 40;
@@ -37,7 +48,7 @@ const enc = encodeURIComponent;
 const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
 const ref = (f: ChatArtifact) => (f.root ? { root: f.root, path: f.path } : { path: f.path });
 
-export function designCanvas(host: WorkspaceHost): Panel {
+export function designCanvas(host: WorkspaceHost, o: { notes?: CanvasNotes; backdrop?: string } = {}): Panel & { repaint(): void; unpick(): void } {
   let files: ChatArtifact[] = [];
   let current: ChatArtifact | undefined;
   /** The viewer picked a design, so a newer one no longer takes over by itself. */
@@ -165,7 +176,10 @@ export function designCanvas(host: WorkspaceHost): Panel {
       const r = b.getBoundingClientRect();
       return h('span.canvas-label', { style: `left:${r.left}px;top:${r.top - 20}px;max-width:${Math.max(40, r.width)}px` }, b.getAttribute(ARTBOARD) || 'Artboard');
     }));
-    pins.replaceChildren(...notes().map((n, i) => {
+    const shown = o.notes
+      ? o.notes.pins().flatMap((s) => (s.pin && typeof s.pin.path === 'string' ? [{ n: s.n, state: s.state, text: s.text, board: typeof s.pin.board === 'string' ? s.pin.board : undefined, path: s.pin.path, fx: Number(s.pin.fx) || 0, fy: Number(s.pin.fy) || 0 }] : []))
+      : notes().map((n, i) => ({ ...n, n: i + 1, state: 'draft' }));
+    pins.replaceChildren(...shown.map((n) => {
       const el = findAgain(doc!, n.board, n.path);
       let x: number, y: number;
       if (el) {
@@ -178,7 +192,7 @@ export function designCanvas(host: WorkspaceHost): Panel {
         x = r ? r.left + n.fx * r.width : -99;
         y = r ? r.top + n.fy * r.height : -99;
       }
-      return h('span.canvas-pin', { style: `left:${x}px;top:${y}px`, title: n.text }, String(i + 1));
+      return h(`span.canvas-pin.${n.state}`, { style: `left:${x}px;top:${y}px`, title: n.text }, n.state === 'done' ? '\u2713' : String(n.n ?? ''));
     }));
     if (!pop.classList.contains('hidden') && selected) placePop();
   }
@@ -214,7 +228,7 @@ export function designCanvas(host: WorkspaceHost): Panel {
       return;
     }
     doc = d;
-    layOut(d);
+    layOut(d, o.backdrop);
     // Reselect what was selected, by where it was: the page is new on every save.
     if (selected && current) {
       const board = artboardOf(selected)?.getAttribute(ARTBOARD) ?? undefined;
@@ -341,6 +355,12 @@ export function designCanvas(host: WorkspaceHost): Panel {
     selected = el;
     place(selBox, selected);
     place(hoverBox, undefined);
+    if (o.notes) {
+      if (!el || !canSend() || !doc) return o.notes.pick(undefined);
+      const art = artboardOf(el), board = art?.getAttribute(ARTBOARD) ?? undefined;
+      const ar = (art ?? doc.body).getBoundingClientRect(), r = el.getBoundingClientRect();
+      return o.notes.pick({ where: whereOf(el), label: `${describe(el)}${board ? ` \u00b7 ${board}` : ''}`, pin: { ...(board ? { board } : {}), path: pathTo(el), fx: ar.width ? (r.left - ar.left) / ar.width : 0, fy: ar.height ? (r.top - ar.top) / ar.height : 0 } });
+    }
     if (el && canSend()) openPop(el);
     else closePop();
   }
@@ -393,6 +413,7 @@ export function designCanvas(host: WorkspaceHost): Panel {
   }
 
   function renderNotes() {
+    if (o.notes) return notesBar.classList.add('hidden');
     const list = notes();
     notesBar.classList.toggle('hidden', !list.length);
     sendBtn.textContent = `Send ${list.length === 1 ? 'this note' : `${list.length} notes`} to ${host.workerName}`;
@@ -489,6 +510,7 @@ export function designCanvas(host: WorkspaceHost): Panel {
     current = f;
     paintBar();
     if (!same) load(f);
+    o.notes?.opened(current);
   }
 
   timer = setInterval(() => void check(), POLL_MS);
@@ -501,6 +523,7 @@ export function designCanvas(host: WorkspaceHost): Panel {
       const chosen = touched && keep ? keep : (latestLinked(next, snapshot) ?? keep ?? next[0]);
       const changed = !current || !chosen || artifactKey(current) !== artifactKey(chosen);
       current = chosen;
+      o.notes?.opened(current);
       paintBar();
       if (changed) {
         if (chosen) load(chosen);
@@ -522,6 +545,11 @@ export function designCanvas(host: WorkspaceHost): Panel {
     stop() {
       stopped = true;
       if (timer) clearInterval(timer);
+    },
+    repaint,
+    unpick() {
+      selected = undefined;
+      place(selBox, undefined);
     },
   };
 }

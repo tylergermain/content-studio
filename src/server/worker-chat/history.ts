@@ -13,7 +13,7 @@ function savedReview(v: unknown): ChatReview | undefined {
   if (!r || typeof r !== 'object' || !isReviewKind(r.kind) || !Array.isArray(r.files) || !r.files.length || r.files.length > 4) return;
   if (!r.files.every(f => f && typeof f.path === 'string' && (f.root === undefined || typeof f.root === 'string'))) return;
   if (r.notes !== undefined && !(Array.isArray(r.notes) && r.notes.length <= 50 && r.notes.every(n => n && Number.isFinite(n.at) && n.at >= 0 && typeof n.text === 'string'))) return;
-  return { kind: r.kind, files: r.files.map(f => f.root ? { root: f.root, path: f.path } : { path: f.path }), ...(r.notes ? { notes: r.notes.map(n => ({ at: n.at, text: n.text })) } : {}) };
+  return { kind: r.kind, files: r.files.map(f => f.root ? { root: f.root, path: f.path } : { path: f.path }), ...(r.notes ? { notes: r.notes.map(n => ({ at: n.at, text: n.text, ...(typeof n.where === 'string' ? { where: n.where } : {}) })) } : {}) };
 }
 
 export function chatHistory(dataDir: string, id: string): ChatMessage[] {

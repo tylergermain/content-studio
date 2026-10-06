@@ -1,5 +1,6 @@
 // The loopback-only server for the workers' own calls: their agents' hook events, and the office's
 // queue and workers for the board agents and the office-workers command.
+import { officeAssistant } from '../assistant/tools.js';
 import http from 'node:http';
 import { readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
@@ -23,6 +24,7 @@ export async function startHookServer(ctx: Ctx): Promise<{ hookServer: http.Serv
     if (url.pathname === '/office/queue') return officeQueue(ctx, req, res, url);
     if (url.pathname === '/office/board') return officeBoard(ctx, req, res, url);
     if (url.pathname === '/office/workers' || url.pathname.startsWith('/office/workers/')) return officeWorkers(ctx, req, res, url);
+    if (url.pathname.startsWith('/office/assistant')) return officeAssistant(ctx, req, res, url);
     // Each provider with hooks has its route, /hooks/<provider> (see providers/).
     const route = url.pathname.startsWith('/hooks/') ? url.pathname.slice('/hooks/'.length) : '';
     const hook = providerHook(route);

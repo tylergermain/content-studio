@@ -4,9 +4,12 @@
 .workspace { flex:1; min-height:0; display:flex; flex-direction:column; outline:none; }
 .ws-bar { flex-shrink:0; display:flex; align-items:center; flex-wrap:wrap; gap:8px 12px; padding:12px 18px; border-bottom:1px solid var(--hairline); }
 .ws-title { margin:0; font-size:15px; font-weight:600; letter-spacing:-.01em; white-space:nowrap; }
+/* With the apps' tabs showing, they name what's open, so the title gives them its room. */
+.ws-bar:has(> .ws-tabs:not([hidden])) .ws-title { display:none; }
 .ws-tabs { display:inline-flex; gap:2px; padding:2px; border-radius:var(--r-sm); background:var(--wash); max-width:100%; overflow-x:auto; }
 .ws-tab { display:inline-flex; align-items:center; gap:6px; padding:4px 12px; border:0; border-radius:var(--r-xs); background:none; color:var(--muted); font:inherit; font-size:13px; font-weight:500; cursor:pointer; white-space:nowrap; transition:background-color .15s var(--ease), color .15s var(--ease); }
 .ws-tab:hover { color:var(--ink); }
+.ws-tab.idle:not(.on) { opacity:.55; }
 .ws-tab.on { background:var(--control); color:var(--ink); box-shadow:var(--shadow-1); }
 .ws-tab:focus-visible { outline:3px solid var(--accent-ring); outline-offset:1px; }
 .ws-count { font-size:11px; font-weight:600; color:var(--muted); font-variant-numeric:tabular-nums; }

@@ -1,0 +1,13 @@
+/* The design canvas's room (room.ts): the canvas (../canvas.css) on the dark stage; the rest is ../room.css. */
+.rr-stage.cv-stage { padding:0; align-items:stretch; justify-content:stretch; }
+.canvas-room .ws-canvas { flex:1; min-height:0; color:var(--ink);
+  --ink:#f1f1f4; --muted:#9b9ba6; --hairline:rgba(255,255,255,.08); --hairline-2:rgba(255,255,255,.14); --wash:rgba(255,255,255,.06); --control:#1e1e22; --surface:#151518; --accent:#7c5cff; --accent-ring:rgba(124,92,255,.3); }
+.canvas-room .canvas-bar { background:var(--rr-panel); border-bottom:1px solid var(--rr-line); }
+.canvas-room .canvas-bar .btn { background:var(--rr-raise); color:var(--rr-ink); border-color:var(--rr-line-2); box-shadow:none; }
+.canvas-room .canvas-stage, .canvas-room .canvas-frame { background:#1a1a1f; }
+.canvas-room .canvas-label { color:#9b9ba6; }
+.canvas-room .canvas-status { background:var(--rr-panel); }
+.canvas-room .canvas-empty { background:var(--rr-bg); color:var(--rr-muted); }
+.canvas-room .canvas-pin { width:auto; min-width:24px; height:24px; padding:0 5px; border:2px solid #fff; border-radius:12px 12px 12px 3px; background:var(--rr-accent); font-size:11.5px; }
+.canvas-room .canvas-pin.draft { background:#fff; color:#5b3fff; border-color:var(--rr-accent); }
+.canvas-room .canvas-pin.done { background:var(--rr-ok); }

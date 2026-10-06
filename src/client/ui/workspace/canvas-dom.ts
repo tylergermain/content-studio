@@ -27,7 +27,7 @@ export function artboardOf(el: Element): HTMLElement | undefined {
  * them (`data-x` and `data-y`, as an import from Paper keeps them), else side by side in a row. It
  * changes only the canvas's copy of the page; the file is untouched.
  */
-export function layOut(doc: Document): void {
+export function layOut(doc: Document, backdrop = '#e8e8ec'): void {
   if (!doc.documentElement || !doc.body) return;
   doc.getElementById(STYLE_ID)?.remove();
   const boards = [...doc.querySelectorAll<HTMLElement>(`[${ARTBOARD}]`)];
@@ -35,7 +35,7 @@ export function layOut(doc: Document): void {
   const style = doc.createElement('style');
   style.id = STYLE_ID;
   style.textContent = [
-    `html { overflow: hidden !important; transform-origin: 0 0; background: #e8e8ec !important; }`,
+    `html { overflow: hidden !important; transform-origin: 0 0; background: ${/^#[0-9a-f]{3,8}$/i.test(backdrop) ? backdrop : '#e8e8ec'} !important; }`,
     `body { margin: 0 !important; background: transparent !important; position: relative !important; ${placed ? '' : `display: flex !important; flex-direction: row !important; flex-wrap: nowrap !important; align-items: flex-start !important; gap: ${GAP}px !important; padding: ${PAD}px !important; width: max-content !important;`} }`,
     `[${ARTBOARD}] { flex: none !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.10); }`,
     `* { cursor: default !important; }`,

@@ -40,7 +40,7 @@ export function openWorkerChat(id:string,terminal:()=>void,onChanges?:()=>void){
   // Editor, or Files. The snapshot names the role's choice; until it comes, the starter roles' own.
   const fileUrl=(f:{root?:string;path:string})=>chatUrl(id,'/file',f.path,f.root);
   const host:WorkspaceHost={workerId:id,workerName,get admin(){return store.me.admin;},canSend:()=>!!snapshot&&snapshot.canSend!==false,url:fileUrl,
-    review:async r=>{await reviewRequest(id,{...r,requestId:crypto.randomUUID()});if(!closed)await refresh();},refresh:()=>refresh()};
+    review:async r=>{await reviewRequest(id,{...r,requestId:crypto.randomUUID()});if(!closed)await refresh();},refresh:()=>refresh(),draft:t=>{input.value=t;input.focus();input.setSelectionRange(t.length,t.length);}};
   let kind:WorkspaceKind=workspaceOf(worker.specialist);let workspace=mountWorkspace(host,kind);
   const aside=h('aside.chat-preview',{},workspace.element);
   const paneNav=h('div.chat-pane-nav',{'aria-label':'Worker chat views'});

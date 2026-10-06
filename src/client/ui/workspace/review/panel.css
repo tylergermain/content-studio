@@ -1,0 +1,13 @@
+/* The Review tab in a worker's window (index.ts): where the review stands and Open review, or how to get the app here. */
+.ws-review { flex:1; min-height:0; display:flex; flex-direction:column; }
+.rv-panel-body { flex:1; min-height:0; display:grid; place-items:center; padding:24px; overflow:auto; }
+.rv-empty, .rv-summary { display:flex; flex-direction:column; align-items:center; gap:8px; max-width:440px; text-align:center; }
+.rv-empty p, .rv-summary p { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+.rv-icon { font-size:30px; line-height:1; }
+.rv-title { font-size:17px; letter-spacing:-.01em; }
+.rv-state { padding:3px 10px; border-radius:999px; font-size:12px; font-weight:600; background:var(--wash); color:var(--ink); }
+.rv-state[data-state=changes] { background:rgba(255,159,10,.16); color:#b25f00; }
+.rv-state[data-state=approved] { background:rgba(48,209,88,.16); color:#1a7f37; }
+.rv-summary .btn.primary { margin-top:6px; padding:9px 18px; font-size:14px; }
+.rv-apps { list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:2px; font-size:13px; }
+.rv-hint { font-size:12px !important; }

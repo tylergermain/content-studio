@@ -2,7 +2,7 @@
 
 Back to the [README](../README.md).
 
-The **Canvas** tab is where you watch a designer work. It's the first tab of the Design board, the window a Designer opens with, and it shows in the Screening room and Reports too when a worker there makes a design. A design shows on it live, laid out like a design tool's page. You pin notes to its elements and send them back, export its artboards as PNGs, and an admin can bring a page of a Paper file in as a design.
+The **Canvas** tab is where you watch a designer work. Clicking it opens the canvas full screen, with the comments down the right as the other review rooms have them (Open / Done / All, a check to mark one done) and **Approve** along the top. It's the first tab of the Design board, the window a Designer opens with, and it shows in the Screening room and Reports too when a worker there makes a design. A design shows on it live, laid out like a design tool's page. You pin notes to its elements and send them back, export its artboards as PNGs, and an admin can bring a page of a Paper file in as a design.
 
 ## What a design is
 

@@ -172,6 +172,10 @@ test('kept reviews are checked when read, and follow a matching session copy', t
   const session: ChatMessage[] = [{ id: 's1', role: 'user', text: 'Revision notes - 0:31 Louder', at: 6 }, { id: 's2', role: 'assistant', text: 'Revision notes - 0:31 Louder', at: 7 }];
   const merged = mergeMessages(session, chatHistory(dir, 'w1'));
   assert.deepEqual(merged.map(m => [m.id, m.review?.kind]), [['s1', 'notes'], ['s2', undefined]]);
+  // A note about the whole cut (or a design's element) keeps where it's on.
+  const whole = { kind: 'notes' as const, files: [{ path: RENDER }], notes: [{ at: 0, text: 'Tighter overall', where: 'the whole cut' }] };
+  keepMessage(dir, 'w3', { id: 'e', role: 'user', text: 'Revision notes', at: 8, review: whole });
+  assert.deepEqual(chatHistory(dir, 'w3')[0].review, whole);
 });
 
 test('a review body is tidied: files de-duplicated, notes trimmed and in time order, an empty root is the worker\'s own folder', () => {

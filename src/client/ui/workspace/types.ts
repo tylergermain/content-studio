@@ -13,6 +13,8 @@ export interface WorkspaceHost {
   review(r: Omit<ReviewRequest, 'requestId'>): Promise<void>;
   /** Fetches a fresh snapshot now, so a sent review shows its badge. */
   refresh(): Promise<void>;
+  /** Puts `text` in the message box, for you to change or send. */
+  draft(text: string): void;
 }
 
 /**
@@ -25,6 +27,8 @@ export interface Panel {
   element: HTMLElement;
   paint(files: ChatArtifact[], data: ChatSnapshot): void;
   show(file: ChatArtifact): void;
+  /** Its tab was clicked: a panel that works full screen (Software review's room) opens it now. */
+  open?(): void;
   /** Keys while the workspace has focus: never Escape, never while typing. True when handled. */
   key?(e: KeyboardEvent): boolean;
   stop(): void;

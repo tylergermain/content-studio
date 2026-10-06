@@ -56,9 +56,19 @@ export function reviewRoute(req: http.IncomingMessage, res: http.ServerResponse,
   return true;
 }
 
-/** The office origin to add the review script for, when this is a framed page in review mode; else nothing. */
-export function reviewOffice(req: http.IncomingMessage, tailnet: string | undefined): string | undefined {
+/**
+ * The office origin to add the review script for, when this is a framed page in review mode; else
+ * nothing. A browser on the office's own machine (`local`, see relay.ts localBrowser) framing
+ * p<port>.localhost is in review mode with no cookie: the office's localhost is another site to it, so
+ * the cookie never comes back in the frame. Its office is the machine's own, by either name (a space
+ * between them), and the script picks the one framing it.
+ */
+export function reviewOffice(req: http.IncomingMessage, tailnet: string | undefined, local?: { port: number }): string | undefined {
   if (req.method !== 'GET' || req.headers['sec-fetch-dest'] !== 'iframe') return undefined;
+  if (local) {
+    const scheme = (req.socket as { encrypted?: boolean } | undefined)?.encrypted ? 'https' : 'http';
+    return `${scheme}://localhost:${local.port} ${scheme}://127.0.0.1:${local.port}`;
+  }
   const raw = parseCookies(req.headers.cookie)[REVIEW_COOKIE];
   let office = '';
   try {

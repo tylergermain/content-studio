@@ -13,6 +13,23 @@ export const MAX_NOTE = 1000;
 
 const PREFIX = 'agent-office.screening-notes:';
 
+/** Where a note about the cut as a whole says it's on (its `at` is 0). */
+export const WHOLE_CUT = 'the whole cut';
+
+/** A note being written: on an image, a document or a design it says where (`where`), with what the room needs to pin it again (`pin`). */
+export type DraftNote = ReviewNote & { pin?: Record<string, string | number> };
+
+/** A note's pin as kept: a few short values, nothing else. */
+function cleanPin(v: unknown): Record<string, string | number> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [k, x] of Object.entries(v).slice(0, 8)) {
+    if (typeof x === 'number' && Number.isFinite(x)) out[k] = x;
+    else if (typeof x === 'string' && x.length <= 600) out[k] = x;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Where the notes you're writing on one file are kept: one draft per worker and file (a share's file is its own). */
 export function draftKey(workerId: string, file: FileRef): string {
   return `${PREFIX}${workerId}:${artifactKey(file)}`;
@@ -30,11 +47,16 @@ export function sortNotes(notes: readonly ReviewNote[]): ReviewNote[] {
   return [...notes].sort((a, b) => a.at - b.at);
 }
 
-/** The notes with one more at `at` seconds, in order; the same notes when it says nothing or there's no room. */
-export function addNote(notes: readonly ReviewNote[], at: number, text: string): ReviewNote[] {
+/**
+ * The notes with one more at `at` seconds (or about the whole cut, with `whole`), in order; the same
+ * notes when it says nothing or there's no room.
+ */
+export function addNote(notes: readonly DraftNote[], at: number, text: string, whole: boolean | string = false, pin?: DraftNote['pin']): DraftNote[] {
   const clean = cleanNote(text);
   if (!clean || !validAt(at) || notes.length >= MAX_NOTES) return [...notes];
-  return sortNotes([...notes, { at: Math.round(at * 100) / 100, text: clean }]);
+  // `whole` as words: where the note is on (an element, a point, a quote), at 0.
+  const where = whole === true ? WHOLE_CUT : typeof whole === 'string' ? cleanNote(whole).slice(0, 600) : '';
+  return sortNotes([...notes, where ? { at: 0, text: clean, where, ...(pin ? { pin } : {}) } : { at: Math.round(at * 100) / 100, text: clean }]);
 }
 
 /** Where clicking a note takes the player: two seconds before it, so you see what leads into it. */
@@ -50,11 +72,16 @@ function local(): Store | undefined {
 }
 
 /** The notes kept for a file, in order. Anything unreadable is left out, and a store that throws keeps nothing. */
-export function loadDraft(key: string, store: Store | undefined = local()): ReviewNote[] {
+export function loadDraft(key: string, store: Store | undefined = local()): DraftNote[] {
   try {
     const list: unknown = JSON.parse(store?.getItem(key) ?? '[]');
     if (!Array.isArray(list)) return [];
-    const notes = list.flatMap((n: Partial<ReviewNote> | null) => (n && validAt(n.at) && typeof n.text === 'string' && cleanNote(n.text) ? [{ at: n.at, text: cleanNote(n.text) }] : []));
+    const notes = list.flatMap((n: Partial<DraftNote> | null) => {
+      if (!n || !validAt(n.at) || typeof n.text !== 'string' || !cleanNote(n.text)) return [];
+      const where = typeof n.where === 'string' ? cleanNote(n.where).slice(0, 600) : '';
+      const pin = where ? cleanPin(n.pin) : undefined;
+      return [{ at: n.at, text: cleanNote(n.text), ...(where ? { where } : {}), ...(pin ? { pin } : {}) }];
+    });
     return sortNotes(notes).slice(0, MAX_NOTES);
   } catch {
     return [];
@@ -81,8 +108,8 @@ export function seriesKey(file: FileRef): string {
   return artifactKey({ root: file.root, path: file.path.replace(/(^|[^a-z0-9])v\d{1,3}(?![0-9])/gi, '$1v#') });
 }
 
-/** Notes that were sent on one file, with when. */
-export interface SentNotes { file: FileRef; at?: number; notes: ReviewNote[] }
+/** Notes that were sent on one file, with when, and the message that carried them (`id`, for each note's done mark: `<id>#<n>`). */
+export interface SentNotes { id: string; file: FileRef; at?: number; notes: ReviewNote[] }
 
 /** The notes left once `sent` went: the ones written while they were on their way stay. */
 export function withoutNotes(notes: readonly ReviewNote[], sent: readonly ReviewNote[]): ReviewNote[] {
@@ -102,7 +129,7 @@ export function sentNotes(messages: readonly ChatMessage[], file: FileRef): Sent
     if (r?.kind !== 'notes' || !Array.isArray(r.files) || !r.notes?.length) continue;
     const on = r.files.find((f) => artifactKey(f) === self) ?? r.files.find((f) => seriesKey(f) === series);
     const notes = sortNotes(r.notes.filter((n) => validAt(n.at) && typeof n.text === 'string'));
-    if (on && notes.length) out.push({ file: { ...(on.root ? { root: on.root } : {}), path: on.path }, at: m.at, notes });
+    if (on && notes.length) out.push({ id: m.id, file: { ...(on.root ? { root: on.root } : {}), path: on.path }, at: m.at, notes });
   }
   return out.reverse();
 }
