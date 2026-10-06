@@ -56,7 +56,8 @@ export interface WorkerInfo {
    * `branch` is the branch the worktree is on: the office's own office/<name>-<id> until the worker
    * switches to one of its own (`git checkout -b fix-x`), which `made` then remembers.
    */
-  worktree?: { path: string; branch: string; base: string; from?: string; made?: string };
+  /** `root`: the checkout it's a worktree of when that isn't its floor's own (its project room's repository, see shared/project-rooms.ts); `path` is from there. */
+  worktree?: { path: string; branch: string; base: string; from?: string; made?: string; root?: string };
   /**
    * Set while the folder it works in (its worktree, or its workspace across repositories) is gone:
    * deleted outside the office, so it can't start there until it's rebuilt ('worker.rebuild') or sent

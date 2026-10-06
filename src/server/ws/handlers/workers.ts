@@ -46,7 +46,13 @@ export const workerHandlers = {
     };
     // Every project it gets a worktree of starts from what's on GitHub.
     const fresh = [floor, ...repos.map((x) => ctx.floors.get(x.floor)!)];
-    ctx.withSignIn(c, kind === 'agent' ? ctx.claudeFor(msg.provider ?? floor.workers.officeDefault.provider) : undefined, () => (msg.worktree === true ? ctx.withFreshBase(c, fresh, hire) : hire()));
+    // A project room's repository too, for a worktree of that.
+    const room = () => {
+      const fetching = msg.worktree === true ? floor.workers.fetchRoom(str(msg.deskId, 32)) : undefined;
+      if (!fetching) return hire();
+      void fetching.then(() => (ctx.floors.get(floor.id) === floor ? hire() : undefined));
+    };
+    ctx.withSignIn(c, kind === 'agent' ? ctx.claudeFor(msg.provider ?? floor.workers.officeDefault.provider) : undefined, () => (msg.worktree === true ? ctx.withFreshBase(c, fresh, room) : hire()));
   },
   'worker.resume'(ctx, c, msg) {
     const w = workerOf(ctx, msg.workerId);

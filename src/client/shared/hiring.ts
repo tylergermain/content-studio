@@ -1,6 +1,7 @@
 /**
  * Hiring, as the 3D office and the 2D view (/lite) both do it. No three.js here: the 2D view imports it.
  */
+import { seatingOf } from '../../shared/table-seats';
 import type { Piece } from '../../shared/furniture';
 import { DESK_BY_ID } from '../../shared/layout';
 import { layoutDesks, layoutFurniture } from '../../shared/office-builder';
@@ -15,7 +16,7 @@ export function repoChoices(): { id: string; name: string }[] {
 /** The project room the desk `deskId` is in on this floor, as its layout was last saved (see shared/project-rooms.ts). */
 export function deskRoom(deskId: string): Piece | undefined {
   const plan = store.floorPlan;
-  const spot = layoutDesks(plan.desks ?? {}).find((d) => d.id === deskId) ?? DESK_BY_ID.get(deskId);
+  const spot = seatingOf(plan).tables.get(deskId) ?? layoutDesks(plan.desks ?? {}).find((d) => d.id === deskId) ?? DESK_BY_ID.get(deskId);
   return spot ? projectRoomAt(layoutFurniture(plan), spot.x, spot.z) : undefined;
 }
 
@@ -29,11 +30,25 @@ export function deskLabel(deskId: string, label: string): string {
 export function hireNote(deskId: string, text: string): string {
   const room = deskRoom(deskId);
   if (!room) return text;
-  const where = room.project?.dir ? `works in ${room.project.dir}` : 'has no project folder set yet';
+  const where = roomWorktree(deskId) ? `works on ${room.project?.repo ?? room.project?.dir}: this worker gets a worktree of its own` : room.project?.dir ? `works in ${room.project.dir}` : 'has no project folder set yet';
   return `📁 The ${room.text || 'Project'} room ${where}. ${text}`;
 }
 
-/** Whether a worker hired at `deskId` may have a worktree of the floor's project: not in a project room with a folder of its own. */
+/**
+ * Whether a worker hired at `deskId` may have a worktree: of the floor's project, unless it's in a project room with a
+ * folder of its own, which it may have one of when that folder is a repository (see roomWorktree).
+ */
 export function worktreeAt(deskId: string): boolean {
-  return !!store.project?.branch && !deskRoom(deskId)?.project?.dir;
+  return roomWorktree(deskId) || (!!store.project?.branch && !deskRoom(deskId)?.project?.dir);
+}
+
+/** Whether `deskId` is in a project room whose project is a repository: whoever's hired there works in a worktree of it, by default. */
+export function roomWorktree(deskId: string): boolean {
+  const project = deskRoom(deskId)?.project;
+  return !!project?.dir && !!project.git;
+}
+
+/** The other projects a worker hired at `deskId` can also work in: none for one in a project room's own repository. */
+export function repoChoicesAt(deskId: string | undefined): { id: string; name: string }[] {
+  return deskId && deskRoom(deskId)?.project?.dir ? [] : repoChoices();
 }

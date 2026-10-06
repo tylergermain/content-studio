@@ -4,6 +4,7 @@
 // in its plan (shared/floorplan.ts). The workers' desks are the builder's too, but they're seats with
 // ids of their own (see DeskLayout).
 
+import { assignTableSeats } from './table-seats.js';
 import { FRAMES, PICTURE_MAX, PICTURE_MIN } from './decor.js';
 import type { RoomOptions } from './floorplan.js';
 import { PAINTING, hangSize } from './hangings.js';
@@ -92,6 +93,8 @@ export const FURNITURE = {
     seat: { label: '💻 Team desk', places: [0], hips: 0.62, depth: -0.05, out: -0.8, z: 0.42, turn: Math.PI, share: true },
   },
   'long-table': { label: 'Long table', icon: '🪵', group: 'Work', w: 3.6, d: 1.2, top: 0.76, color: '#c9a36b' },
+  // Six chairs round it that workers sit at (shared/table-seats.ts): its footprint takes them in, and you bump only into the table.
+  'conference-table': { label: 'Conference table', icon: '🪑', group: 'Work', w: 5.2, d: 3, top: 0.76, solid: { w: 3.6, d: 1.4, z: 0 }, color: '#8a6f55' },
   'podcast-desk': { label: 'Podcast desk', icon: '🎙️', group: 'Work', w: 2, d: 1, top: 0.76, color: '#c9a36b' },
   screen: { label: 'Video screen', icon: '📺', group: 'Work', w: 2.3, d: 0.5, top: 1.85, color: '#2b2d42', plays: true },
   // The same screen with no stand, hung at eye level: pushed up against a wall, with nothing in the way under it.
@@ -212,6 +215,8 @@ export interface Piece {
   d?: number;
   /** The project a project room is for: its folder, its app and whether the room is kept (see shared/project-rooms.ts). */
   project?: ProjectLink;
+  /** A conference table's chairs: the first of its six table seats' numbers (see shared/table-seats.ts). */
+  seats?: number;
 }
 
 /** The most pieces a floor takes: the rooms upstairs and the paintings on their walls are all pieces. */
@@ -513,6 +518,7 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
     if (k.stretch) Object.assign(piece, { w: cleanProjectSize(r.w, k.w ?? 1), d: cleanProjectSize(r.d, k.d ?? 1) });
     const project = k.project ? cleanProject(r.project) : undefined;
     if (project) piece.project = project;
+    if (kind === 'conference-table' && typeof r.seats === 'number') piece.seats = r.seats;
     // A file of the floor's own; a screen that plays can follow the floor's channels instead, which a picture can't.
     if ((k.plays || k.shows) && typeof r.media === 'string' && ((k.plays && r.media === WATCH_MEDIA) || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
     if (r.level === 1 && canGoUp(kind)) piece.level = 1;
@@ -533,5 +539,6 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
     ids.add(piece.id);
     out.push(piece);
   }
-  return out;
+  // Each conference table keeps its chairs, and a new one takes the next free six.
+  return assignTableSeats(out);
 }

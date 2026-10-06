@@ -33,6 +33,7 @@ import { balcony } from './balcony';
 import { downstairs } from './ground';
 import { wing } from './wing';
 import { beanbags, desks, kiosks } from './seats';
+import { tableSeats } from './table-seats';
 import { meetingRoom } from './meeting-room';
 import { steps } from './steps';
 import { loft } from './loft';
@@ -66,6 +67,8 @@ function floorPlan() {
     desks,
     beanbags,
     kiosks,
+    // The chairs round the conference tables, which are furniture.
+    tableSeats,
     boards,
     // The lounge: the TV, and the jukebox and the arcade in the corner. Its couch, table and poufs are
     // furniture, with the rugs and the plants: whatever the office builder can move.

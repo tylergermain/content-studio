@@ -4,13 +4,16 @@
 // and the task queue. You're in the office as someone on the 2D view (PeerInfo.lite), not standing
 // anywhere in it.
 
+import { seatingOf } from '../shared/table-seats';
 import { Net } from './net';
 import { AVATAR_COLORS, loadProfile, loadSettings, saveProfile, store } from './state';
 import { randomLook } from '../shared/avatar';
 import { cloneLabel } from '../shared/floors';
 import { openAgentsPanel, whenReady } from './ui/agents/panel';
+import { openRoomsPanel } from './ui/rooms/panel';
 import { ROOF } from '../shared/rooftop';
 import { DESK_BY_ID, nextFreeSeat } from '../shared/layout';
+import { layoutFurniture } from '../shared/office-builder';
 import { isAsleep } from '../shared/status';
 import type { AgentEffort, AgentProvider, FloorInfo, WorkerInfo } from '../shared/protocol';
 import { $, clip, closeAllModals, doingNow, h, onDoingChange, onModalChange, openModal, readingNow, STATUS_LABEL, timeAgo, toast } from './ui/dom';
@@ -27,7 +30,7 @@ import { openSignIns } from './ui/signins';
 import { modelBadge, providerLabel } from './ui/provider';
 import { byUrgency, waitingInOrder, waitingLabel } from './nextup';
 import { askNotifyPermission, DesktopNotifier, notifyPermission, waitingOnSomeone } from './notify';
-import { deskLabel, repoChoices, worktreeAt } from './shared/hiring';
+import { deskLabel, repoChoicesAt, roomWorktree, worktreeAt } from './shared/hiring';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
 
@@ -261,11 +264,11 @@ function hire(deskId: string, prompt: string, worktree: boolean, provider?: Agen
   net.send({ t: 'worker.spawn', deskId, prompt, worktree, provider, model, effort, issue, specialist, repos: repos?.length ? repos : undefined });
 }
 
-/** With `issue`, the worker the prompt goes to takes that GitHub issue. */
-function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number) {
+/** With `issue`, the worker the prompt goes to takes that GitHub issue; with `seat`, a new one is hired there (a room's chair). */
+function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number, seat?: string) {
   if (!store.project) return toast('Pick a floor first', 'warn');
   // The back office's desks too, as far as the floor's built out (see WING).
-  const desk = nextFreeSeat((id) => !!store.workerAtDesk(id), store.floorPlan.wing)?.id;
+  const desk = seat ?? nextFreeSeat((id) => !!store.workerAtDesk(id), store.floorPlan.wing, seatingOf(store.floorPlan))?.id;
   const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));
   if (!desk && !awake.length) return toast('Every desk and bean bag is taken — send a worker home first', 'warn');
   openAsk({
@@ -274,8 +277,9 @@ function sendToWorker(title: string, text: { context?: string; initial?: string 
     newDesk: desk ? deskLabel(desk, DESK_BY_ID.get(desk)!.label) : undefined,
     workers: awake.map((w) => ({ id: w.id, name: w.name, color: w.color, status: w.status })),
     worktreeOption: desk ? worktreeAt(desk) : !!store.project.branch,
+    worktreeOn: !!desk && roomWorktree(desk),
     providerOption: true,
-    repoOptions: repoChoices(),
+    repoOptions: repoChoicesAt(desk),
     onSubmit: (prompt, to, worktree, provider, model, effort, repos, specialist) => {
       if (to) net.send({ t: 'worker.prompt', workerId: to, prompt, issue });
       else if (desk) hire(desk, prompt, worktree, provider, model, effort, repos, issue, specialist);
@@ -339,17 +343,22 @@ $('btn-agents').addEventListener('click', () => openAgentsPanel({
   sendHome: (id) => net.send({ t: 'worker.kill', workerId: id, cleanup: 'keep' }),
 }));
 
+// The floor's project rooms (ui/rooms/panel.ts): a new task in one is a new worker at its table.
+$('btn-rooms').addEventListener('click', () => openRoomsPanel({ hireAt: (seat) => sendToWorker('✨ New task', {}, undefined, seat), openWorker }));
+
 function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
   count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
   count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
   count('btn-agents', store.floors.reduce((n, f) => n + (f.waiting ?? 0), 0));
+  $('btn-rooms').hidden = !layoutFurniture(store.floorPlan).some((p) => p.kind === 'project-room');
 }
 store.on('issues', renderNav);
 store.on('pulls', renderNav);
 store.on('queue', renderNav);
 store.on('floors', renderNav);
+store.on('floorPlan', renderNav);
 
 // ---- What you have open, for the others (see PeerInfo.doing) -----------------------------------
 let doingSent: string | undefined;

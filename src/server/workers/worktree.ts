@@ -69,6 +69,22 @@ export class WorkerTrees {
   constructor(private ctx: WorkerContext) {}
 
   /**
+   * A new worker's worktree, `slug`: its workspace across `repos`, one of its project room's repository (`room`), or
+   * one of this floor's. What's worth saying about it is toasted. Why not, as a string.
+   */
+  make(name: string, slug: string, repos: RepoSource[], room?: string): { worktree: NonNullable<WorkerInfo['worktree']>; repos?: WorkerRepo[] } | string {
+    const made = repos.length ? this.makeWorkspace(slug, repos) : this.ctx.treesAt(room ? { root: room } : undefined).create(slug);
+    if (typeof made === 'string') return made;
+    if ('repos' in made) {
+      for (const note of made.notes) this.ctx.events.toast(`\u{1f33f} ${name}'s worktree of ${note}`, 'info');
+      return { worktree: made.worktree, repos: made.repos };
+    }
+    const { note, ...ref } = made;
+    if (note) this.ctx.events.toast(`\u{1f33f} ${name}'s worktree ${note}`, 'info');
+    return { worktree: room ? { ...ref, root: room } : ref };
+  }
+
+  /**
    * The workspace of a worker across repositories: `.agent-office/worktrees/<slug>`, with a worktree of
    * this floor's project and of each of `repos` in it, all on office/<slug>, and a brief for the agent
    * (the 'worker.repos' prompt, as CLAUDE.md and AGENTS.md). All or nothing: when one repository
@@ -165,7 +181,7 @@ export class WorkerTrees {
   private treesOf(info: WorkerInfo, landed?: string, landedRepos?: Record<string, string | undefined>): { name: string; dir: string; trees: Worktrees; ref: WorktreeRef; landed?: string }[] {
     const wt = info.worktree!;
     return [
-      { name: path.basename(wt.path), dir: this.ctx.dir, trees: this.ctx.trees, ref: wt, landed },
+      { name: path.basename(wt.path), dir: this.ctx.rootOf(wt), trees: this.ctx.treesAt(wt), ref: wt, landed },
       ...(info.repos ?? []).map((r) => ({
         name: r.name,
         dir: r.dir,
@@ -194,7 +210,7 @@ export class WorkerTrees {
     if (!w || !info?.worktree) return undefined;
     if (!info.repos?.length) {
       await this.syncBranch(w);
-      return this.ctx.trees.inspect(w.info.worktree!);
+      return this.ctx.treesAt(w.info.worktree).inspect(w.info.worktree!);
     }
     const repos = await Promise.all(this.treesOf(info).map(async (t) => ({ name: t.name, state: await t.trees.inspect(t.ref) })));
     const sum = (k: 'dirty' | 'ahead' | 'unpushed') => repos.reduce((n, r) => n + r.state[k], 0);
@@ -227,11 +243,12 @@ export class WorkerTrees {
 
   /** A worktree on the branch it's on now, with the office's own branch kept in `made`; the same one when nothing moved. */
   private async current(wt: Worktree): Promise<Worktree> {
-    const live = await this.ctx.trees.branchOf(wt);
+    const trees = this.ctx.treesAt(wt);
+    const live = await trees.branchOf(wt);
     if (!live) return wt;
     let made = wt.made ?? (live === wt.branch ? undefined : wt.branch);
     // Back on it, or renamed it (`git branch -m fix-x`): the branch it's on is the office's own.
-    if (made === live || (made && (await this.ctx.trees.renamedTo(made, live)))) made = undefined;
+    if (made === live || (made && (await trees.renamedTo(made, live)))) made = undefined;
     return live === wt.branch && made === wt.made ? wt : { ...wt, branch: live, made };
   }
 
@@ -251,7 +268,7 @@ export class WorkerTrees {
     }
     // Where its branch is only changes by hand: looked at again when someone tries to start it.
     if (info.lost && !recheck) return true;
-    const branch = this.ctx.trees.branchState(info.worktree.branch);
+    const branch = this.ctx.treesAt(info.worktree).branchState(info.worktree.branch);
     if (branch !== info.lost?.branch) {
       info.lost = { branch };
       this.ctx.emit(w);
@@ -352,7 +369,7 @@ export class WorkerTrees {
     const name = info.name;
     if (info.repos?.length) return this.clearRepos(info, cleanup, landed, landedRepos);
     if (!cleanup) {
-      const work = describeWork(await this.ctx.trees.inspect(wt, landed));
+      const work = describeWork(await this.ctx.treesAt(wt).inspect(wt, landed));
       if (work) return { note: `Kept ${name}'s worktree and branch ${wt.branch} — it has ${work}` };
       cleanup = 'all';
     }
@@ -360,22 +377,22 @@ export class WorkerTrees {
     let gone = wt;
     let kept = '';
     if (cleanup === 'all' && wt.made) {
-      if (!(await this.ctx.trees.hasBranch(wt.made))) {
+      if (!(await this.ctx.treesAt(wt).hasBranch(wt.made))) {
         // The agent deleted the office's branch (a rename is followed, see current), so git can't say
         // whether the one it's on is its own or was there before it: that one stays.
         cleanup = 'worktree';
       } else {
         // The office's own branch stays while it has commits that no remote, the project's checkout
         // or the branch it's on has.
-        const work = await this.ctx.trees.wouldLose(wt.made, [wt.branch]);
+        const work = await this.ctx.treesAt(wt).wouldLose(wt.made, [wt.branch]);
         if (work) kept = ` and kept branch ${wt.made} — it has ${work}`;
         // A branch it made itself goes with it; one that was there before it (main, say) isn't the office's to delete.
-        if (await this.ctx.trees.madeSince(wt.branch, wt.made)) gone = work ? { ...wt, made: undefined } : wt;
+        if (await this.ctx.treesAt(wt).madeSince(wt.branch, wt.made)) gone = work ? { ...wt, made: undefined } : wt;
         else if (work) cleanup = 'worktree';
         else gone = { ...wt, branch: wt.made, made: undefined };
       }
     }
-    const error = await this.ctx.trees.remove(gone, cleanup);
+    const error = await this.ctx.treesAt(gone).remove(gone, cleanup);
     if (error) return { error: `Couldn't delete ${name}'s worktree: ${error}` };
     if (cleanup === 'worktree') return { note: `Deleted ${name}'s worktree${kept || ` and kept branch ${wt.branch}`}` };
     return { note: `Deleted ${name}'s worktree and branch ${gone.branch}${kept && `,${kept}`}` };

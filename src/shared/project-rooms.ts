@@ -17,6 +17,8 @@ export interface ProjectLink {
   keep?: boolean;
   /** Whether the folder is a git checkout. The office says so when the layout is saved; a browser's word isn't taken. */
   git?: boolean;
+  /** The GitHub repository the room is for, as owner/name: the office cloned it into `dir` (see server/factory-rooms.ts). */
+  repo?: string;
 }
 
 /** The project room a worker was hired into (see WorkerInfo.project): its piece's id, its name and its project. */
@@ -25,7 +27,12 @@ export interface WorkerProject {
   name: string;
   dir?: string;
   url?: string;
+  /** Its GitHub repository (owner/name), when it has one: a worker hired there works in a worktree of it. */
+  repo?: string;
 }
+
+/** A GitHub repository as a room keeps it: owner/name. */
+export const REPO_NAME = /^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9._-]{1,100}$/;
 
 /** How long and wide a project room may be, in meters. */
 export const PROJECT_SIZE = { min: 2, max: 30 } as const;
@@ -69,7 +76,8 @@ export function cleanProject(raw: unknown): ProjectLink | undefined {
   const r = raw as Record<string, unknown>;
   const dir = cleanProjectDir(r.dir);
   const url = cleanProjectUrl(r.url);
-  const link: ProjectLink = { ...(dir ? { dir } : {}), ...(url ? { url } : {}), ...(r.keep === true ? { keep: true } : {}), ...(dir && r.git === true ? { git: true } : {}) };
+  const repo = typeof r.repo === 'string' && REPO_NAME.test(r.repo) && !r.repo.includes('..') ? r.repo : undefined;
+  const link: ProjectLink = { ...(dir ? { dir } : {}), ...(url ? { url } : {}), ...(r.keep === true ? { keep: true } : {}), ...(dir && r.git === true ? { git: true } : {}), ...(repo ? { repo } : {}) };
   return Object.keys(link).length ? link : undefined;
 }
 
@@ -112,7 +120,7 @@ export function cleanWorkerProject(raw: unknown): WorkerProject | undefined {
 
 /** What a worker hired into project room `p` keeps of it (see WorkerInfo.project). */
 export function workerProject(p: Piece): WorkerProject {
-  return { room: p.id, name: p.text || 'Project', ...(p.project?.dir ? { dir: p.project.dir } : {}), ...(p.project?.url ? { url: p.project.url } : {}) };
+  return { room: p.id, name: p.text || 'Project', ...(p.project?.dir ? { dir: p.project.dir } : {}), ...(p.project?.url ? { url: p.project.url } : {}), ...(p.project?.repo ? { repo: p.project.repo } : {}) };
 }
 
 /**
@@ -120,11 +128,13 @@ export function workerProject(p: Piece): WorkerProject {
  * project is and where its app runs. `inFolder` is whether it already starts in the project's folder
  * (a specialist starts in its role's folder instead, see WorkerManager.cwd).
  */
-export function projectBrief(project: WorkerProject, inFolder: boolean): string {
-  const lines = [`You're working in the ${project.name} room of the office.`];
-  if (project.dir) lines.push(inFolder ? `Your working folder is the project itself: ${project.dir}` : `Its project is in ${project.dir}: do this task's work there, and keep any notes you make for it there too.`);
+export function projectBrief(project: WorkerProject, inFolder: boolean, worktree?: { folder: string; branch: string }): string {
+  const lines = [`You're working in the ${project.name} room of the office${project.repo ? `, on ${project.repo}` : ''}.`];
+  // In a worktree of the room's repository: its own folder and branch, which nobody else works in.
+  if (worktree) lines.push(`Your working folder is your own git worktree of the project, on the branch ${worktree.branch}: ${worktree.folder}. Commit your work there, push the branch, and open a pull request with gh when it's ready.`);
+  else if (project.dir) lines.push(inFolder ? `Your working folder is the project itself: ${project.dir}` : `Its project is in ${project.dir}: do this task's work there, and keep any notes you make for it there too.`);
   else lines.push('The room has no project folder set yet, so ask before you assume one.');
   if (project.url) lines.push(`The project's app runs at ${project.url}.`);
-  lines.push('Other workers may be in this project at the same time: do not switch branches, stash, reset or commit in it unless you are asked to.');
+  if (!worktree) lines.push('Other workers may be in this project at the same time: do not switch branches, stash, reset or commit in it unless you are asked to.');
   return lines.join('\n');
 }

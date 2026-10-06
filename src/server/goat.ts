@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { seatingOf } from '../shared/table-seats.js';
 import path from 'node:path';
 import { dogAt, legSeconds, type DogState } from '../shared/dog.js';
 import type { RoomOptions } from '../shared/floorplan.js';
@@ -173,7 +174,7 @@ export class Goat {
     const key = `${wing}:${layout.revision}`;
     if (key !== this.navKey || !this.base) {
       this.navKey = key;
-      this.base = officeNav(wing, [...layoutDesks(layout.desks), ...builtDesks(wing).filter((d) => d.wing)], layout.furniture, layout.room);
+      this.base = officeNav(wing, seatingOf(layout).only ? [] : [...layoutDesks(layout.desks), ...builtDesks(wing).filter((d) => d.wing)], layout.furniture, layout.room);
     }
     const dog = this.env.dog();
     return goatNav(this.base, layout.room, dog ? [walkEnd(dog)] : []);

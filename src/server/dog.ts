@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { seatingOf } from '../shared/table-seats.js';
 import path from 'node:path';
 import { DESK_BY_ID, FLOOR, KIOSK, type DeskDef } from '../shared/layout.js';
 import { cleanDogName, dogAt, dogDefaults, legSeconds, type DogAct, type DogBreed, type DogState } from '../shared/dog.js';
@@ -295,14 +296,14 @@ export class Dog {
     const key = `${this.wing}:${layout?.revision ?? 0}`;
     if (key !== this.navKey || !this.navGrid) {
       this.navKey = key;
-      this.navGrid = officeNav(this.wing, [...layoutDesks(layout?.desks), ...builtDesks(this.wing).filter((d) => d.wing)], layout?.furniture, layout?.room);
+      this.navGrid = officeNav(this.wing, seatingOf(layout).only ? [] : [...layoutDesks(layout?.desks), ...builtDesks(this.wing).filter((d) => d.wing)], layout?.furniture, layout?.room);
     }
     return this.navGrid;
   }
   /** A seat as this floor has it: a desk the builder moved is where it stands now, and a meeting seat is at the floor's own meeting place. */
   private desk(id: string): DeskDef {
     const layout = this.env.layout?.();
-    return layoutDesks(layout?.desks).find((d) => d.id === id) ?? meetingSeats(layout?.room).find((d) => d.id === id) ?? DESK_BY_ID.get(id)!;
+    return seatingOf(layout).tables.get(id) ?? layoutDesks(layout?.desks).find((d) => d.id === id) ?? meetingSeats(layout?.room).find((d) => d.id === id) ?? DESK_BY_ID.get(id)!;
   }
 
   private nap(w: WorkerInfo) {

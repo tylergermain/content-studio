@@ -213,6 +213,7 @@ export class Floor {
     this.workers.hiringPolicy = (owner,specialist,kind) => ctx.hiringAllowed?.(this,owner,specialist,kind);
     this.workers.wing = () => this.plan.wing;
     this.workers.projectAt = (deskId) => this.plan.deskProject(deskId);
+    this.workers.seating = () => this.plan.seating();
 
     this.github = new GitHub(
       def.dir,
@@ -289,6 +290,8 @@ export class Floor {
       (workerId, repo) => {
         const w = this.workers.get(workerId);
         if (!w) return undefined;
+        // In its project room's repository: diffed in its worktree there, against the branch that was made from.
+        if (!repo && w.worktree?.root) return { name: w.name, cwd: path.join(w.worktree.root, w.worktree.path), rel: w.worktree.path, worktreeBase: w.worktree.base, baseBranch: w.worktree.from ?? null };
         if (!repo) return { name: w.name, cwd: w.worktree ? path.join(def.dir, w.worktree.path) : def.dir, rel: w.worktree?.path ?? '', worktreeBase: w.worktree?.base };
         // One of the other floors' repositories it works in: diffed against, and PRs opened against, that floor's branch.
         const r = w.repos?.find((x) => x.floor === repo);

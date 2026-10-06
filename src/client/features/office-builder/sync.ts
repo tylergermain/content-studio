@@ -7,6 +7,7 @@ import { roomOf, type RoomOptions } from '../../../shared/floorplan';
 import { floorPalette } from '../../../shared/floors';
 import { furnitureSeats, setFloorSeats, type Piece } from '../../../shared/furniture';
 import { DESKS, MEETING_SEATS, deskSeat, seatAt } from '../../../shared/layout';
+import { TABLE_SEATS, assignTableSeats, seatingOf } from '../../../shared/table-seats';
 import { meetingPlace, type MeetingKind } from '../../../shared/meeting-place';
 import { DECK_Y, deckOf, hasBoss, onDeck, type Area, type Deck } from '../../../shared/mezzanine';
 import { nearestWalkable, setOfficeFurniture, setOfficeRoom } from '../../../shared/nav';
@@ -73,6 +74,18 @@ export function createLayoutSync(ctx: Ctx) {
     // Where the floor's workers meet: the five seats every floor shares stand at this floor's own place, so whoever
     // looks one up by its id (a worker walking in to it, its view) finds it there. (The 3D office moves what you see of them.)
     meetingPlace(room).seats.forEach((pose, i) => Object.assign(MEETING_SEATS[i], pose));
+    // The chairs at its conference tables, the same way: the table seats every floor shares stand where this floor's
+    // tables put them (and nowhere for one no table has), and the desks are put away on a floor seated only at tables.
+    // A table new in the builder takes its block of chairs now, as saving gives it them; and the draft's furniture is
+    // moved about in place, so its chairs are worked out afresh each time (seatingOf keeps them by the array).
+    const seated = assignTableSeats([...a.furniture]);
+    const seating = seatingOf({ room: a.room, furniture: typeof seated === 'string' ? [...a.furniture] : seated });
+    for (const def of TABLE_SEATS) {
+      const pose = seating.tables.get(def.id);
+      Object.assign(def, pose ? { x: pose.x, z: pose.z, rotY: pose.rotY } : { x: 0, z: 0, rotY: 0 });
+    }
+    office.setTables(seating.tables);
+    office.setDesksOut(!seating.only);
     ctx.sound.setKitchen(room.kitchen);
     office.furniture.set(a.furniture, wing);
     // The seats there are to sit on: the furniture's, and a bench on each tier of the Steps on a floor that has them.

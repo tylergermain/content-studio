@@ -3,6 +3,7 @@
  * up when they're sent home, and the seats: which are free, the bean bags, the back office built
  * out. Also the building dressed up for a holiday, and what the workers have spent.
  */
+import { seatingOf } from '../../../shared/table-seats';
 import * as THREE from 'three';
 import { FLOOR, WING, beanbagsOut, deskBuilt, vacantSeats, wingMinZ, wingRowZ } from '../../../shared/layout';
 import { MEETING_PATTERNS } from '../../../shared/meetings';
@@ -238,7 +239,7 @@ export function installWorkerViews(ctx: Ctx, parts: WorkerViewsParts) {
       p.set(level ? side : p.x, 0, level ? wingMinZ(level) + 0.6 : FLOOR.minZ + 1.6);
     }
     office.setWing(level);
-    office.signs.set(fp.labels, (d) => deskBuilt(d, level));
+    office.signs.set(fp.labels, (d) => deskBuilt(d, level, seatingOf(fp)));
     player.wing = sound.wing = level;
     sky.setWing(level);
     parts.travel.syncStack();

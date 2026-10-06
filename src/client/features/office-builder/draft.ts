@@ -4,6 +4,7 @@
  * leaves something where it can't stand is put back, with why (see shared/office-builder.ts). A wall
  * takes the paintings on its faces with it, wherever it goes (see drag.ts).
  */
+import { FACTORY_ROOM, softwareFactory } from '../../../shared/software-factory';
 import { DEFAULT_FURNITURE, MAX_PIECES, canGoUp, isRound, kindDef, newPieceId, pieceBox, pieceRadius, type Box, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { cleanRoom, type RoomOptions } from '../../../shared/floorplan';
 import { PAINTING, hangSize } from '../../../shared/hangings';
@@ -360,6 +361,17 @@ export class DraftLayout {
     const rooms = starterRooms(this.now.furniture);
     if (this.now.furniture.length + rooms.length > MAX_PIECES) return `A floor takes at most ${MAX_PIECES} pieces of furniture: take some away first`;
     return this.edit((d) => d.furniture.push(...rooms));
+  }
+
+  /**
+   * The Software Factory (shared/software-factory.ts): its rooms, hallway and conference tables in place of the
+   * floor's furniture, and the floor seated at the tables. Undo brings the floor back.
+   */
+  factory(): string | undefined {
+    return this.edit((d) => {
+      d.furniture = softwareFactory();
+      d.room = { ...FACTORY_ROOM };
+    });
   }
 
   /** Takes everything upstairs away. */

@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { TABLE } from '../../../shared/table-seats';
 import { DESK_SIZE } from '../../../shared/layout';
 import { kindDef, type FurnitureKind, type Piece } from '../../../shared/furniture';
 import { mesh, roundedBox, textPlane, toon } from '../toon';
@@ -72,6 +73,17 @@ function table(color: string): THREE.Group {
   const g = new THREE.Group();
   g.add(mesh(roundedBox(2.4, 0.08, 1.1, 0.1), toon(color), 0, 0.72, 0));
   legs(g, 2.4, 1.1, 0.68, 0.16);
+  return g;
+}
+
+/** A conference table: a long top on two pedestals. Its chairs are the floor's (table-seats.ts), where workers sit. */
+function conferenceTable(color: string): THREE.Group {
+  const g = new THREE.Group();
+  g.add(mesh(roundedBox(TABLE.width, 0.08, TABLE.depth, 0.12), toon(color), 0, TABLE.height - 0.04, 0));
+  for (const sx of [-1, 1]) {
+    g.add(mesh(new THREE.CylinderGeometry(0.1, 0.12, TABLE.height - 0.08, 10), toon(PALETTE.deskLeg), sx * (TABLE.width / 2 - 0.75), (TABLE.height - 0.08) / 2, 0));
+    g.add(mesh(roundedBox(0.8, 0.05, 0.8, 0.05), toon(PALETTE.deskLeg), sx * (TABLE.width / 2 - 0.75), 0.025, 0));
+  }
   return g;
 }
 
@@ -208,6 +220,7 @@ const plantOf = (species: PlantSpecies) => () => plant(species, 1);
 const BUILDERS: Builders = {
   'team-desk': (_p, color) => teamDesk(color),
   table: (_p, color) => table(color),
+  'conference-table': (_p, color) => conferenceTable(color),
   'standing-table': (_p, color) => standingTable(color),
   'coffee-table': (_p, color) => wrap(coffeeTable(color)),
   'side-table': (_p, color) => sideTable(color),

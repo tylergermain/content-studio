@@ -84,6 +84,8 @@ export interface BuilderActions {
   starter(): void;
   /** Takes everything upstairs away. */
   clearUp(): void;
+  /** The Software Factory's rooms and tables in place of the floor's furniture. */
+  factory(): void;
   expand(): void;
   shrink(): void;
   /** The floor's boards, kiosk agents and ticker (see features/studio). */
@@ -130,7 +132,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
   // ---- The catalog ------------------------------------------------------------------------------
   const paints = h('div.ob-paints');
   const backOffice = h('div.ob-back');
-  const structure = createRoomUi(act.room);
+  const structure = createRoomUi(act.room, act.factory);
   /** The catalog's cards, by kind: what only stands on the office floor can't be added upstairs. */
   const cards = new Map<FurnitureKind, HTMLButtonElement>();
   const card = (kind: FurnitureKind) => {

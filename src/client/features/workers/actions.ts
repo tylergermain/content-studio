@@ -4,6 +4,7 @@
  * at a desk; and what the hint bar says at a desk or a board agent's kiosk. Also what the boards'
  * buttons do with a worker.
  */
+import { seatingOf } from '../../../shared/table-seats';
 import { deskSeat, type DeskDef } from '../../../shared/layout';
 import { canLabel } from '../../../shared/floorplan';
 import { officeFull, pressureNote } from '../../../shared/machine';
@@ -17,7 +18,7 @@ import { aside, key } from '../../core/hint';
 import type { Parts } from '../../core/parts';
 import { stationInfo, stationName } from '../../core/stations';
 import { askNotifyPermission, notifyPermission } from '../../notify';
-import { deskLabel, hireNote, repoChoices, worktreeAt } from '../../shared/hiring';
+import { deskLabel, hireNote, repoChoicesAt, roomWorktree, worktreeAt } from '../../shared/hiring';
 import { store } from '../../state';
 import { openAsk } from '../../ui/ask';
 import { STATUS_LABEL, clip, closeAllModals, h, toast } from '../../ui/dom';
@@ -51,7 +52,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
     // Prefer the empty desk nearest to you; when they're all taken, the bean bag that's out.
     let best: string | null = null;
     let bestD = Infinity;
-    for (const d of plan().desks) {
+    // The chairs round the floor's conference tables too, where they put them.
+    for (const d of [...plan().desks, ...seatingOf(store.floorPlan).tables.values()]) {
       if (!seatBuilt(d.id)) continue;
       if (store.workerAtDesk(d.id)) continue;
       const dist = Math.hypot(d.x - player.pos.x, d.z - player.pos.z);
@@ -65,7 +67,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
 
   /** The first seat nobody's at, in the plan's order: the desks (as far as the floor's built out), then the overflow seats. */
   function firstFreeSeat(): string | undefined {
-    return [...plan().desks, ...plan().overflow].find((d) => seatBuilt(d.id) && !store.workerAtDesk(d.id))?.id;
+    return [...plan().desks, ...plan().overflow, ...seatingOf(store.floorPlan).tables.values()].find((d) => seatBuilt(d.id) && !store.workerAtDesk(d.id))?.id;
   }
 
   let askedToNotify = false;
@@ -105,7 +107,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
         providerOption: true,
       specialistOption: true,
         worktreeOption: worktreeAt(deskId),
-        repoOptions: repoChoices(),
+        worktreeOn: roomWorktree(deskId),
+        repoOptions: repoChoicesAt(deskId),
         onSubmit: (text, o) => hire(deskId, text, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, o.specialist),
       });
     } else if (w.lost) {
@@ -142,7 +145,8 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       providerOption: true,
       specialistOption: true,
       worktreeOption: worktreeAt(deskId),
-      repoOptions: repoChoices(),
+      worktreeOn: roomWorktree(deskId),
+      repoOptions: repoChoicesAt(deskId),
       onSubmit: (text, o) => hire(deskId, text || undefined, o.worktree, o.provider, o.model, o.effort, undefined, o.repos, o.specialist),
     });
   }
@@ -459,7 +463,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
       workers: awake.map((w) => ({ id: w.id, name: w.name, color: w.color, status: w.status })),
       worktreeOption: desk ? worktreeAt(desk) : !!store.project?.branch,
       providerOption: true,
-      repoOptions: repoChoices(),
+      repoOptions: repoChoicesAt(desk ?? undefined),
       onSubmit: (prompt, to, worktree, provider, model, effort, repos, specialist) => {
         if (to) net.send({ t: 'worker.prompt', workerId: to, prompt, issue });
         else if (desk) hire(desk, prompt, worktree, provider, model, effort, issue, repos, specialist);

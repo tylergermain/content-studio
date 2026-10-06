@@ -101,7 +101,7 @@ export async function officeAssistant(ctx: Ctx, req: http.IncomingMessage, res: 
     if (!f) return send(res, 404, { error: `Say which floor: ${floors.map((x) => `${x.def.name} (${x.id})`).join(', ')}` });
     const task = str(body.task, 20_000).trim();
     if (!task) return send(res, 400, { error: 'Say what the task is' });
-    const desk = nextFreeSeat((id) => f.workers.deskOccupied(id), f.plan.wing)?.id;
+    const desk = nextFreeSeat((id) => f.workers.deskOccupied(id), f.plan.wing, f.plan.seating?.())?.id;
     if (!desk) return send(res, 409, { error: `Every desk on ${f.def.name} is taken: send someone home first` });
     const specialist = str(body.specialist, 80) || undefined;
     const provider = body.provider === 'claude' || body.provider === 'codex' ? body.provider : undefined;

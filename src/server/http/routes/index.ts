@@ -10,6 +10,7 @@ import { canvasRoute } from './canvas.js';
 import { reviewRoute } from './review.js';
 import { agentsPanelRoute } from './agents-panel.js';
 import { assistantRoute } from './assistant.js';
+import { roomsRoute } from './rooms.js';
 import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
@@ -45,6 +46,7 @@ export const routes: readonly Route[] = [
   reviewRoute,
   agentsPanelRoute,
   assistantRoute,
+  roomsRoute,
   sharesRoute,
   specialistRoute,
   skillLibraryRoute,

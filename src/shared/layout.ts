@@ -2,6 +2,7 @@
 // Units are meters; +y is up. The office floor spans FLOOR.minX..maxX / minZ..maxZ at y = 0,
 // upstairs over a garage whose floor is level with the street (STREET_Y).
 
+import { TABLE_SEATS, type Seating } from './table-seats.js';
 import { CLERESTORY } from './clerestory.js';
 
 export const FLOOR = { minX: -18, maxX: 18, minZ: -13, maxZ: 13 } as const;
@@ -23,6 +24,8 @@ export interface DeskDef {
   room?: boolean;
   /** A desk in the back office (see WING): there once the floor is built out this many rows. */
   wing?: number;
+  /** A chair at a conference table (see TABLE_SEATS): there while a table on the floor has it, where the table puts it. */
+  table?: boolean;
 }
 
 const DESK_WIDTH = 2.2;
@@ -100,14 +103,15 @@ export const WING_DESKS: DeskDef[] = Array.from({ length: WING.rows }, (_, i) =>
   ];
 }).flat();
 
-/** Whether `desk` is there on a floor built out `level` rows: every desk in the room is. */
-export function deskBuilt(desk: DeskDef, level: number): boolean {
+/** Whether `desk` is there on a floor built out `level` rows and seated as `here` says (see shared/table-seats.ts). */
+export function deskBuilt(desk: DeskDef, level: number, here?: Seating): boolean {
+  if (desk.table || (here?.only && !desk.station && !desk.room)) return !!desk.table && !!here?.tables.has(desk.id);
   return !desk.wing || desk.wing <= level;
 }
 
-/** Every desk on a floor built out `level` rows: the room's, then the back office's. */
-export function builtDesks(level: number): DeskDef[] {
-  return [...DESKS, ...WING_DESKS.filter((d) => deskBuilt(d, level))];
+/** Every desk on a floor built out `level` rows: the room's, then the back office's (none on a floor seated only at tables). */
+export function builtDesks(level: number, here?: Seating): DeskDef[] {
+  return here?.only ? [] : [...DESKS, ...WING_DESKS.filter((d) => deskBuilt(d, level))];
 }
 
 /**
@@ -199,14 +203,14 @@ export const MEETING_SEATS: DeskDef[] = (
 export const MEETING_BOARD = { x: MEETING_TABLE.x, y: 1.95, z: FLOOR.maxZ - 0.08, width: 3.6, height: 1.2 } as const;
 
 /** Any place a worker can be by id: the seats (the back office's included), the board agents' kiosks and the meeting room's chairs. */
-export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS].map((d) => [d.id, d]));
+export const DESK_BY_ID = new Map([...SEATS, ...STATIONS, ...MEETING_SEATS, ...TABLE_SEATS].map((d) => [d.id, d]));
 
 /**
  * The seat a new worker takes when nobody picks one: the first free desk (in the back office too, as
  * far as the floor is built out: `wing` rows), else the first free bean bag.
  */
-export function nextFreeSeat(taken: (id: string) => boolean, wing = 0): DeskDef | undefined {
-  return SEATS.find((d) => !taken(d.id) && deskBuilt(d, wing));
+export function nextFreeSeat(taken: (id: string) => boolean, wing = 0, here?: Seating): DeskDef | undefined {
+  return [...(here?.only ? [] : SEATS), ...(here?.tables.values() ?? [])].find((d) => !taken(d.id) && deskBuilt(d, wing, here));
 }
 
 /**

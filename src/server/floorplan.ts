@@ -1,12 +1,13 @@
 import { existsSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
-import { floorSeat, type Piece } from '../shared/furniture.js';
+import { cleanPieceText, floorSeat, pieceBox, type Piece } from '../shared/furniture.js';
 import { layoutFurniture, structureProblem, validateLayout, type DeskLayout } from '../shared/office-builder.js';
 import { structureKey } from '../shared/mezzanine.js';
 import { canLabel, cleanLabel, cleanLook, cleanPlan, cleanRoom, roomOf, rowDesks, signColor, type DeskLabel, type FloorPlan, type FloorRoom } from '../shared/floorplan.js';
-import { DESK_BY_ID, MEETING_SEATS, WING, type SeatDef } from '../shared/layout.js';
+import { DESK_BY_ID, MEETING_SEATS, SEATS, WING, type SeatDef } from '../shared/layout.js';
+import { seatingOf, type Seating } from '../shared/table-seats.js';
 import { meetingOf } from '../shared/meeting-place.js';
-import type { WorkerProject } from '../shared/project-rooms.js';
+import type { ProjectLink, WorkerProject } from '../shared/project-rooms.js';
 import { checkProjects, deskProject } from './project-rooms.js';
 
 /**
@@ -47,6 +48,11 @@ export class FloorPlanStore {
   /** The seat called `id` on this floor (see floorSeat), for whoever sits down: none of the loft's on a floor without the boss's office. */
   seat(id: string): SeatDef | undefined {
     return floorSeat(layoutFurniture(this.plan), this.plan.wing, id, roomOf(this.plan));
+  }
+
+  /** Where its workers sit beyond its desks: the chairs at its conference tables, and whether those are all (see shared/table-seats.ts). */
+  seating(): Seating {
+    return seatingOf({ furniture: layoutFurniture(this.plan), room: this.plan.room });
   }
 
   /** The project room the desk `deskId` is in, as a worker hired there keeps it (see shared/project-rooms.ts). */
@@ -116,6 +122,10 @@ export class FloorPlanStore {
     const before = this.plan.desks ?? {};
     const moved = new Set([...Object.keys(before), ...Object.keys(layout.desks)]);
     for (const id of moved) if (JSON.stringify(before[id]) !== JSON.stringify(layout.desks[id]) && taken(id)) return 'Send a worker home before moving its desk';
+    // Nobody's left at a desk on a floor seated at tables, or at a table that's gone (one moved takes its workers with it).
+    if (room.seating === 'tables' && SEATS.some((d) => taken(d.id))) return 'Send the workers at desks and bean bags home before seating the floor at its tables';
+    const chairs = seatingOf({ furniture: layout.furniture, room }).tables;
+    if ([...this.seating().tables.keys()].some((id) => taken(id) && !chairs.has(id))) return 'Send its workers home before taking a conference table away';
     // The meeting's seats are the meeting place's: it doesn't move out from under whoever's in one.
     if (meetingOf(room) !== meetingOf(this.plan.room) && MEETING_SEATS.some((d) => taken(d.id))) return 'Clear the meeting room before moving the meeting place';
     const project = checkProjects(layout.furniture, this.floorDir, this.home);
@@ -130,6 +140,41 @@ export class FloorPlanStore {
     } catch {
       return 'The layout could not be saved to disk. Your current office is unchanged';
     }
+  }
+
+  /**
+   * Names a project room, and gives it its project or takes that away (`project: null`): what a room set up for a
+   * repository has (server/factory-rooms.ts). The room keeps where it is; its folder is checked as the builder's
+   * are (checkProjects). The room as it is now, or why not.
+   */
+  setRoom(id: string, patch: { name?: string; project?: ProjectLink | null }): Piece | string {
+    const furniture = layoutFurniture(this.plan).map((p) => ({ ...p, ...(p.project ? { project: { ...p.project } } : {}) }));
+    const room = furniture.find((p) => p.id === id && p.kind === 'project-room');
+    if (!room) return 'There is no such room on this floor';
+    if (patch.name !== undefined) {
+      const was = room.text;
+      room.text = cleanPieceText(patch.name) || room.text;
+      // Its doorway's sign, when it was named for the room (as the Software Factory's are), goes by the new name too.
+      const b = pieceBox(room);
+      for (const d of furniture) {
+        if (d.kind !== 'doorway' || !was || d.text !== was) continue;
+        const db = pieceBox(d);
+        if (db.maxX > b.minX - 0.5 && db.minX < b.maxX + 0.5 && db.maxZ > b.minZ - 0.5 && db.minZ < b.maxZ + 0.5) d.text = room.text;
+      }
+    }
+    if (patch.project === null) delete room.project;
+    else if (patch.project) room.project = { ...room.project, ...patch.project };
+    const problem = checkProjects(furniture, this.floorDir, this.home);
+    if (problem) return problem;
+    const next: FloorPlan = { ...this.plan, furniture, layoutRevision: (this.plan.layoutRevision ?? 0) + 1 };
+    try {
+      writeFileSync(this.file + '.tmp', JSON.stringify(next, null, 2), { mode: 0o600 });
+      renameSync(this.file + '.tmp', this.file);
+      this.plan = next;
+    } catch {
+      return 'The room could not be saved to disk';
+    }
+    return room;
   }
 
   private load(): FloorPlan {

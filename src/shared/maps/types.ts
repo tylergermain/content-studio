@@ -38,6 +38,8 @@ export interface MapPlan {
   overflow: DeskDef[];
   stations: DeskDef[];
   meeting: DeskDef[];
+  /** The chairs at conference tables, where a floor's own tables put them (see shared/table-seats.ts). */
+  tables: DeskDef[];
   /** Everywhere a worker can be, by id. */
   byId: Map<string, DeskDef>;
   /** Where people can sit (the couches, the chairs, the stools). */

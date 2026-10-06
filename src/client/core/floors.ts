@@ -3,6 +3,7 @@
  * back office goes, what each one's storey looks like from outside, and which seats are there to sit
  * at. Also the paint of the floor you're on, and who's waiting on another floor.
  */
+import { seatingOf } from '../../shared/table-seats';
 import { floorPalette } from '../../shared/floors';
 import { DESK_BY_ID, FLOOR, WING, deskBuilt, inWing } from '../../shared/layout';
 import type { FloorInfo } from '../../shared/protocol';
@@ -33,7 +34,7 @@ export function floorStoreys(floors: FloorInfo[]): StoreyLook[] {
 /** Whether seat `id` is there to sit at on this floor: a back office desk only once the floor's built out that far. */
 export function seatBuilt(id: string): boolean {
   const d = DESK_BY_ID.get(id);
-  return !d || deskBuilt(d, store.floorPlan.wing);
+  return !d || deskBuilt(d, store.floorPlan.wing, seatingOf(store.floorPlan));
 }
 
 /**

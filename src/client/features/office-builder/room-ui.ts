@@ -68,10 +68,10 @@ const CEILINGS: readonly [kind: CeilingKind, label: string, title: string, note:
 const SIDE_NAMES: Record<Side, [letter: string, name: string]> = { north: ['N', 'North'], east: ['E', 'East'], south: ['S', 'South'], west: ['W', 'West'] };
 
 /** The choices under Structure, by name: which one a refusal is said under. */
-type PartName = 'Layout' | 'The loft is' | 'Stairs' | 'Meeting place' | 'The Steps' | 'Kitchen' | 'Ceiling' | 'Wood walls' | 'Driving tees';
+type PartName = 'Layout' | 'The loft is' | 'Stairs' | 'Meeting place' | 'The Steps' | 'Kitchen' | 'Seating' | 'Ceiling' | 'Wood walls' | 'Driving tees';
 
 /** `set` changes some of the room's fittings in the draft, and says why when it couldn't. */
-export function createRoomUi(set: (patch: RoomOptions) => string | undefined) {
+export function createRoomUi(set: (patch: RoomOptions) => string | undefined, factory?: () => void) {
   const el = h('div.ob-back');
   const note = (text: string) => h('p.ob-note', {}, text);
   const warn = (text: string) => h('p.ob-note.warn', { role: 'alert' }, text);
@@ -166,6 +166,15 @@ export function createRoomUi(set: (patch: RoomOptions) => string | undefined) {
           ['Kitchen', room.kitchen, pick('Kitchen', { kitchen: true }), 'The counter, the fridge and the coffee machine in the south-west corner'],
           ['No kitchen', !room.kitchen, pick('Kitchen', { kitchen: false }), 'That corner is floor like any other'],
         ]),
+      ),
+      part(
+        'Seating',
+        seg('Seating', [
+          ['Desks', room.seating === 'desks', pick('Seating', { seating: 'desks' }), 'Desks, and bean bags once they\u2019re all taken'],
+          ['Conference tables', room.seating === 'tables', pick('Seating', { seating: 'tables' }), 'Workers sit round the conference tables put down on the floor'],
+        ]),
+        note(room.seating === 'tables' ? 'Workers sit round the conference tables (in the catalog under Work), six to a table. The desks and bean bags are put away.' : 'Or seat the floor round conference tables, six to a table, with the desks put away.'),
+        !!factory && h('button.btn', { type: 'button', disabled: busy, title: 'Seven rooms off one hallway, each round a conference table, in place of the floor\u2019s furniture', onclick: factory }, '\u{1f3ed} Software Factory layout'),
       ),
       part(
         'Ceiling',
