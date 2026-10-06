@@ -395,6 +395,8 @@ export const GOLF_HOLE = { x: -5, z: 58, green: 5.5, fairway: [-11, 0] } as cons
  */
 /** How high the balcony railing's top is: lower than a jump, so you can hop up onto it and off the far side by parachute (see features/parachute). */
 export const BALCONY_RAIL = 1.07;
+/** How high the rooftop's glass railing is to the top of its steel rail: in reach of a jump, so you can go over it by parachute too. */
+export const ROOF_RAIL = 1.22;
 export const PARACHUTE = { jump: { x: BALCONY_DOOR.u, z: BALCONY.maxZ - 0.45 }, railTop: 1.09, out: 1.2, east: [0.6, 1.8] } as const;
 
 // ---- The rooftop bar (see shared/rooftop.ts) ------------------------------------------------------
