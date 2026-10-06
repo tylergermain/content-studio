@@ -10,6 +10,7 @@ import type { WorkspaceHost } from '../types';
 import { marks as marksCall, myName, type Marks } from '../marks';
 import { screeningComments, type Chapter } from './comments';
 import { screeningPlayer } from './player';
+import { roomDock } from '../room-dock';
 
 // The screening room full screen, the way Frame.io reviews a cut: the cut on a dark stage with a timeline of the
 // notes and chapters under it (player.ts), the notes down the right (comments.ts), and along the top which version
@@ -115,6 +116,9 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
       h('div.rr-nav.sr-nav', {}, meta),
       h('div.rr-right', {}, pill, approveBtn, openOut)),
     h('div.rr-body', {}, h('div.rr-stage.sr-stage', {}, player.element), comments.element));
+  // Opened from the review queue: its strip over the top bar, and its keys.
+  const dock = roomDock();
+  if (dock) root.prepend(dock.bar());
 
   async function review(r: Omit<ReviewRequest, 'requestId'>) {
     await host.review(r);
@@ -292,6 +296,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
       return modal.close();
     }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (dock?.key(e)) return e.preventDefault();
     const k = e.key.toLowerCase();
     if (k === ' ' || k === 'k') {
       e.preventDefault();

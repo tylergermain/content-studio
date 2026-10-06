@@ -34,7 +34,7 @@ export const PANELS: Record<WorkspaceTab, (host: WorkspaceHost) => Panel> = {
 const TAB_LABELS: Record<WorkspaceTab, string> = { canvas: 'Canvas', review: 'Review', watch: 'Watch', board: 'Board', read: 'Read', files: 'Files' };
 
 /** Every file once: what the worker linked (and remembered links), then the files beside them, then the floor's scan. */
-function everyFile(data: ChatSnapshot): ChatArtifact[] {
+export function everyFile(data: ChatSnapshot): ChatArtifact[] {
   const seen = new Set<string>();
   return [...(data.linked ?? []), ...(data.nearby ?? []), ...data.artifacts].filter((f) => !seen.has(artifactKey(f)) && !!seen.add(artifactKey(f)));
 }
