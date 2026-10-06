@@ -5,7 +5,7 @@
 
 import { BOSS_ROOM } from './boss-walls.js';
 import type { RoomOptions } from './floorplan.js';
-import { kindDef, type Piece } from './furniture.js';
+import { kindDef, pieceLength, type Piece } from './furniture.js';
 import { FLOOR } from './layout.js';
 import { deckOf, type Area } from './mezzanine.js';
 
@@ -57,7 +57,7 @@ export function wallFaces(furniture: readonly Piece[], level = 0, room: RoomOpti
     if (!k.wall || (p.level ?? 0) !== level) continue;
     const q = quarterOf(p.rotY);
     const out = (k.d ?? 0) / 2;
-    const half = (k.w ?? 0) / 2;
+    const half = pieceLength(p) / 2;
     for (const side of [0, 2]) {
       const rotY = ((q + side) % 4) * QUARTER;
       faces.push({ x: tidy(p.x + Math.sin(rotY) * out), z: tidy(p.z + Math.cos(rotY) * out), rotY, half, piece: p.id });

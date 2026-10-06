@@ -10,6 +10,7 @@ import { Ledger } from '../src/server/usage.js';
 import { WorkerManager, type WorkerEvents } from '../src/server/workers.js';
 import { cleanFurniture, type Piece } from '../src/shared/furniture.js';
 import { DESKS, deskBuilt, nextFreeSeat } from '../src/shared/layout.js';
+import { deskPoint, officeNav } from '../src/shared/nav.js';
 import { layoutProblems, validateLayout } from '../src/shared/office-builder.js';
 import { projectRoomAt } from '../src/shared/project-rooms.js';
 import type { GhPull, WorkerInfo } from '../src/shared/protocol.js';
@@ -65,7 +66,7 @@ test('each table keeps its block of chairs, and a floor takes twelve at most', (
   assert.equal((kept as Piece[])[0].seats, 13);
 });
 
-test('the Software Factory is seven project rooms off a hallway, a table in each, with nothing in the way', () => {
+test('the Software Factory is seven project rooms off the hallway, a table and a TV in each, with nothing in the way', () => {
   const f = factory();
   assert.equal(layoutProblems({ desks: {}, furniture: f }, FACTORY_ROOM).size, 0);
   assert.equal(typeof validateLayout({}, f, FACTORY_ROOM), 'object');
@@ -79,6 +80,18 @@ test('the Software Factory is seven project rooms off a hallway, a table in each
   for (const t of tables) for (const s of tableSeats(t)) assert.equal(roomOf(s.x, s.z), roomOf(t.x, t.z), s.id);
   // And the hallway between the rooms is no room's.
   assert.equal(roomOf(0, 1), undefined);
+  // Each room has its TV, and an automatic door onto the hallway with the room's name over it.
+  const doors = f.filter((p) => p.kind === 'glass-door');
+  for (const r of rooms) {
+    assert.equal(f.filter((p) => p.kind === 'wall-screen' && roomOf(p.x, p.z) === r.id).length, 1, r.text);
+    const door = doors.find((d) => d.text === r.text);
+    assert.ok(door, `${r.text} has a door`);
+    assert.ok((door!.z === -1 || door!.z === 1.4) && Math.abs(door!.x - r.x) < 3.1, `${r.text}'s door is on the hallway`);
+  }
+  // Its walls go up to the ceiling, and each is as long as it's laid down.
+  const walls = f.filter((p) => p.kind === 'tall-wall' || p.kind === 'tall-glass');
+  assert.ok(walls.length > 20);
+  for (const w of walls) assert.ok(w.w! >= 0.3 && w.w! <= 18, `${w.id} is ${w.w} long`);
   // Its rooms are named as it's asked.
   const named = softwareFactory(['API', 'Web']).filter((p) => p.kind === 'project-room').map((p) => p.text);
   assert.deepEqual(named.slice(0, 2), ['API', 'Web']);
@@ -120,8 +133,8 @@ test('a room is named and set up for a repository, cleared again, and its table 
   const set = plan.setRoom(room.id, { name: '  API  ', project: { dir: repo, repo: 'acme/api', git: true } });
   assert.equal(typeof set, 'object', String(set));
   assert.equal((set as Piece).text, 'API');
-  // Its doorway's sign is renamed with it, and no other room's.
-  const signs = JSON.parse(readFileSync(path.join(data, 'floorplan.json'), 'utf8')).furniture.filter((p: Piece) => p.kind === 'doorway').map((p: Piece) => p.text);
+  // Its door's sign is renamed with it, and no other room's.
+  const signs = JSON.parse(readFileSync(path.join(data, 'floorplan.json'), 'utf8')).furniture.filter((p: Piece) => p.kind === 'glass-door').map((p: Piece) => p.text);
   assert.deepEqual(signs.filter((s: string) => s === 'API').length, 1);
   assert.ok(signs.includes('Room 2'), signs.join());
   assert.deepEqual(plan.deskProject(chair), { room: room.id, name: 'API', dir: repo, repo: 'acme/api' });
@@ -213,4 +226,19 @@ test("a room worker's pull request isn't mistaken for the floor's of the same nu
   // On the floor's own repository it's the floor's list that says.
   const own = { ...w, worktree: { ...w.worktree!, root: undefined } } as WorkerInfo;
   assert.deepEqual(workerPr(own, floorPulls, []), { state: 'merged', number: 5 });
+});
+
+test('from the elevator you can walk to every room\'s chairs, the balcony, the street door and the meeting room', () => {
+  const f = factory();
+  const nav = officeNav(0, [], f, FACTORY_ROOM);
+  const from = nav.nearestWalkable([8.5, -10.1]);
+  const reach = (to: [number, number], what: string) => {
+    const path = nav.route(from, nav.nearestWalkable(to));
+    assert.ok(path.every((p, i) => i === 0 || nav.clearLine(path[i - 1], p)), `there's a way to ${what}`);
+  };
+  for (const t of f.filter((p) => p.kind === 'conference-table')) for (const s of tableSeats(t)) reach(deskPoint(s, 0, 0.95), s.id);
+  reach([-4, 12.55], 'the balcony');
+  reach([-17.55, 6.5], 'the street door');
+  reach([10.7, 9.2], 'the meeting room');
+  reach([15.4, 4.2], 'the commons');
 });

@@ -22,28 +22,29 @@ export interface Seating {
   only: boolean;
   tables: ReadonlyMap<string, DeskDef>;
 }
-/** How far in from the table's edge a laptop sits, and how far out from it the chair (see deskSeat). */
+/** How far in from the table's edge a laptop sits, and how far apart the chairs down each side are. */
 const IN = 0.45;
-const SPACING = 0.9;
+const SPACING = 1.2;
 
 /** The blocks there are: a table's `seats` is 1, 7, 13\u2026 */
 export const TABLE_BLOCKS = TABLE_SEAT_POOL / TABLE.seats;
 const validBase = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n) && n >= 1 && n <= TABLE_SEAT_POOL - TABLE.seats + 1 && (n - 1) % TABLE.seats === 0;
 
 /**
- * A table's chairs, where it puts them: two down each long side and one at each end, each (x, z) the spot on the
- * table its worker's laptop goes, turned so the worker faces in (a DeskDef's worker sits on its +z side at rotY 0).
+ * A table's chairs, where it puts them: three down each long side and none at the ends (one end's for the room's
+ * TV), each (x, z) the spot on the table its worker's laptop goes, turned so the worker faces in (a DeskDef's
+ * worker sits on its +z side at rotY 0).
  */
 export function tableSeats(p: Pick<Piece, 'x' | 'z' | 'rotY' | 'seats'>): DeskDef[] {
   if (!validBase(p.seats)) return [];
-  const half = { w: TABLE.width / 2, d: TABLE.depth / 2 };
+  const half = { d: TABLE.depth / 2 };
   const local: [number, number, number][] = [
-    [-SPACING / 2 - 0.45, half.d - IN, 0],
-    [SPACING / 2 + 0.45, half.d - IN, 0],
-    [SPACING / 2 + 0.45, -half.d + IN, Math.PI],
-    [-SPACING / 2 - 0.45, -half.d + IN, Math.PI],
-    [half.w - IN, 0, Math.PI / 2],
-    [-half.w + IN, 0, -Math.PI / 2],
+    [-SPACING, half.d - IN, 0],
+    [0, half.d - IN, 0],
+    [SPACING, half.d - IN, 0],
+    [SPACING, -half.d + IN, Math.PI],
+    [0, -half.d + IN, Math.PI],
+    [-SPACING, -half.d + IN, Math.PI],
   ];
   const c = Math.cos(p.rotY), s = Math.sin(p.rotY);
   const round = (n: number) => Math.round(n * 1000) / 1000;

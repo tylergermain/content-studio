@@ -49,7 +49,10 @@ export function deskPoint(d: DeskDef, t: number, s: number): Pt {
  * the plants and whatever else the office builder put there) and everything built into a room like
  * `room` (see fixedIn: the stairs are only in the way on a floor with a mezzanine). What stands upstairs is in nobody's way down here.
  */
-function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly Piece[] = floorFurniture, room: RoomOptions = floorRoom): Obstacles {
+function obstacles(wing: number, desks?: readonly DeskDef[], furniture: readonly Piece[] = floorFurniture, room: RoomOptions = floorRoom): Obstacles {
+  // A floor seated at its conference tables has its desks and bean bags put away (see RoomOptions.seating).
+  const tables = room.seating === 'tables';
+  desks ??= tables ? [] : builtDesks(wing);
   const rects: Rect[] = [];
   const circles: Circle[] = [];
   for (const d of desks) {
@@ -67,7 +70,7 @@ function obstacles(wing: number, desks = builtDesks(wing), furniture: readonly P
   circles.push(...fixed.circles.map((f) => f.circle));
   // The overflow bean bags and their lap desks. They're only out while every desk is taken, but they
   // always come out in the same spots, so the dog keeps off those.
-  for (const b of BEANBAGS) {
+  for (const b of tables ? [] : BEANBAGS) {
     const corners = [deskPoint(b, -0.62, -1.1), deskPoint(b, 0.62, -1.1), deskPoint(b, -0.62, 0.64), deskPoint(b, 0.62, 0.64)];
     const xs = corners.map(([x]) => x);
     const zs = corners.map(([, z]) => z);
@@ -293,7 +296,7 @@ export function setOfficeFurniture(pieces: readonly Piece[]) {
 
 /** The floor's room is `room` from now on (its upstairs and its stairs, its kitchen, or none of them): its grids are made again, for that room, when what's built into it changed. */
 export function setOfficeRoom(room: RoomOptions) {
-  if (structureKey(room) === structureKey(floorRoom)) return;
+  if (structureKey(room) === structureKey(floorRoom) && room.seating === floorRoom.seating) return;
   floorRoom = { ...room };
   clearOfficeNav();
 }

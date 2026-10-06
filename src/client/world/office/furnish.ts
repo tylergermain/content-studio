@@ -6,6 +6,7 @@ import type { Fixture } from './fixture';
 import { buildPiece, disposePiece } from './furniture';
 import { pillowsIn } from './props';
 import type { ScreenMesh } from './furniture-kit';
+import type { Door } from './shell';
 
 // The furniture on the floor: the lounge, the rugs, the plants and whatever else the office builder
 // put there (see shared/furniture.ts). It's built as the office comes, and then stands wherever the
@@ -34,6 +35,8 @@ export interface PieceView {
   /** A stock ticker's faces (features/studio), and the part of a punching bag that swings (features/playthings). */
   ticker?: ScreenMesh[];
   swing?: THREE.Object3D;
+  /** An automatic door's, in the office's doors (see Office.update), which open it for anyone who comes up to it. */
+  door?: Door;
   /** Put away: in the way into the back office while that's built out. */
   away: boolean;
 }
@@ -143,6 +146,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     built.group.userData.piece = p.id;
     site.group.add(built.group);
     const v: PieceView = { piece: { ...p }, group: built.group, screen: built.screen, ticker: built.ticker, swing: built.swing, away: false };
+    if (built.door) site.doors.push((v.door = { x: p.x, y: 0, z: p.z, open: 0, show: built.door.show }));
     views.set(p.id, v);
     return v;
   }
@@ -154,6 +158,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     if (v.seat) drop(site.interactables, v.seat);
     if (v.play) drop(site.interactables, v.play);
     if (v.watch) drop(site.interactables, v.watch);
+    if (v.door) drop(site.doors, v.door);
     views.delete(v.piece.id);
   }
 
@@ -172,6 +177,7 @@ export const furniture: Fixture<'furniture' | 'plants'> = (site) => {
     v.group.rotation.y = p.rotY;
     v.group.scale.setScalar(pieceScale(p));
     v.group.visible = !v.away;
+    if (v.door) Object.assign(v.door, { x: p.x, y: pieceY(p), z: p.z, locked: v.away });
 
     const box = v.away ? undefined : pieceCollider(p);
     if (box) {

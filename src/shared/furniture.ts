@@ -9,7 +9,7 @@ import { FRAMES, PICTURE_MAX, PICTURE_MIN } from './decor.js';
 import type { RoomOptions } from './floorplan.js';
 import { PAINTING, hangSize } from './hangings.js';
 import { HOOP } from './hoop.js';
-import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WHITEBOARD, WING, type SeatDef } from './layout.js';
+import { BOOKSHELF, CABINET, FLOOR, GONG, JUKEBOX, SEATING, SEATING_BY_ID, TV, WALL_HEIGHT, WHITEBOARD, WING, type SeatDef } from './layout.js';
 import { hasBoss, levelY } from './mezzanine.js';
 import { LOFT_SEATS } from './office-fixed.js';
 import { cleanProject, cleanProjectSize, type ProjectLink } from './project-rooms.js';
@@ -76,6 +76,8 @@ export interface KindDef {
   overhead?: boolean;
   /** Each one is as long and wide as it's made (see Piece.w and Piece.d): `w` and `d` are what it's laid down at. */
   stretch?: boolean;
+  /** Each one is as long as it's made (Piece.w), from the first to the second of these; `w` is what it's laid down at, `d` always its depth. */
+  long?: readonly [number, number];
   /** It marks out one project's room, and keeps which project (see Piece.project, and shared/project-rooms.ts). */
   project?: boolean;
 }
@@ -94,7 +96,7 @@ export const FURNITURE = {
   },
   'long-table': { label: 'Long table', icon: '🪵', group: 'Work', w: 3.6, d: 1.2, top: 0.76, color: '#c9a36b' },
   // Six chairs round it that workers sit at (shared/table-seats.ts): its footprint takes them in, and you bump only into the table.
-  'conference-table': { label: 'Conference table', icon: '🪑', group: 'Work', w: 5.2, d: 3, top: 0.76, solid: { w: 3.6, d: 1.4, z: 0 }, color: '#8a6f55' },
+  'conference-table': { label: 'Conference table', icon: '🪑', group: 'Work', w: 4, d: 3, top: 0.76, solid: { w: 3.6, d: 1.4, z: 0 }, color: '#8a6f55' },
   'podcast-desk': { label: 'Podcast desk', icon: '🎙️', group: 'Work', w: 2, d: 1, top: 0.76, color: '#c9a36b' },
   screen: { label: 'Video screen', icon: '📺', group: 'Work', w: 2.3, d: 0.5, top: 1.85, color: '#2b2d42', plays: true },
   // The same screen with no stand, hung at eye level: pushed up against a wall, with nothing in the way under it.
@@ -112,6 +114,11 @@ export const FURNITURE = {
   'glass-short': { label: 'Short glass wall', icon: '🔲', group: 'Rooms', w: 1.2, d: 0.1, top: 2.6, color: '#3d405b' },
   'wood-wall': { label: 'Wood slat panel', icon: '🪵', group: 'Rooms', w: 2.4, d: 0.12, top: 2.6, color: '#b98554', wall: true },
   'wood-short': { label: 'Short wood panel', icon: '🟫', group: 'Rooms', w: 1.2, d: 0.12, top: 2.6, color: '#b98554', wall: true },
+  // From the floor to the ceiling, each as long as it's laid down (Piece.w): a room that's a room, with nothing over its walls.
+  'tall-wall': { label: 'Wall to the ceiling', icon: '\u{1f9f1}', group: 'Rooms', w: 2.4, d: 0.14, top: WALL_HEIGHT, color: '#f1ede6', wall: true, long: [0.3, 18] },
+  'tall-glass': { label: 'Glass to the ceiling', icon: '\u{1f533}', group: 'Rooms', w: 2.4, d: 0.1, top: WALL_HEIGHT, color: '#2b2d42', long: [0.3, 18] },
+  // A glass door to the ceiling that slides open as anyone comes up to it, with the room's name lit over it. Nothing's in the way in it.
+  'glass-door': { label: 'Automatic door', icon: '\u{1f6aa}', group: 'Rooms', w: 1.4, d: 0.12, top: 0, color: '#2b2d42', text: 'Room' },
   // A frame to walk through, with the room's name over it: what a row of walls leaves a gap for.
   doorway: { label: 'Doorway', icon: '🚪', group: 'Rooms', w: 1.2, d: 0.14, top: 0, color: '#fff6ea', text: 'Office' },
   // A slatted panel hung low from the ceiling on rods, with a light under it: a soffit over a way in, a few side by side. Nothing's in the way under it.
@@ -210,7 +217,7 @@ export interface Piece {
   aspect?: number;
   /** How high the picture's middle hangs above the floor the piece is on. */
   lift?: number;
-  /** How long (across x) and wide (along z) it is, for a kind that stretches (see KindDef.stretch). */
+  /** How long (across x) and wide (along z) it is, for a kind that stretches (see KindDef.stretch); a wall laid down at a length has only `w` (KindDef.long). */
   w?: number;
   d?: number;
   /** The project a project room is for: its folder, its app and whether the room is kept (see shared/project-rooms.ts). */
@@ -343,6 +350,12 @@ function turnedBox(x: number, z: number, rotY: number, w: number, d: number, fro
 }
 
 /** The floor it takes up: nothing else that stands on the floor goes there. */
+/** How long a piece is across its own x: as it's made, for one that's laid down at a length (KindDef.long), else its kind's. */
+export function pieceLength(p: Pick<Piece, 'kind' | 'w'>): number {
+  const k = kindDef(p.kind);
+  return (k.long || k.stretch) && p.w !== undefined ? p.w : (k.w ?? 1);
+}
+
 export function pieceBox(p: Piece): Box {
   const k = kindDef(p.kind);
   if (k.r !== undefined) {
@@ -351,7 +364,7 @@ export function pieceBox(p: Piece): Box {
   }
   // What hangs is on the wall's face, and takes the floor from there out: as wide as its frame.
   if (k.hangs) return turnedBox(p.x, p.z, p.rotY, hangSize(p).w, k.d ?? 0.08, (k.d ?? 0.08) / 2);
-  return k.stretch ? turnedBox(p.x, p.z, p.rotY, p.w ?? k.w ?? 1, p.d ?? k.d ?? 1) : turnedBox(p.x, p.z, p.rotY, k.w ?? 1, k.d ?? 1);
+  return k.stretch ? turnedBox(p.x, p.z, p.rotY, p.w ?? k.w ?? 1, p.d ?? k.d ?? 1) : turnedBox(p.x, p.z, p.rotY, pieceLength(p), k.d ?? 1);
 }
 
 /**
@@ -469,6 +482,8 @@ const COLOR = /^#[0-9a-f]{6}$/;
 const MEDIA_NAME = /^[\w][\w.\- ()]{0,120}$/;
 /** What `media` is on a screen that plays the newest videos from the channels the floor watches, rather than a file (see StudioSetup.watch). */
 export const WATCH_MEDIA = '@watch';
+/** A screen in a project room set to show the room's app as it is now (server/room-screens.ts): its TV. */
+export const ROOM_MEDIA = '@room';
 
 /** An id for a new piece, that none of `taken` has. */
 export function newPieceId(taken: Iterable<{ id: string }>): string {
@@ -516,11 +531,15 @@ export function cleanFurniture(raw: unknown): Piece[] | string {
     }
     if (k.text !== undefined) piece.text = cleanPieceText(r.text) || k.text;
     if (k.stretch) Object.assign(piece, { w: cleanProjectSize(r.w, k.w ?? 1), d: cleanProjectSize(r.d, k.d ?? 1) });
+    if (k.long) {
+      const w = typeof r.w === 'number' && Number.isFinite(r.w) ? r.w : (k.w ?? 1);
+      piece.w = tidy(round(Math.max(k.long[0], Math.min(k.long[1], w)), GRID));
+    }
     const project = k.project ? cleanProject(r.project) : undefined;
     if (project) piece.project = project;
     if (kind === 'conference-table' && typeof r.seats === 'number') piece.seats = r.seats;
     // A file of the floor's own; a screen that plays can follow the floor's channels instead, which a picture can't.
-    if ((k.plays || k.shows) && typeof r.media === 'string' && ((k.plays && r.media === WATCH_MEDIA) || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
+    if ((k.plays || k.shows) && typeof r.media === 'string' && ((k.plays && (r.media === WATCH_MEDIA || r.media === ROOM_MEDIA)) || (MEDIA_NAME.test(r.media) && !r.media.includes('..')))) piece.media = r.media;
     if (r.level === 1 && canGoUp(kind)) piece.level = 1;
     if (k.shows) {
       const num = (v: unknown, or: number) => (typeof v === 'number' && Number.isFinite(v) ? v : or);

@@ -6,7 +6,7 @@
  * Looking at one, E opens what's on it in a window, with its sound.
  */
 import * as THREE from 'three';
-import { WATCH_MEDIA, kindDef } from '../../../shared/furniture';
+import { ROOM_MEDIA, WATCH_MEDIA, kindDef } from '../../../shared/furniture';
 import type { Ctx } from '../../core/context';
 import { aside, hintTitle, key, onE } from '../../core/hint';
 import { store } from '../../state';
@@ -16,6 +16,7 @@ import { ScreenPlayer } from './player';
 import { LIST_AT_MOST_EVERY, LIST_EVERY, freeSlot, mediaFolder, mediaListUrl, nextAfter, programme, startOf, type MediaFile, type Programme } from './playlist';
 import { openScreenWindow } from './ui';
 import { WatchScreens } from './watch';
+import { RoomTvs } from './room-tv';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -168,6 +169,7 @@ export function installScreens(ctx: Ctx) {
     lookedAt = -Infinity;
   }
 
+  const roomTvs = new RoomTvs();
   const frustum = new THREE.Frustum();
   const m = new THREE.Matrix4();
 
@@ -196,6 +198,13 @@ export function installScreens(ctx: Ctx) {
       }
       // Its face is a new one whenever the piece is built again (painted another color), so it's checked every frame.
       s.player.attach(v.screen);
+      if (v.piece.media === ROOM_MEDIA) {
+        // A project room's TV: its app as it is now, or a card saying there's none (room-tv.ts).
+        s.named = ROOM_MEDIA;
+        s.player.idle(roomTvs.texture(v.piece));
+        s.player.tick(dt, false);
+        continue;
+      }
       if (v.piece.media === WATCH_MEDIA) {
         // The channels' videos, on YouTube's own player over the face: its own picture is only the card under that.
         s.named = WATCH_MEDIA;
@@ -218,6 +227,7 @@ export function installScreens(ctx: Ctx) {
       screens.delete(id);
     }
     watch.sweep();
+    roomTvs.tick(now, floor);
     // Looks in the folder when you arrive, when a screen's put up, and every minute after: a file dropped in shows up by itself.
     if (here && screens.size && !looking) {
       const since = now - lookedAt;
@@ -235,12 +245,15 @@ export function installScreens(ctx: Ctx) {
     hint: (it) => {
       const watching = watch.hint(it.pieceId);
       if (watching) return watching;
+      const tv = it.pieceId ? roomTvs.hint([...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece) : undefined;
+      if (tv) return { k: tv, parts: [hintTitle('\u{1f4fa} Room TV'), aside(tv)] };
       const file = it.pieceId ? screens.get(it.pieceId)?.player.file : undefined;
       if (!file) return { k: 'idle', parts: [hintTitle('📺 Video screen'), aside('Nothing to play yet')] };
       return { k: file.name, parts: [hintTitle(`📺 ${file.name}`), key('E', file.kind === 'video' ? 'Watch with sound' : 'Look closer')] };
     },
     use: onE((it) => {
       if (watch.open(it.pieceId)) return;
+      if (it.pieceId && [...office.furniture.all()].find((v) => v.piece.id === it.pieceId)?.piece.media === ROOM_MEDIA) return;
       const player = it.pieceId ? screens.get(it.pieceId)?.player : undefined;
       const file = player?.file;
       if (!floor || !player || !file) return void toast(`📺 Drop videos in ${folder()}`);

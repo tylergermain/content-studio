@@ -17,6 +17,7 @@ import { hangUi } from './hang-ui';
 import type { Level, Upstairs } from './levels';
 import { mediaPicker } from './media-picker';
 import { projectUi } from './project-ui';
+import { lengthUi } from './length-ui';
 import { createRoomUi, segments } from './room-ui';
 
 /** What's picked, as the inspector shows it: a piece of furniture, or (with no `piece`) one of the room's desks. */
@@ -215,6 +216,7 @@ export function createBuilderUi(state: BuilderState, act: BuilderActions) {
     if (p.piece && k?.plays) out.push(...mediaPicker(p.piece.media, act.remedia));
     if (p.piece && k?.shows) out.push(...hangUi(p.piece, act.edit, fixed));
     if (p.piece && k?.project) out.push(...projectUi(p.piece, act.edit, fixed));
+    if (p.piece && k?.long) out.push(lengthUi(p.piece, k.long, act.edit, fixed));
     // To the other level, on a floor with an upstairs to furnish: what's up there comes down, and what can go up goes.
     if (p.piece && (p.piece.level || (state.upstairs().there && canGoUp(p.piece.kind)))) out.push(button(p.piece.level ? '⬇ Move downstairs' : '⬆ Move upstairs', p.piece.level ? 'Stand it on the office floor' : 'Stand it up on the deck', act.relevel));
     if (k?.fixed) out.push(h('p.ob-note', {}, 'The office has one of these. Remove it and this floor goes without; the catalog puts it back.'), button('Remove from this floor', 'Take it off this floor (Delete)', act.remove, '.danger'));
