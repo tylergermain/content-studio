@@ -16,6 +16,7 @@ export interface AppDef {
 
 export const APPS: readonly AppDef[] = [
   { tab: 'canvas', icon: '🎨', name: 'Design canvas', about: 'Designs live as they’re saved: click anything on them to pin a note, export PNGs, bring pages in from Paper.' },
+  { tab: 'review', icon: '🧪', name: 'Software review', about: 'Use the app or site a worker is running at any screen size, click anything on it to comment, and send the comments back.' },
   { tab: 'board', icon: '🖼️', name: 'Image board', about: 'Compare images side by side and at YouTube size, pick one, or ask for variations.' },
   { tab: 'watch', icon: '🎬', name: 'Screening room', about: 'Watch each cut, leave notes at timestamps, send them back as a revision request, and approve the final version.' },
   { tab: 'read', icon: '📄', name: 'Reports', about: 'Read reports with their sources beside them, ask about them, and approve them.' },

@@ -1,6 +1,7 @@
 import type http from 'node:http';
 import type { Session } from '../auth.js';
 import { RELAY_LOGIN, relayRequest, signInPage, stoppedPage, tunneledService } from '../relay.js';
+import { relayReviewed, reviewOffice, reviewRoute } from '../review/relay.js';
 import type { Ctx } from '../office/context.js';
 import { login, loginOptions } from './routes/auth.js';
 import { send } from './util.js';
@@ -50,8 +51,11 @@ export function requestHandler(ctx: Ctx, routes: readonly Route[]) {
       if (tunneled) {
         if (req.method === 'POST' && req.url === RELAY_LOGIN) return await login(ctx, req, res);
         if (!auth.fromAnyCookie(req)) return signInPage(res, tunneled.port, loginOptions(ctx));
+        // Review mode: the office's Review app framing the worker's app (see review/relay.ts).
+        if (reviewRoute(req, res, cfg.tailnet)) return;
         if (tunneled.svc === 'gone') return stoppedPage(res, tunneled.port);
-        return relayRequest(req, res, tunneled.svc);
+        const office = reviewOffice(req, cfg.tailnet);
+        return office ? relayReviewed(req, res, tunneled.svc, office) : relayRequest(req, res, tunneled.svc);
       }
       let url: URL;
       let p: string;

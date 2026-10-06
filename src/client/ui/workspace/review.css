@@ -1,0 +1,38 @@
+/* Software review (review.ts): the bar, the app at a device's size in the stage, the comment popover, and the comments waiting to be sent. */
+.ws-review { flex:1; min-height:0; display:flex; flex-direction:column; }
+.review-bar { flex-shrink:0; display:flex; align-items:center; flex-wrap:wrap; gap:6px; padding:10px 18px; border-bottom:1px solid var(--hairline); }
+.review-pick { max-width:220px; padding:5px 8px; font:inherit; font-size:13px; color:var(--ink); background:var(--control); border:1px solid var(--hairline-2); border-radius:var(--r-sm); }
+.review-pick[hidden] { display:none; }
+.review-address { flex:1; min-width:120px; padding:5px 9px; font:13px ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--ink); background:var(--control); border:1px solid var(--hairline-2); border-radius:var(--r-sm); outline:none; }
+.review-address:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring); }
+.review-sizes { display:inline-flex; gap:2px; padding:2px; border-radius:var(--r-sm); background:var(--wash); }
+.review-sizes .btn { border:0; background:none; box-shadow:none; }
+.review-sizes .btn.on { background:var(--control); box-shadow:var(--shadow-1); }
+.review-comment.on { background:var(--accent); color:#fff; border-color:var(--accent); }
+.review-stage { position:relative; flex:1; min-height:240px; overflow:hidden; display:flex; align-items:flex-start; justify-content:center; padding:12px; background:#e8e8ec; }
+.review-device { flex:none; box-shadow:0 1px 2px rgba(0,0,0,.08), 0 10px 30px rgba(0,0,0,.12); border-radius:6px; overflow:hidden; background:#fff; }
+.review-frame { display:block; border:0; background:#fff; transform-origin:0 0; }
+.review-pop { position:absolute; z-index:2; display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:var(--r-md); background:var(--glass-thick); backdrop-filter:var(--glass-filter); border:1px solid var(--glass-border); box-shadow:var(--shadow-3); }
+.review-pop.hidden, .review-empty.hidden, .review-notes.hidden { display:none; }
+.review-where { margin:0; font-size:12px; color:var(--muted); }
+.review-where strong { color:var(--ink); font-weight:600; }
+.review-input { width:100%; box-sizing:border-box; resize:vertical; padding:7px 9px; font:inherit; font-size:13px; color:var(--ink); background:var(--control); border:1px solid var(--hairline-2); border-radius:var(--r-sm); outline:none; }
+.review-input:focus { border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-ring); }
+.review-row { display:flex; gap:8px; }
+.review-empty { position:absolute; inset:0; display:flex; flex-direction:column; justify-content:center; align-items:center; gap:4px; padding:24px; text-align:center; color:var(--muted); font-size:13px; background:var(--surface); }
+.review-empty p { margin:0; max-width:460px; }
+.review-status { flex-shrink:0; margin:0; padding:6px 18px; font-size:12px; color:var(--muted); }
+.review-status:empty { display:none; }
+.review-status.error { color:var(--bad-ink); }
+.review-notes { flex-shrink:0; max-height:34%; overflow:auto; padding:10px 18px 12px; border-top:1px solid var(--hairline); }
+.review-notes-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; font-size:13px; }
+.review-notes-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.review-notes-list li { display:flex; align-items:flex-start; gap:8px; padding:6px 8px; border:1px solid var(--hairline); border-radius:var(--r-sm); background:var(--surface); }
+.review-notes-list li > div { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.review-go { flex:none; border:0; background:none; padding:0; cursor:pointer; }
+.review-pin { display:grid; place-items:center; width:22px; height:22px; border-radius:50% 50% 50% 2px; background:var(--accent); color:#fff; font-size:11px; font-weight:700; }
+.review-note-where { color:var(--muted); font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.review-note-text { font-size:13px; white-space:pre-wrap; overflow-wrap:anywhere; }
+.review-remove { flex:none; border:0; background:none; color:var(--muted); cursor:pointer; font-size:12px; }
+.review-remove:hover { color:var(--bad-ink); }
+@media (max-width: 640px) { .review-bar, .review-notes { padding-left:10px; padding-right:10px; } .review-sizes .btn:not(.on) { display:none; } }

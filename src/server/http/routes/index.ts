@@ -7,6 +7,7 @@ import { orgChartRoute } from './org-chart.js';
 import { specialistRoute } from './specialists.js';
 import { workerChatRoutes } from './worker-chat.js';
 import { canvasRoute } from './canvas.js';
+import { reviewRoute } from './review.js';
 import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
@@ -39,6 +40,7 @@ export const routes: readonly Route[] = [
   agentRoutes.models,
   workerChatRoutes.chat,
   canvasRoute,
+  reviewRoute,
   sharesRoute,
   specialistRoute,
   skillLibraryRoute,

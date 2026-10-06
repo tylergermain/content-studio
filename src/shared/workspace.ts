@@ -13,7 +13,7 @@ import { isDesignFile } from './design-canvas.js';
 export const WORKSPACE_KINDS = ['files', 'screening', 'board', 'reader'] as const;
 export type WorkspaceKind = typeof WORKSPACE_KINDS[number];
 /** Every tab a worker's window can have, in the order the ones a kind doesn't list come after its own (see shared/apps.ts). */
-export const WORKSPACE_TABS = ['canvas', 'watch', 'board', 'read', 'files'] as const;
+export const WORKSPACE_TABS = ['canvas', 'review', 'watch', 'board', 'read', 'files'] as const;
 export type WorkspaceTab = (typeof WORKSPACE_TABS)[number];
 
 /**
