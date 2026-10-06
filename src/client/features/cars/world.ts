@@ -202,6 +202,11 @@ function underneath(p: CarPose): boolean {
 
 /** Boxes along the car's body, for colliders: a car turned off square takes more than one. */
 const SLICES = 3;
+/** The squares what stands on the ground is sorted into (m), how far out they go, and how often they're made again anyway (ms). */
+const GRID = 16;
+const BOUND = 1000;
+const REGRID_MS = 2000;
+const cellKey = (cx: number, cz: number) => (cx + 4096) * 8192 + (cz + 4096);
 
 /**
  * The floor's cars (see CARS in shared/garage.ts), down on the street under the floor you're on: in
@@ -214,6 +219,12 @@ export class Fleet {
   private street = STREET_Y;
   /** Every car's boxes: what the cars bump into among themselves is their shapes (shared/car-crash.ts), not these. */
   private carBoxes = new Set<Collider>();
+  /**
+   * What stands on the street's ground, sorted into squares of GRID meters so a car looks only at what's
+   * near it (out on the loop there are trees by the thousand). Made again when the office's boxes change
+   * (one's added or taken away), or a couple of seconds on, for any that moved.
+   */
+  private grid: { cells: Map<number, Collider[]>; count: number; at: number; street: number } | null = null;
 
   constructor(
     /** The office's: the cars' go in with them. */
@@ -322,14 +333,44 @@ export class Fleet {
    * thousand, nearly all of them nowhere near you.
    */
   solids(x: number, z: number, r: number): Box[] {
+    const cells = this.cells();
     const out: Box[] = [];
-    for (const c of this.all) {
-      // Not the ground itself (the lawn, the lots), nor anything overhead.
-      if (this.carBoxes.has(c) || (c.bottom ?? 0) > this.street + 1 || c.top < this.street + 0.3) continue;
-      if (c.minX > x + r || c.maxX < x - r || c.minZ > z + r || c.maxZ < z - r) continue;
-      out.push(c);
+    const seen = new Set<Collider>();
+    for (let cx = Math.floor((x - r) / GRID); cx <= Math.floor((x + r) / GRID); cx++) {
+      for (let cz = Math.floor((z - r) / GRID); cz <= Math.floor((z + r) / GRID); cz++) {
+        for (const c of cells.get(cellKey(cx, cz)) ?? []) {
+          if (seen.has(c) || c.minX > x + r || c.maxX < x - r || c.minZ > z + r || c.maxZ < z - r) continue;
+          seen.add(c);
+          out.push(c);
+        }
+      }
     }
     return out;
+  }
+
+  /** The grid of what stands on the ground (see `grid`), made again when it's out of date. */
+  private cells(): Map<number, Collider[]> {
+    const now = performance.now();
+    const g = this.grid;
+    if (g && g.count === this.all.length && g.street === this.street && now - g.at < REGRID_MS) return g.cells;
+    const cells = new Map<number, Collider[]>();
+    for (const c of this.all) {
+      // Not the cars, the ground itself (the lawn, the lots), nor anything overhead.
+      if (this.carBoxes.has(c) || (c.bottom ?? 0) > this.street + 1 || c.top < this.street + 0.3) continue;
+      // Something enormous (the sea's edge) goes in the squares it covers up to a sensible size; past that, it's everywhere it reaches anyway.
+      const x0 = Math.floor(Math.max(c.minX, -BOUND) / GRID), x1 = Math.floor(Math.min(c.maxX, BOUND) / GRID);
+      const z0 = Math.floor(Math.max(c.minZ, -BOUND) / GRID), z1 = Math.floor(Math.min(c.maxZ, BOUND) / GRID);
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cz = z0; cz <= z1; cz++) {
+          const k = cellKey(cx, cz);
+          let list = cells.get(k);
+          if (!list) cells.set(k, (list = []));
+          list.push(c);
+        }
+      }
+    }
+    this.grid = { cells, count: this.all.length, at: now, street: this.street };
+    return cells;
   }
 
   /**

@@ -1,7 +1,8 @@
 import { knock, type Kick } from '../../../shared/car-crash';
+import { pointAt } from '../../../shared/circuit';
 import type { CarPose } from '../../../shared/garage';
 import { store } from '../../state';
-import { botMind, botPedals, type BotMind } from './bots';
+import { LOST_FOR, botMind, botPedals, type BotMind } from './bots';
 import type { OtherCar, StepEvents, StepWorld } from './physics';
 import { stepCar } from './physics';
 import type { Fleet } from './world';
@@ -121,8 +122,21 @@ export class Traffic {
       let mind = this.minds.get(car);
       if (!mind) this.minds.set(car, (mind = botMind(car)));
       const from = this.fleet.cars[car]?.pose;
-      if (!from) continue;
-      const pose = stepCar(car, from, botPedals(from, mind, dt, go, this.hooks.finished(car)), dt, world, this.events(car));
+      const c = store.cars[car];
+      if (!from || !c) continue;
+      // Till the lights go out, a bot's where the office lines it up.
+      if (!go) {
+        this.fleet.place(car, { x: c.x, z: c.z, rotY: c.rotY, speed: 0, steer: 0, slip: 0, spin: 0 });
+        mind.lost = 0;
+        continue;
+      }
+      let pose = stepCar(car, from, botPedals(from, mind, dt, go, this.hooks.finished(car)), dt, world, this.events(car));
+      // Lost for a while: back on the circuit where it last was on it, facing the way round.
+      if (mind.lost > LOST_FOR && mind.lastOn !== undefined) {
+        const p = pointAt(mind.lastOn);
+        pose = { x: p.x + p.tz * mind.lane, z: p.z - p.tx * mind.lane, rotY: Math.atan2(p.tx, p.tz), speed: 0, steer: 0, slip: 0, spin: 0 };
+        mind.lost = 0;
+      }
       this.fleet.place(car, pose);
       this.send(car, pose, false);
     }

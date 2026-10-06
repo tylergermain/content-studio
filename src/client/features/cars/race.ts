@@ -31,11 +31,12 @@ export interface RaceControls {
 export function raceControls(ctx: Ctx, driver: Driver): RaceControls {
   const hud = h('div.race-hud', { 'aria-live': 'polite', hidden: true });
   const lights = h('div.race-lights', { hidden: true }, ...[0, 1, 2].map(() => h('span.race-light')));
-  const board = h('ol.race-board');
+  // The order goes down the side of the screen: not in the line's box, which is centred by a transform (that a fixed box inside would go by).
+  const board = h('ol.race-board', { hidden: true });
   const head = h('div.race-head');
   const results = h('div.race-results', { hidden: true });
-  hud.append(head, lights, board);
-  document.body.append(hud, results);
+  hud.append(head, lights);
+  document.body.append(hud, board, results);
 
   /** Milliseconds till the lights go out, now (negative once it's under way). */
   const startsIn = (r: RaceView) => r.startsIn - (performance.now() - store.raceAt);
@@ -63,6 +64,7 @@ export function raceControls(ctx: Ctx, driver: Driver): RaceControls {
     const r = store.race;
     if (!r) {
       hud.hidden = true;
+      board.hidden = true;
       return;
     }
     if (r.id !== raceId) {
@@ -98,6 +100,7 @@ export function raceControls(ctx: Ctx, driver: Driver): RaceControls {
     if (stamp !== painted) {
       painted = stamp;
       hud.hidden = false;
+      board.hidden = false;
       head.textContent = line;
       head.classList.toggle('go', go);
       lights.hidden = !(left > 0 && left <= RACE.lights) && !go;

@@ -18,13 +18,19 @@ export interface BotMind {
   lane: number;
   stuck: number;
   reversing: number;
+  /** How long it's been lost (well off the circuit, or stuck however it backs out), and the last place round it that it was on it. */
+  lost: number;
+  lastOn?: number;
 }
+
+/** How long a bot's lost before it's put back on the circuit where it last was (s). */
+export const LOST_FOR = 6;
 
 /** A bot for car `car`: its skill and lane, the same every race for that car. */
 export function botMind(car: number): BotMind {
   const k = (Math.sin(car * 12.9898) * 43758.5453) % 1;
   const r = Math.abs(k);
-  return { skill: 0.86 + r * 0.12, lane: ((car % 3) - 1) * 1.6, stuck: 0, reversing: 0 };
+  return { skill: 0.86 + r * 0.12, lane: ((car % 3) - 1) * 1.6, stuck: 0, reversing: 0, lost: 0 };
 }
 
 /** The pedals for a bot in `pose`: still, held on the grid, till `go`; `easy` once it's finished, a lap at cruising pace. */
@@ -32,6 +38,11 @@ export function botPedals(pose: CarPose, mind: BotMind, dt: number, go: boolean,
   if (!go) return { gas: 0, turn: 0, brake: true };
   const v = Math.abs(pose.speed);
   const at = circuitAt(pose.x, pose.z);
+  // Lost: off the circuit, or going nowhere.
+  if (at && at.off < 10 && v > 2) {
+    mind.lastOn = at.s;
+    mind.lost = 0;
+  } else mind.lost += dt;
   if (!at) return { gas: 0.4, turn: 0, brake: false };
   // A point up the circuit, further the faster it's going, in its lane.
   const p = pointAt(at.s + 10 + v * 0.55);
