@@ -45,7 +45,7 @@ export const cars: Slice = {
     'car.move'(s, m) {
       const c = s.cars[m.car];
       if (!c) return;
-      Object.assign(c, { x: m.x, z: m.z, rotY: m.rotY, speed: m.speed, steer: m.steer });
+      Object.assign(c, { x: m.x, z: m.z, rotY: m.rotY, speed: m.speed, steer: m.steer, slip: m.slip ?? 0, spin: m.spin ?? 0 });
       s.carsAt[m.car] = performance.now();
     },
   },

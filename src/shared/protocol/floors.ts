@@ -11,6 +11,7 @@ import type { HeliState } from './heli.js';
 import type { PuttView } from './minigolf.js';
 import type { StreetView } from './street.js';
 import type { CarState } from '../garage.js';
+import type { RaceView } from '../race.js';
 import type { BallState } from '../hoop.js';
 import type { HoopView } from './hoop.js';
 import type { JukeboxState } from '../jukebox.js';
@@ -137,6 +138,8 @@ export interface FloorView {
   hoop: HoopView;
   /** The cars in the garage (see CARS in shared/garage.ts): where each one is, and who's in it. */
   cars: CarState[];
+  /** The race on the floor, lining up, under way or just over (see shared/race.ts); null when there's none. */
+  race: RaceView | null;
   /** What this floor's wall boards and kiosks are for, when it has made them its own, and what's posted on the boards. */
   studio: StudioState;
   /** The prices on this floor's ticker (none, when it has no ticker). */

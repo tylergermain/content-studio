@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAR, CARS, DRIVE, PAVEMENT, carFits, carPoint, drive, onPavement, overlaps, parked, paved, steerLimit, type CarPose, type Pedals } from '../src/shared/garage.js';
+import { CAR, CARS, DRIVE, PAVEMENT, carFits, carPoint, drive, onPavement, overlaps, parked, paved, steerLimit, turnRadius, type CarPose, type Pedals } from '../src/shared/garage.js';
 import { ELEVATOR, ELEVATOR_FRONT, FLOOR, ROAD } from '../src/shared/layout.js';
 import { Garage } from '../src/server/garage.js';
 
@@ -30,26 +30,32 @@ test('every car is parked on the pavement, clear of the others and of the elevat
   assert.equal(new Set(CARS.map((c) => c.name)).size, CARS.length, 'no two cars go by the same name');
 });
 
-test('a car on the gas gets up to top speed and no faster, and rolls to a dead stop off it', () => {
+test('a car on the gas is quick off the line, gets up past 200 km/h (the boost well past that), and rolls to a dead stop off it', () => {
   let p = run(still(), GAS, 2);
-  assert.ok(p.speed > 12 && p.speed < DRIVE.top, `quick off the line (${p.speed.toFixed(1)} m/s after 2 s)`);
-  p = run(p, GAS, 10);
-  assert.equal(p.speed, DRIVE.top);
-  assert.ok(Math.abs(p.x) < 1e-9 && p.z > 100, 'straight ahead, along its nose');
-  p = run(p, COAST, 20);
+  assert.ok(p.speed > 20 && p.speed < DRIVE.top, `quick off the line (${p.speed.toFixed(1)} m/s after 2 s)`);
+  p = run(p, GAS, 20);
+  assert.ok(Math.abs(p.speed - DRIVE.top) < 1e-9, `flat out (${p.speed.toFixed(1)} m/s)`);
+  assert.ok(DRIVE.top * 3.6 > 200, `${Math.round(DRIVE.top * 3.6)} km/h`);
+  assert.ok(Math.abs(p.x) < 1e-6 && p.z > 100, 'straight ahead, along its nose');
+  const boosted = run(p, { ...GAS, boost: true }, 20);
+  assert.ok(Math.abs(boosted.speed - DRIVE.boostTop) < 1e-9, `on the boost (${boosted.speed.toFixed(1)} m/s)`);
+  assert.ok(Math.abs(run(boosted, GAS, 15).speed - DRIVE.top) < 1e-9, 'off it, back down to its top speed');
+  p = run(p, COAST, 40);
   assert.equal(p.speed, 0, 'stopped, not creeping');
   const z = p.z;
   assert.equal(run(p, COAST, 1).z, z);
 });
 
-test('the brake stops it quickly, and S brakes before it reverses', () => {
+test('S brakes hard before it reverses, and the handbrake slows it too', () => {
   const fast = { ...still(), speed: DRIVE.top };
-  assert.equal(run(fast, { ...GAS, brake: true }, 1.1).speed, 0, 'the brake beats the gas');
   const back = { gas: -1, turn: 0, brake: false };
-  const braking = run(fast, back, 0.5);
-  assert.ok(braking.speed > 0 && braking.speed < fast.speed, 'still going forward, slower');
-  const reversing = run(fast, back, 6);
-  assert.equal(reversing.speed, -DRIVE.reverse, 'then backs up, only so fast');
+  const braking = run(fast, back, 1);
+  assert.ok(braking.speed > 0 && braking.speed < fast.speed - 25, `still going forward, a lot slower (${braking.speed.toFixed(1)})`);
+  assert.ok(run(fast, back, 2.1).speed <= 0, 'stopped in a couple of seconds from flat out');
+  assert.equal(run(fast, back, 8).speed, -DRIVE.reverse, 'then backs up, only so fast');
+  const hand = run(fast, { gas: 0, turn: 0, brake: true }, 1);
+  assert.ok(hand.speed < fast.speed - 10 && hand.speed > braking.speed, `the handbrake slows it, less than S (${hand.speed.toFixed(1)})`);
+  assert.equal(run(fast, { gas: 0, turn: 0, brake: true }, 12).speed, 0);
 });
 
 test('A turns left and D right, going forward; backing up swings the other way', () => {
@@ -61,14 +67,25 @@ test('A turns left and D right, going forward; backing up swings the other way',
   assert.ok(back.rotY < -0.1, 'reversing with the wheel left, the nose swings right');
 });
 
-test('it turns tighter slowly than flat out, so it never spins at speed', () => {
-  const radius = (speed: number) => DRIVE.wheelbase / Math.tan(steerLimit(speed));
-  assert.ok(radius(3) < 7, `a tight turn at a crawl (${radius(3).toFixed(1)} m)`);
-  assert.ok(radius(DRIVE.top) > 2 * radius(3), `a wide one flat out (${radius(DRIVE.top).toFixed(1)} m)`);
+test('slowly it turns tight; flat out it corners only as hard as the tyres hold, and on the handbrake the back comes round', () => {
+  assert.ok(turnRadius(3) < 8, `a tight turn at a crawl (${turnRadius(3).toFixed(1)} m)`);
+  assert.ok(turnRadius(DRIVE.top) > 100, `a wide one flat out (${turnRadius(DRIVE.top).toFixed(0)} m)`);
+  // Full lock flat out: it turns as fast as the tyres let it and no faster, and holds the road.
+  const lock = run({ ...still(), speed: DRIVE.top }, { gas: 1, turn: 1, brake: false }, 2);
+  assert.ok((lock.spin ?? 0) > 0 && (lock.spin ?? 0) <= DRIVE.grip / DRIVE.top + 1e-9, `turning at ${(lock.spin ?? 0).toFixed(2)} rad/s`);
+  assert.ok(Math.abs(lock.slip ?? 0) < 0.5, `not sliding (${(lock.slip ?? 0).toFixed(2)} m/s)`);
+  // The handbrake into a turn: it spins round faster than it's going round, and slides out sideways.
+  const drift = run({ ...still(), speed: 30 }, { gas: 0, turn: 1, brake: true }, 0.6);
+  assert.ok((drift.spin ?? 0) > DRIVE.grip / 30, `spinning round (${(drift.spin ?? 0).toFixed(2)} rad/s)`);
+  assert.ok(Math.abs(drift.slip ?? 0) > 3, `sliding out (${(drift.slip ?? 0).toFixed(1)} m/s)`);
+  // Let go and it straightens up, the slide dying away.
+  const after = run(drift, { gas: 0, turn: 0, brake: false }, 2);
+  assert.ok(Math.abs(after.slip ?? 0) < 0.01 && Math.abs(after.spin ?? 0) < 0.05);
   // The wheel takes a moment to turn all the way, and then holds there.
   const p = run({ ...still(), speed: 10 }, { gas: 0, turn: 1, brake: false }, 0.05);
   assert.ok(p.steer > 0 && p.steer < steerLimit(10));
-  assert.ok(Math.abs(run(p, { gas: 1, turn: 1, brake: false }, 1).steer - steerLimit(DRIVE.top)) < 0.05);
+  const held = run(p, { gas: 1, turn: 1, brake: false }, 1);
+  assert.ok(Math.abs(held.steer - steerLimit(held.speed)) < 0.05, 'less lock the faster it goes');
 });
 
 test('you can drive out of the garage, across the lot and down the street, but not onto the grass', () => {
@@ -112,12 +129,16 @@ test('the garage: one driver and one passenger a car, and only the driver moves 
   assert.ok(!g.enter('cat', 1, 'passenger'), 'full');
   assert.deepEqual(g.seatOf('bob'), { car: 1, seat: 'passenger' });
   const pose = { x: 0, z: 18, rotY: 1, speed: 12, steer: 0.1 };
+  const going = { ...pose, slip: 0, spin: 0 };
   assert.ok(!g.drive('bob', 1, pose), "the passenger doesn't steer");
-  assert.deepEqual(g.drive('ann', 1, pose), pose);
-  assert.deepEqual({ ...g.state()[1], driver: undefined, passenger: undefined }, { ...pose, driver: undefined, passenger: undefined });
-  assert.ok(!g.drive('ann', 1, { ...pose, x: -60 }), 'not off onto the grass');
+  assert.deepEqual(g.drive('ann', 1, pose), going);
+  assert.deepEqual({ ...g.state()[1], driver: undefined, passenger: undefined }, { ...going, driver: undefined, passenger: undefined });
+  assert.ok(g.drive('ann', 1, { ...pose, x: -60 }), 'off across the grass');
+  assert.ok(!g.drive('ann', 1, { ...pose, x: -280 }), 'but not into the sea');
+  assert.ok(!g.drive('ann', 1, { ...pose, x: 5000 }), 'nor off the map');
   assert.ok(!g.drive('ann', 1, { ...pose, speed: Number.NaN }), 'nor any nonsense');
-  assert.equal(g.drive('ann', 1, { ...pose, speed: 999 })?.speed, DRIVE.top, 'no faster than a car goes');
+  assert.equal(g.drive('ann', 1, { ...pose, speed: 999 })?.speed, DRIVE.boostTop, 'no faster than a car goes');
+  assert.ok(g.drive('ann', 1, pose));
   assert.ok(!g.enter('ann', 1, 'bogus' as never));
   // Ann gets out: it stops where she left it, with Bob still in it.
   assert.ok(g.leave('ann'));

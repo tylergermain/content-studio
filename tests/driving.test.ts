@@ -5,10 +5,9 @@ import { PlayerController } from '../src/client/player/index.js';
 import { Driver } from '../src/client/features/cars/controller.js';
 import { Fleet } from '../src/client/features/cars/world.js';
 import type { Collider, Interactable } from '../src/client/world/types.js';
-import { CAR, SEATS, carPoint, onPavement, type CarPose } from '../src/shared/garage.js';
+import { CAR, DRIVE, SEATS, carPoint, onPavement, type CarPose } from '../src/shared/garage.js';
+import { SURFACES } from '../src/shared/car-ground.js';
 import { ROAD, STREET_Y } from '../src/shared/layout.js';
-import { LOOP_LENGTH, STREET_END, nearLoop } from '../src/shared/scenic.js';
-import { LapTimer } from '../src/client/features/cars/laps.js';
 
 const G = STREET_Y;
 const ROAD_Z = (ROAD.minZ + ROAD.maxZ) / 2;
@@ -32,7 +31,12 @@ function street(t: TestContext, solids: Collider[] = []) {
   player.view = 'third';
   const sent: CarPose[] = [];
   const bumps: number[] = [];
-  const driver = new Driver(player, fleet, { moved: (_car, p) => sent.push({ ...p }), bump: (_at, speed) => bumps.push(speed) });
+  const driver = new Driver(player, fleet, {
+    moved: (_car, p) => sent.push({ ...p }),
+    world: () => ({ solids: (x, z, r) => fleet.solids(x, z, r), cars: () => [] }),
+    events: () => ({ bump: (_at, speed) => bumps.push(speed), hitCar: () => {} }),
+    held: () => false,
+  });
   fleet.place(BLUE, { x: 0, z: ROAD_Z, rotY: Math.PI / 2, speed: 0, steer: 0 });
   const keys = (...codes: string[]) => {
     player.clearKeys();
@@ -74,7 +78,7 @@ test('a column in the way stops the car short with a crunch, and it backs away f
   assert.ok(s.car().x < 8, 'reversing out of it');
 });
 
-test('at an angle into a wall, the car slides along it rather than stopping dead', (t) => {
+test('at an angle into a wall, the car scrapes along it rather than stopping dead', (t) => {
   // A wall along the road's north edge; the car heads east, veering into it.
   const wall = { minX: -80, maxX: 80, minZ: ROAD.minZ - 1, maxZ: ROAD.minZ + 0.3, bottom: G, top: G + 3 };
   const s = street(t, [wall]);
@@ -84,7 +88,8 @@ test('at an angle into a wall, the car slides along it rather than stopping dead
   s.frames(60);
   const car = s.car();
   assert.ok(car.x > 10 && car.speed > 10, `on along the wall (x ${car.x.toFixed(1)}, ${car.speed.toFixed(1)} m/s)`);
-  assert.ok(Math.abs(car.rotY - Math.PI / 2) < 0.05, 'turned to run along it');
+  assert.ok(Math.abs(car.rotY - Math.PI / 2) < 0.4, `turned along it (${car.rotY.toFixed(2)})`);
+  assert.ok(s.bumps.length >= 1, 'with a crunch');
   for (const [sx, sz] of [[1, 1], [-1, 1], [1, -1], [-1, -1]]) {
     const c = carPoint(car, (sx * CAR.width) / 2, (sz * CAR.length) / 2);
     assert.ok(c.z >= wall.maxZ - 1e-6, 'not into it');
@@ -127,25 +132,18 @@ test("beside the driver, you ride along but don't drive", (t) => {
   assert.ok(Math.hypot(s.player.pos.x - seat.x, s.player.pos.z - seat.z) < 1e-6);
 });
 
-test("flat out with no hands, the car rides the scenic loop's edges all the way round, and the lap is timed", (t) => {
+test('flat out with no hands, it runs off the road where the loop bends away and on across the grass, slower there', (t) => {
   const s = street(t);
-  s.fleet.place(BLUE, { x: -20, z: ROAD_Z, rotY: Math.PI / 2, speed: 0, steer: 0 });
+  s.fleet.place(BLUE, { x: 60, z: ROAD_Z, rotY: Math.PI / 2, speed: 0, steer: 0 });
   s.driver.enter(BLUE, 'driver');
   s.keys('KeyW');
-  const laps = new LapTimer();
-  let lap: number | null = null;
-  let furthest = 0;
-  let slowest = Infinity;
-  for (let frame = 0; frame < 60 * 110 && lap === null; frame++) {
+  let left = -1;
+  for (let frame = 0; frame < 60 * 12 && s.car().x < 260; frame++) {
     s.frames(1);
-    const car = s.car();
-    assert.ok(onPavement(car), `on the road at (${car.x.toFixed(1)}, ${car.z.toFixed(1)})`);
-    lap = laps.update(car.x, car.z, frame / 60);
-    const at = nearLoop(car.x, car.z);
-    if (at && Math.abs(car.x) > STREET_END) furthest = Math.max(furthest, at.d);
-    if (frame > 60 * 5) slowest = Math.min(slowest, car.speed);
+    if (left < 0 && !onPavement(s.car())) left = s.car().x;
   }
-  assert.ok(furthest > LOOP_LENGTH - 20, `all the way round (${furthest.toFixed(0)} of ${LOOP_LENGTH.toFixed(0)} m)`);
-  assert.ok(lap !== null && lap > 60 && lap < 100, `a lap in ${lap?.toFixed(1)} s`);
-  assert.ok(slowest > 10, `bumping round the bends, never stopped (slowest ${slowest.toFixed(1)} m/s)`);
+  const car = s.car();
+  assert.ok(left > 140, `off the road past the loop's straight (at x ${left.toFixed(0)})`);
+  assert.ok(car.x > 200 && Math.abs(car.z - ROAD_Z) < 1e-6, `straight on across the grass (x ${car.x.toFixed(0)})`);
+  assert.ok(Math.abs(car.speed - DRIVE.top * SURFACES.grass.top) < 2, `as fast as the grass allows (${car.speed.toFixed(1)} m/s)`);
 });

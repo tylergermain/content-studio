@@ -6,6 +6,7 @@ import type { DogState } from '../dog.js';
 import type { CarSeat, CarState } from '../garage.js';
 import type { BallState } from '../hoop.js';
 import type { JukeboxState } from '../jukebox.js';
+import type { RaceView } from '../race.js';
 import type { WbElement, WbPointer } from '../whiteboard.js';
 
 export type DecorClientMsg =
@@ -63,10 +64,18 @@ export type CarClientMsg =
   | { t: 'car.enter'; car: number; seat: CarSeat }
   /** Get out of the car you're in; driving, it stays parked where you left it. */
   | { t: 'car.leave' }
-  /** Where the car you're driving has got to, and how it's going; everyone else on the floor sees it there. */
-  | { t: 'car.drive'; car: number; x: number; z: number; rotY: number; speed: number; steer: number }
+  /** Where the car you're driving (or a bot of yours is) has got to, and how it's going; everyone else on the floor sees it there. */
+  | { t: 'car.drive'; car: number; x: number; z: number; rotY: number; speed: number; steer: number; slip?: number; spin?: number }
+  /** A car nobody's in, knocked rolling by yours: where it's got to (your page rolls it till it stops). */
+  | { t: 'car.push'; car: number; x: number; z: number; rotY: number; speed: number; steer: number; slip?: number; spin?: number }
+  /** Your car (`by`) ran into car `car`, which somebody else drives: the knock it gets, for their page (see shared/car-crash.ts). */
+  | { t: 'car.hit'; car: number; by: number; dvx: number; dvz: number; dspin: number }
   /** Honk the horn of the car you're in. */
-  | { t: 'car.honk' };
+  | { t: 'car.honk' }
+  /** Start a race round the circuit (shared/race.ts) from the wheel of your car: `laps` of it, with `bots` in cars nobody's in. */
+  | { t: 'race.start'; laps?: number; bots?: number }
+  /** Join the race that's lining up, from the wheel of your car. */
+  | { t: 'race.join' };
 
 export type DogClientMsg =
   /** Give the dog on your floor a pat; it has to be within reach. */
@@ -82,10 +91,14 @@ export type ToysServerMsg =
   | { t: 'ball'; ball: BallState }
   /** Someone got into one of your floor's cars, or out of one; `answer` to each car.enter and car.leave of yours, whether you got in or not. */
   | { t: 'cars'; cars: CarState[]; answer?: boolean }
-  /** A car on your floor is being driven (see car.drive). */
-  | { t: 'car.move'; car: number; x: number; z: number; rotY: number; speed: number; steer: number }
+  /** A car on your floor is being driven, or rolling from a knock (see car.drive and car.push). */
+  | { t: 'car.move'; car: number; x: number; z: number; rotY: number; speed: number; steer: number; slip?: number; spin?: number }
+  /** Someone's car ran into the one you drive (or a bot of yours): the knock it gets. */
+  | { t: 'car.hit'; car: number; by: number; dvx: number; dvz: number; dspin: number }
   /** Someone in a car on your floor honked its horn. */
   | { t: 'car.honk'; car: number }
+  /** The race on your floor, as it stands now (null: none, or over and cleared away). */
+  | { t: 'race'; race: RaceView | null }
   | { t: 'jukebox'; state: JukeboxState }
   /** Who's at the arcade cabinet on your floor now, and the building's high scores. */
   | { t: 'cabinet'; state: CabinetState }

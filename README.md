@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/AgentSystemLabs/agent-office/main/i
 - **Together.** Voice, chat, screen sharing on the lounge TV, your webcam as your character's face (**I**, off until you turn it on; it goes browser to browser, or encrypted through a TURN server if you set one, and the office never decodes or records it), a shared whiteboard, and the boss's desk for meeting across: share your screen or a game to a monitor facing two guest chairs, on a call.
 - **Something on.** The jukebox plays its own tunes, internet radio or a YouTube video, which shows on the lounge TV with its sound as the floor's music. A floor's video screens can follow YouTube channels, and every worker wears an emblem on its antenna for the agent it runs on.
 
-There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive round a scenic loop past a farm, pines, mountains and a beach, and out front Main Street, with plots for other businesses, a mini golf course and a helicopter to fly over it all): see [docs/features.md](docs/features.md).
+There's a lot more (a rooftop bar, a whisky cabinet to pour a dram at and clink glasses over, an office dog and a goat, an arcade, supercars in the garage to drive flat out (and off-road), crash and race against bots round a scenic loop past a farm, pines, mountains and a beach, and out front Main Street, with plots for other businesses, a mini golf course and a helicopter to fly over it all): see [docs/features.md](docs/features.md).
 
 ## Requirements
 

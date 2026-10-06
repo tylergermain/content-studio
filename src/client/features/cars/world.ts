@@ -202,6 +202,11 @@ function underneath(p: CarPose): boolean {
 
 /** Boxes along the car's body, for colliders: a car turned off square takes more than one. */
 const SLICES = 3;
+/** The squares what stands on the ground is sorted into (m), how far out they go, and how often they're made again anyway (ms). */
+const GRID = 16;
+const BOUND = 1000;
+const REGRID_MS = 2000;
+const cellKey = (cx: number, cz: number) => (cx + 4096) * 8192 + (cz + 4096);
 
 /**
  * The floor's cars (see CARS in shared/garage.ts), down on the street under the floor you're on: in
@@ -212,6 +217,14 @@ export class Fleet {
   readonly cars: CarView[];
   /** How far below the floor you're on the street is (see streetBelow). */
   private street = STREET_Y;
+  /** Every car's boxes: what the cars bump into among themselves is their shapes (shared/car-crash.ts), not these. */
+  private carBoxes = new Set<Collider>();
+  /**
+   * What stands on the street's ground, sorted into squares of GRID meters so a car looks only at what's
+   * near it (out on the loop there are trees by the thousand). Made again when the office's boxes change
+   * (one's added or taken away), or a couple of seconds on, for any that moved.
+   */
+  private grid: { cells: Map<number, Collider[]>; count: number; at: number; street: number } | null = null;
 
   constructor(
     /** The office's: the cars' go in with them. */
@@ -227,6 +240,7 @@ export class Fleet {
       const colliders: Collider[] = [];
       for (let i = 0; i <= SLICES; i++) colliders.push({ minX: 0, maxX: 0, minZ: 0, maxZ: 0, top: 0, bottom: 0 });
       all.push(...colliders);
+      for (const c of colliders) this.carBoxes.add(c);
       const view: CarView = { ...model, index, def, pose: { x: def.x, z: def.z, rotY: def.rotY, speed: 0, steer: 0 }, occupied: false, colliders, interactable };
       this.show(view);
       return view;
@@ -241,11 +255,11 @@ export class Fleet {
 
   /**
    * Each frame: every car where the office says it is (smoothed out, and carried on a little the
-   * way it's going, since its driver said so), but for the one you're in (`mine`) if you're driving
-   * it, which is where your own driving put it. The office doesn't tell you your own moves, so that
-   * goes back into `cars` for when you get out.
+   * way it's going, since its driver said so), but for the ones this page moves (`local`: yours if
+   * you're driving it, bots you're racing, cars you knocked rolling), which are where it put them. The
+   * office doesn't tell you your own moves, so those go back into `cars` for when you let go of them.
    */
-  update(dt: number, cars: CarState[], at: number[], now: number, mine: { car: number; driving: boolean } | null, eye: THREE.Vector3) {
+  update(dt: number, cars: CarState[], at: number[], now: number, mine: { car: number; driving: boolean } | null, local: ReadonlySet<number>, eye: THREE.Vector3) {
     const k = 1 - Math.exp(-dt * 12);
     // From up in the office, the cars in under it can't be seen through its floor: not drawn at all.
     const indoors = eye.y > -SLAB && eye.x > FLOOR.minX && eye.x < FLOOR.maxX && eye.z > FLOOR.minZ && eye.z < FLOOR.maxZ;
@@ -260,22 +274,25 @@ export class Fleet {
         v.open.visible = occupied;
         this.show(v);
       }
-      if (v.index === mine?.car && mine.driving) {
+      if (local.has(v.index)) {
         Object.assign(c, v.pose);
         at[v.index] = now;
         continue;
       }
       const p = v.pose;
-      // Where it'd be by now, going on as it was: at most a quarter of a second on.
-      const ahead = c.speed ? Math.min(0.25, Math.max(0, (now - (at[v.index] ?? now)) / 1000)) * c.speed : 0;
-      const x = c.x + Math.sin(c.rotY) * ahead;
-      const z = c.z + Math.cos(c.rotY) * ahead;
-      const far = Math.hypot(x - p.x, z - p.z) > 8;
+      // Where it'd be by now, going on as it was (sliding too): at most a quarter of a second on.
+      const since = Math.min(0.25, Math.max(0, (now - (at[v.index] ?? now)) / 1000));
+      const slip = c.slip ?? 0;
+      const x = c.x + (Math.sin(c.rotY) * c.speed + Math.cos(c.rotY) * slip) * since;
+      const z = c.z + (Math.cos(c.rotY) * c.speed - Math.sin(c.rotY) * slip) * since;
+      const far = Math.hypot(x - p.x, z - p.z) > 8 + Math.abs(c.speed) * 0.15;
       const turn = Math.atan2(Math.sin(c.rotY - p.rotY), Math.cos(c.rotY - p.rotY));
       p.x = far ? x : p.x + (x - p.x) * k;
       p.z = far ? z : p.z + (z - p.z) * k;
       p.rotY = far ? c.rotY : p.rotY + turn * k;
       p.speed = c.speed;
+      p.slip = slip;
+      p.spin = c.spin ?? 0;
       p.steer += (c.steer - p.steer) * k;
       this.show(v);
     }
@@ -309,21 +326,51 @@ export class Fleet {
   }
 
   /**
-   * What a car bumps into on the street, besides the pavement's edge: whatever stands on it (the
-   * garage's columns and walls, street lamps, trees, the elevator, the other cars), but not car
-   * `except`'s own boxes. With `near`, only what's within `r` of (x, z): out on the scenic loop
-   * there are trees by the thousand, nearly all of them nowhere near you.
+   * What a car bumps into on the ground within `r` of (x, z), besides the edge of where cars go:
+   * whatever stands on it (the garage's columns and walls, street lamps, trees, the elevator, the
+   * farm's barn, the mountains' feet), but not the cars, which run into each other by their shapes
+   * (see features/cars/physics.ts). Only what's near: out on the scenic loop there are trees by the
+   * thousand, nearly all of them nowhere near you.
    */
-  solids(except: number, near?: { x: number; z: number; r: number }): Box[] {
-    const own = this.cars[except]?.colliders;
+  solids(x: number, z: number, r: number): Box[] {
+    const cells = this.cells();
     const out: Box[] = [];
-    for (const c of this.all) {
-      // Not the ground itself (the lawn, the lots), nor anything overhead.
-      if (own?.includes(c) || (c.bottom ?? 0) > this.street + 1 || c.top < this.street + 0.3) continue;
-      if (near && (c.minX > near.x + near.r || c.maxX < near.x - near.r || c.minZ > near.z + near.r || c.maxZ < near.z - near.r)) continue;
-      out.push(c);
+    const seen = new Set<Collider>();
+    for (let cx = Math.floor((x - r) / GRID); cx <= Math.floor((x + r) / GRID); cx++) {
+      for (let cz = Math.floor((z - r) / GRID); cz <= Math.floor((z + r) / GRID); cz++) {
+        for (const c of cells.get(cellKey(cx, cz)) ?? []) {
+          if (seen.has(c) || c.minX > x + r || c.maxX < x - r || c.minZ > z + r || c.maxZ < z - r) continue;
+          seen.add(c);
+          out.push(c);
+        }
+      }
     }
     return out;
+  }
+
+  /** The grid of what stands on the ground (see `grid`), made again when it's out of date. */
+  private cells(): Map<number, Collider[]> {
+    const now = performance.now();
+    const g = this.grid;
+    if (g && g.count === this.all.length && g.street === this.street && now - g.at < REGRID_MS) return g.cells;
+    const cells = new Map<number, Collider[]>();
+    for (const c of this.all) {
+      // Not the cars, the ground itself (the lawn, the lots), nor anything overhead.
+      if (this.carBoxes.has(c) || (c.bottom ?? 0) > this.street + 1 || c.top < this.street + 0.3) continue;
+      // Something enormous (the sea's edge) goes in the squares it covers up to a sensible size; past that, it's everywhere it reaches anyway.
+      const x0 = Math.floor(Math.max(c.minX, -BOUND) / GRID), x1 = Math.floor(Math.min(c.maxX, BOUND) / GRID);
+      const z0 = Math.floor(Math.max(c.minZ, -BOUND) / GRID), z1 = Math.floor(Math.min(c.maxZ, BOUND) / GRID);
+      for (let cx = x0; cx <= x1; cx++) {
+        for (let cz = z0; cz <= z1; cz++) {
+          const k = cellKey(cx, cz);
+          let list = cells.get(k);
+          if (!list) cells.set(k, (list = []));
+          list.push(c);
+        }
+      }
+    }
+    this.grid = { cells, count: this.all.length, at: now, street: this.street };
+    return cells;
   }
 
   /**

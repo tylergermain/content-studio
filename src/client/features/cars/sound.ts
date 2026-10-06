@@ -4,24 +4,32 @@ import type { Pos } from '../../sound/places';
 
 // ---- The cars in the garage ------------------------------------------------------------------------
 
-/** A car's engine note: a sawtooth and a square an octave under it, through a filter that opens as it revs. */
+/** A car's engine note: a sawtooth and a square an octave under it, through a filter that opens as it revs; and its tyres' screech. */
 interface Motor {
   saw: OscillatorNode;
   sub: OscillatorNode;
   tone: BiquadFilterNode;
   gain: GainNode;
   pan: PannerNode;
+  /** Hiss through a narrow band, as loud as the tyres are sliding. */
+  hiss: AudioBufferSourceNode;
+  screech: GainNode;
   /** When it started (the AudioContext's clock). */
   born: number;
 }
 
-/** A car somebody's driving: where it is, how fast it's going and how hard it's pushed. */
+/** A car somebody's driving: where it is, how fast it's going, how hard it's pushed, and how much it's sliding (0 to 1). */
 export interface Engine {
   car: number;
   at: Pos;
   speed: number;
   gas: number;
+  skid?: number;
 }
+
+/** How fast a car goes in each gear before it shifts up (m/s), and how many it has. */
+const GEAR = 11;
+const GEARS = 6;
 
 /** The engines of the cars being driven. */
 export class Motors {
@@ -52,12 +60,13 @@ export class Motors {
       const v = Math.abs(e.speed);
       const push = Math.abs(e.gas);
       // Up through the gears: the revs climb in each one and drop back as it shifts up.
-      const gear = Math.min(3, Math.floor(v / 5.5));
-      const f = 44 + gear * 7 + Math.min(1.5, (v - gear * 5.5) / 5.5) * 46 + push * 5;
+      const gear = Math.min(GEARS - 1, Math.floor(v / GEAR));
+      const f = 44 + gear * 6 + Math.min(1.6, (v - gear * GEAR) / GEAR) * 46 + push * 5;
       m.saw.frequency.setTargetAtTime(f, now, 0.06);
       m.sub.frequency.setTargetAtTime(f / 2, now, 0.06);
       m.tone.frequency.setTargetAtTime(240 + f * 5 + push * 450, now, 0.08);
-      m.gain.gain.setTargetAtTime(0.035 + 0.04 * push + 0.025 * Math.min(1, v / 20), now, 0.1);
+      m.gain.gain.setTargetAtTime(0.035 + 0.04 * push + 0.03 * Math.min(1, v / 50), now, 0.1);
+      m.screech.gain.setTargetAtTime(0.06 * Math.min(1, e.skid ?? 0) * Math.min(1, v / 8), now, 0.05);
     }
     for (const [car, m] of this.motors) {
       if (on.has(car)) continue;
@@ -66,6 +75,8 @@ export class Motors {
       m.gain.gain.setTargetAtTime(0, now, 0.12);
       m.saw.stop(now + 0.8);
       m.sub.stop(now + 0.8);
+      m.screech.gain.setTargetAtTime(0, now, 0.05);
+      m.hiss.stop(now + 0.8);
     }
   }
 
@@ -100,7 +111,13 @@ export class Motors {
     tone.connect(gain).connect(pan);
     saw.start(now);
     sub.start(now);
-    return { saw, sub, tone, gain, pan, born: now };
+    // The tyres: silent till they slide.
+    const hiss = this.a.noise(this.a.buf.white, true);
+    const screech = ctx.createGain();
+    screech.gain.value = 0;
+    hiss.connect(biquad(ctx, 'bandpass', 2300, 5)).connect(screech).connect(pan);
+    hiss.start(now);
+    return { saw, sub, tone, gain, pan, hiss, screech, born: now };
   }
 
 }

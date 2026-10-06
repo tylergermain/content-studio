@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CAR, DRIVE, onPavement, paved, steerLimit } from '../src/shared/garage.js';
+import { CAR, onPavement, paved, turnRadius } from '../src/shared/garage.js';
 import { FLOOR, GOLF_HOLE, ROAD, WALL_T } from '../src/shared/layout.js';
 import { CHECKPOINTS, FARM, FOOTHILLS, LAKE, LIGHTHOUSE, LOOP, LOOP_HALF, LOOP_LENGTH, LOOP_PAVED, MOUNTAINS, STREET_END, STREET_Z, TUNNEL, nearLoop, placeAt, shoreX } from '../src/shared/scenic.js';
 import { LapTimer, lapTime } from '../src/client/features/cars/laps.js';
@@ -17,9 +17,9 @@ test('the loop leaves one end of the street and comes back to the other, dead st
   assert.ok(LOOP_LENGTH > 1000, `a drive worth taking (${LOOP_LENGTH.toFixed(0)} m, plus the street)`);
 });
 
-test('no bend on it is tighter than a car can take flat out, and a car fits on it all the way round', () => {
-  // The tightest a car turns at top speed.
-  const tightest = DRIVE.wheelbase / Math.tan(steerLimit(DRIVE.top));
+test('every bend on it can be taken at 90 km/h, and a car fits on it all the way round', () => {
+  // The tightest a car corners at 90 km/h without sliding.
+  const tightest = turnRadius(25);
   for (let i = 3; i < LOOP.length - 3; i++) {
     const a = LOOP[i - 3];
     const b = LOOP[i + 3];
@@ -108,12 +108,14 @@ test('each bit of the loop is somewhere: the farm, the pines, the mountains and 
   assert.equal(placeAt(0, -300), null);
 });
 
-test('the office takes a driver out on the loop at their word, and nowhere off it', () => {
+test('the office takes a driver out on the loop and across the grass at their word, but not into the lake or the sea', () => {
   const g = new Garage();
   assert.ok(g.enter('ada', 8, 'driver'));
   const p = LOOP[Math.floor(LOOP.length / 2)];
   assert.ok(g.drive('ada', 8, { x: p.x, z: p.z, rotY: 0, speed: 12, steer: 0 }), 'out on the loop');
-  assert.equal(g.drive('ada', 8, { x: p.x, z: p.z + 30, rotY: 0, speed: 12, steer: 0 }), undefined, 'not off across the grass');
+  assert.ok(g.drive('ada', 8, { x: p.x, z: p.z + 30, rotY: 0, speed: 12, steer: 0 }), 'off across the grass');
+  assert.equal(g.drive('ada', 8, { x: LAKE.x, z: LAKE.z, rotY: 0, speed: 12, steer: 0 }), undefined, 'not into the lake');
+  assert.equal(g.drive('ada', 8, { x: shoreX(200) - 10, z: 200, rotY: 0, speed: 12, steer: 0 }), undefined, 'nor the sea');
 });
 
 test('a lap is timed from the line in front of the office all the way round, past every checkpoint', () => {
