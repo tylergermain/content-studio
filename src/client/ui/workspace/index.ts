@@ -43,18 +43,19 @@ const enabled = (tab: WorkspaceTab) => appOn(store.studio.setup, tab);
 /**
  * Mounts a workspace of `kind`: a bar with its name, its tabs and Theater, the open tab's panel, and for an admin the
  * folders shared with the floor. Its tabs are the floor's apps that are on (see shared/apps.ts): the kind's own in its
- * order, then the others, Files last. A tab shows when it has files or is the kind's main one (its first that's on);
- * until you pick one, the window opens on the first tab holding a file the worker linked.
+ * order, then the others, Files last. Every one shows, so each is there to open before it has anything (its panel says
+ * how it fills), the ones with nothing yet dimmed; until you pick one, the window opens on the first tab holding a file
+ * the worker linked, else the kind's main one (its first that's on).
  */
 export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Workspace {
   const spec = WORKSPACES[kind];
   const order: WorkspaceTab[] = [...spec.tabs.filter((t) => t !== 'files'), ...WORKSPACE_TABS.filter((t) => t !== 'files' && !spec.tabs.includes(t)), 'files'];
   /** The tab the window opens on: the kind's first, unless the floor has turned it off. Files is always on. */
   const main = () => [spec.tabs[0], ...order].find(enabled)!;
-  /** The tabs showing for `all`: on, and the main one or holding something. */
   /** How much a tab has to show: its files, or for Review the apps the worker is running. */
   const holding = (t: WorkspaceTab, all: ChatArtifact[]) => (t === 'review' ? reviewTargets(host.workerId).length : filesOn(t, all).length);
-  const showing = (all: ChatArtifact[]) => order.filter((t) => enabled(t) && (t === main() || holding(t, all) > 0));
+  /** The tabs showing: every app that's on. */
+  const showing = () => order.filter(enabled);
   const tabBar = h('div.ws-tabs', { role: 'tablist', 'aria-label': `${spec.label} views` });
   const theater = h('button.btn.ws-theater', { type: 'button', 'aria-pressed': 'false', title: 'Hide the conversation to give this side the whole window (F)' }, 'Theater');
   const body = h('div.ws-body', {}, h('p.chat-empty.ws-loading', {}, `Opening ${host.workerName}’s ${spec.label === 'Files' ? 'files' : spec.label.toLowerCase()}…`));
@@ -94,10 +95,12 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
     data = next;
     const all = everyFile(next);
     const linkedTabs = new Set((next.linked ?? []).map((f) => fileTab(f) ?? 'files'));
-    const shown = showing(all);
+    const shown = showing();
     for (const [t, b] of buttons) {
       const n = holding(t, all);
       b.hidden = !shown.includes(t);
+      b.classList.toggle('idle', !n);
+      b.title = n ? '' : 'Nothing here yet';
       b.querySelector('.ws-count')!.textContent = n ? String(n) : '';
     }
     tabBar.hidden = shown.length < 2;
@@ -151,7 +154,7 @@ export function mountWorkspace(host: WorkspaceHost, kind: WorkspaceKind): Worksp
       if (!file) return;
       const own = fileTab(file);
       chosen = true;
-      select(own && showing(all).includes(own) ? own : 'files').show(file);
+      select(own && showing().includes(own) ? own : 'files').show(file);
       element.focus({ preventScroll: true });
     },
     stop() {

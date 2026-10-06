@@ -51,6 +51,9 @@ function relayBase(port: number): string | undefined {
   return undefined;
 }
 
+/** What Ask … to run it puts in the message box. */
+const RUN_IT = 'Run the app you built on this machine and keep its server running (a dev server, or the built site served on a free port), so I can review it in the office.';
+
 interface Note extends SoftwareNote {
   n: number;
 }
@@ -288,9 +291,13 @@ export function softwareReview(host: WorkspaceHost): Panel {
     pick.replaceChildren(...targets.map((t) => h('option', { value: t.key }, t.label)));
     pick.hidden = targets.length < 2;
     empty.classList.toggle('hidden', targets.length > 0);
+    device_.hidden = !targets.length;
+    const ask = h('button.btn.primary.small', { type: 'button', disabled: !host.canSend() }, `Ask ${host.workerName} to run it`);
+    ask.addEventListener('click', () => host.draft(RUN_IT));
     empty.replaceChildren(
       h('p', {}, h('strong', {}, 'No app running yet.')),
-      h('p', {}, `When ${host.workerName} starts its app (npm run dev, a preview build), it shows here: use it at any size, turn on Comment, click anything to pin a comment, and send them all back.`),
+      h('p', {}, `When ${host.workerName} runs its app on this machine (npm run dev, or a built site served on a port), it shows here: use it at any size, turn on Comment, click anything to pin a comment, and send them all back. A site published somewhere else doesn\u2019t show here.`),
+      ask,
     );
     if (current && !targets.some((t) => t.key === current!.key)) current = undefined;
     if (!current && targets[0]) open(targets[0]);
