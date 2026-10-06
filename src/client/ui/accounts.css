@@ -7,3 +7,12 @@
 .accounts .team-head .btn { padding: 3px 10px; font-size: 13px; }
 .role { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--wash); color: var(--muted); }
 .role.admin { background: var(--accent-tint); color: var(--accent-text); }
+
+/* A member's floors (floorsPicker): the ones they work on, read-only on the rest. */
+.accounts .floors-row { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; margin: 6px 0 2px 22px; font-size: 12.5px; }
+.accounts .floors-label { color: var(--muted, #6b6b73); }
+.accounts .floor-pick { display: inline-flex; align-items: center; gap: 5px; font-weight: 500; cursor: pointer; }
+.accounts .floor-pick input:disabled + * , .accounts .floor-pick:has(input:disabled) { opacity: 0.55; }
+.accounts .floor-pick.every { font-weight: 600; }
+.accounts .invite-floors .floors-row { margin-left: 0; }
+.accounts .team-list li { flex-wrap: wrap; }

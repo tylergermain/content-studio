@@ -20,6 +20,27 @@ export function routeAccountsMessage(msg: ServerMsg) {
 }
 
 /** 🔑 Accounts, for admins: invite people by link, list them, change their role or revoke them. */
+/**
+ * The floors a member works on, as a row of checkboxes (read-only on the ones left unchecked; see
+ * shared/floor-access.ts): `floors` undefined is every floor, today's and any added later. `set` is told the new list.
+ */
+function floorsPicker(floors: string[] | undefined, set: (floors: string[] | undefined) => void, label = 'Works on'): HTMLElement {
+  const all = store.floors.map((f) => f.id);
+  const every = h('input', { type: 'checkbox' }) as HTMLInputElement;
+  every.checked = !floors;
+  const boxes = store.floors.map((f) => {
+    const b = h('input', { type: 'checkbox', value: f.id }) as HTMLInputElement;
+    b.checked = !floors || floors.includes(f.id);
+    b.disabled = !floors;
+    return h('label.floor-pick', {}, b, f.name);
+  });
+  const chosen = () => boxes.map((l) => l.querySelector('input')!).filter((b) => b.checked).map((b) => b.value);
+  every.addEventListener('change', () => set(every.checked ? undefined : all));
+  for (const l of boxes) l.querySelector('input')!.addEventListener('change', () => set(chosen()));
+  return h('div.floors-row', { title: 'They look round and read on the other floors, but can\u2019t hire, direct, approve or change anything there' },
+    h('span.floors-label', {}, `${label}:`), h('label.floor-pick.every', {}, every, 'Every floor'), ...boxes);
+}
+
 export function openAccounts(net: Net) {
   let status: HTMLElement | null = null;
   /** The invite just made, shown big until the next one. */
@@ -39,10 +60,19 @@ export function openAccounts(net: Net) {
   const roleSelect = h('select', { 'aria-label': 'Role' }, h('option', { value: 'member' }, 'Member'), h('option', { value: 'admin' }, 'Admin')) as HTMLSelectElement;
   const inviteBtn = h('button.btn.primary', { type: 'submit' }, 'Make invite link');
   const form = h('form.invite-row', {}, nameInput, roleSelect, inviteBtn) as HTMLFormElement;
+  /** The floors a member invited now will work on (every floor, unless they're narrowed). */
+  let inviteFloors: string[] | undefined;
+  const invitePicker = h('div.invite-floors');
+  const paintInviteFloors = () => {
+    invitePicker.hidden = roleSelect.value === 'admin';
+    invitePicker.replaceChildren(floorsPicker(inviteFloors, (f) => ((inviteFloors = f), paintInviteFloors()), 'They\u2019ll work on'));
+  };
+  roleSelect.addEventListener('change', paintInviteFloors);
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     inviteBtn.disabled = true;
-    net.send({ t: 'accounts.invite', name: nameInput.value.trim() || undefined, role: roleSelect.value as AccountRole });
+    const role = roleSelect.value as AccountRole;
+    net.send({ t: 'accounts.invite', name: nameInput.value.trim() || undefined, role, ...(role === 'member' && inviteFloors ? { floors: inviteFloors } : {}) });
   });
 
   const render = () => {
@@ -53,9 +83,11 @@ export function openAccounts(net: Net) {
     body.replaceChildren();
     if (!s) return body.append(h('p.empty', {}, 'Loading…'));
 
+    paintInviteFloors();
     body.append(
       h('label', {}, 'Invite someone'),
       form,
+      invitePicker,
       h('p.note', {}, 'You get a link that makes one account, with its own name and password. It works once and expires after 7 days. Leave the name empty and they pick their own.'),
     );
     if (status) body.append(status);
@@ -90,6 +122,8 @@ export function openAccounts(net: Net) {
           h('span.keys', { title: `Invited by ${a.createdBy}` }, seen),
           you ? null : role,
           you ? null : revoke,
+          // A member's floors: they work on these and look round the rest.
+          a.role === 'member' ? floorsPicker(a.floors, (floors) => net.send({ t: 'accounts.floors', accountId: a.id, floors: floors ?? 'all' })) : null,
         ),
       );
     }

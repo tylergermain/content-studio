@@ -35,6 +35,7 @@ import { askNotifyPermission, DesktopNotifier, notifyPermission, waitingOnSomeon
 import { deskLabel, repoChoicesAt, roomWorktree, worktreeAt } from './shared/hiring';
 // The tab title counts the workers waiting on someone, on every floor, as the 3D office's does.
 import { renderTitle } from './shared/title';
+import { mayWork, readOnlyText } from '../shared/floor-access';
 
 // Sent here because this browser can't draw the 3D office (see noWebGL in core/scene.ts).
 if (new URLSearchParams(location.search).get('why') === 'webgl') {
@@ -111,7 +112,7 @@ function renderFloors() {
   floorSelect.disabled = store.floors.length < 2;
   const p = store.project;
   const f = store.currentFloor();
-  $('floor-meta').textContent = p ? [p.branch && `⎇ ${p.branch}`, f?.repo ?? p.dir, f && `👥 ${f.people} here`].filter(Boolean).join(' · ') : store.floors.length ? '' : 'Add a project from the elevator in the 3D office.';
+  $('floor-meta').textContent = p ? [p.branch && `⎇ ${p.branch}`, f?.repo ?? p.dir, f && `👥 ${f.people} here`, !mayWork(store.me, store.floor) && '\u{1f440} read-only here: you look round, but don\u2019t work here'].filter(Boolean).join(' · ') : store.floors.length ? '' : 'Add a project from the elevator in the 3D office.';
   // Someone waiting on another floor: a way straight there.
   const elsewhere = store.floors.filter((o) => o.id !== store.floor && o.waiting > 0 && !o.cloning);
   const box = $('elsewhere');
@@ -269,6 +270,7 @@ function hire(deskId: string, prompt: string, worktree: boolean, provider?: Agen
 /** With `issue`, the worker the prompt goes to takes that GitHub issue; with `seat`, a new one is hired there (a room's chair). */
 function sendToWorker(title: string, text: { context?: string; initial?: string } = {}, issue?: number, seat?: string) {
   if (!store.project) return toast('Pick a floor first', 'warn');
+  if (!mayWork(store.me, store.floor)) return toast(`\u{1f440} ${readOnlyText(store.currentFloor()?.name ?? 'this floor')}`, 'warn');
   // The back office's desks too, as far as the floor's built out (see WING).
   const desk = seat ?? nextFreeSeat((id) => !!store.workerAtDesk(id), store.floorPlan.wing, seatingOf(store.floorPlan))?.id;
   const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));

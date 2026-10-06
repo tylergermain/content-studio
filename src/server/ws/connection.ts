@@ -11,6 +11,7 @@ import { COLOR_RE, spotFrom, str } from '../office/input.js';
 import { floorView, roofView, screensOf } from '../office/views.js';
 import { dispatch } from './dispatch.js';
 import { features } from './handlers/index.js';
+import { meKey } from '../office/people.js';
 
 /**
  * Someone came in: where they arrive and who they are, the welcome with everything they see, and
@@ -36,7 +37,7 @@ export function onConnection(ctx: Ctx, ws: WebSocket, url: URL, session: Session
   const colorParam = url.searchParams.get('color') ?? '';
   const intParam = (k: string) => (url.searchParams.get(k) ? Number(url.searchParams.get(k)) : undefined);
   const me = meOf(account?.id);
-  const client = newClient(id, ws, { accountId: account?.id, admin: me.admin }, {
+  const client = newClient(id, ws, { accountId: account?.id, admin: me.admin, meKey: meKey(me) }, {
     id,
     name,
     color: COLOR_RE.test(colorParam) ? colorParam : '#4f86f7',

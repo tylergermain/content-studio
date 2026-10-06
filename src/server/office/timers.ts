@@ -1,5 +1,6 @@
 import type { Ctx } from './context.js';
 import { SLOW_CLIENT_BYTES } from './client.js';
+import { meKey } from './people.js';
 
 /** The office's own clocks: terminals re-sent to viewers who fell behind, and the heartbeat. Returns what stops them. */
 export function startTimers(ctx: Ctx): () => void {
@@ -24,7 +25,7 @@ export function startTimers(ctx: Ctx): () => void {
         c.ws.terminate();
         continue;
       }
-      if (!c.out && (!ctx.stillIn(c) || c.admin !== ctx.meOf(c.accountId).admin)) accountsMoved = true;
+      if (!c.out && (!ctx.stillIn(c) || c.meKey !== meKey(ctx.meOf(c.accountId)))) accountsMoved = true;
       c.isAlive = false;
       c.ws.ping();
     }

@@ -1,4 +1,4 @@
-import { employeeWorkerError } from '../../org-chart/access.js';
+import { employeeWorkerError, floorAccessError } from '../../org-chart/access.js';
 // Files a floor's windows show or take: pictures on the walls and the whiteboard, files dropped into
 // a terminal, changed pictures in the Changes window, and the bookshelf's Markdown.
 import type { Floor } from '../../floor.js';
@@ -49,7 +49,7 @@ export const fileRoutes = {
   whiteboardFile: {
     path: '/api/whiteboard/file',
     auth: 'session',
-    async handle(ctx, { req, res, url }) {
+    async handle(ctx, { req, res, url, session }) {
       const floor = floorParam(ctx, url);
       // Pictures on the whiteboard. Their ids are hashes of what's in them, so they never change.
       if (!floor) return send(res, 404, { error: 'No such floor' });
@@ -60,6 +60,8 @@ export const fileRoutes = {
       }
       if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
       if (!sameOrigin(req, ctx.cfg)) return send(res, 403, { error: 'Forbidden' });
+      const readOnly = floorAccessError(ctx, floor, session.account?.id);
+      if (readOnly) return send(res, 403, { error: readOnly });
       let body: unknown;
       try {
         body = JSON.parse(await readBody(req, WB_MAX_FILE_BYTES + 4096));

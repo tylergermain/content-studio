@@ -1,11 +1,11 @@
-import { employeeWorkerError } from '../../org-chart/access.js';
+import { employeeWorkerError, floorAccessError } from '../../org-chart/access.js';
 // Workers at their desks and the board agents at their kiosks: hiring them, their terminals, their
 // worktrees and pull requests.
 import { MAX_REPOS, type RepoSource } from '../../workers.js';
 import { OPEN_CODE_MODEL_MAX } from '../../../shared/providers.js';
 import { isAgentEffort, isAgentProvider, type WorkerClientMsg } from '../../../shared/protocol.js';
 import { issueNumber, num, str } from '../../office/input.js';
-import { here, workerOf } from './common.js';
+import { here, workerOf, workHere } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
 const CLEANUPS = new Set(['keep', 'worktree', 'all']);
@@ -18,7 +18,7 @@ const TYPING_GAP_MS = 500;
 export const workerHandlers = {
   'worker.spawn'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     if (!floor) return;
     const kind = msg.kind === 'shell' ? 'shell' : 'agent';
     const denied=floor.workers.hiringPolicy?.(c.accountId,str(msg.specialist,48)||undefined,kind);if(denied)return ctx.warn(c,denied);
@@ -197,7 +197,9 @@ export const workerHandlers = {
     }
   },
   'term.resize'(ctx, c, msg) {
-    if (c.attached.has(msg.workerId)) ctx.workerFloor(msg.workerId)?.workers.resize(msg.workerId, num(msg.cols), num(msg.rows));
+    // Someone read-only on the floor watches the terminal at the size it is.
+    const floor = ctx.workerFloor(msg.workerId);
+    if (floor && c.attached.has(msg.workerId) && !floorAccessError(ctx, floor, c.accountId)) floor.workers.resize(msg.workerId, num(msg.cols), num(msg.rows));
   },
 } satisfies HandlerMap<WorkerClientMsg>;
 

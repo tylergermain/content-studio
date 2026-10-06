@@ -5,7 +5,7 @@ import type { ServerMsg, WhiteboardClientMsg } from '../../../shared/protocol.js
 import type { Ctx } from '../../office/context.js';
 import { throttle, type Client } from '../../office/client.js';
 import { num } from '../../office/input.js';
-import { here } from './common.js';
+import { here, workHere } from './common.js';
 import type { FeatureHooks, HandlerMap, ViewPieces } from './types.js';
 
 /** Everyone who has their floor's whiteboard open. */
@@ -32,7 +32,7 @@ export const whiteboardHandlers = {
   'wb.open': openOrClose,
   'wb.close': openOrClose,
   'wb.update'(ctx, c, msg) {
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     if (!floor) return;
     const { accepted, error } = floor.whiteboard.apply(msg.elements);
     if (accepted.length) ctx.toNeighbors(c, { t: 'wb.update', elements: accepted });

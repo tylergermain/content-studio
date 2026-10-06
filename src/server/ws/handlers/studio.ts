@@ -2,7 +2,7 @@
 import { EMPTY_STUDIO, isStudioBoard } from '../../../shared/studio.js';
 import type { StudioClientMsg } from '../../../shared/protocol.js';
 import { str } from '../../office/input.js';
-import { here } from './common.js';
+import { here, workHere } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
 export const studioView: ViewPieces['studio'] = (_ctx, floor) => floor?.studio.state() ?? EMPTY_STUDIO;
@@ -33,14 +33,14 @@ export const studioHandlers = {
     ctx.toastFloor(floor, `🧩 ${c.peer.name} changed this floor's apps`);
   },
   'studio.post'(ctx, c, msg) {
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     if (!floor) return;
     const r = floor.studio.post(msg, c.peer.name);
     if (typeof r === 'string') return ctx.warn(c, r);
     ctx.toFloor(floor, { t: 'studio', studio: floor.studio.state() });
   },
   'studio.unpost'(ctx, c, msg) {
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     if (!floor) return;
     const r = floor.studio.remove(str(msg.id, 40));
     if (typeof r === 'string') return ctx.warn(c, r);

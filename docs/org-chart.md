@@ -22,6 +22,8 @@ The chart lives in the floor's private `.agent-office/org-chart.json`, with atom
 
 ## Employee accounts and the computer boundary
 
+Which floors a member works on comes first: on a floor they're read-only on (see [Add users](../README.md#add-users), *Which floors they work on*), they direct no worker, hire nobody and change nothing, whatever the org chart allows them; they can still read a worker's chat, files and review there when the org chart lets them. On the floors they work on, the rules below apply as ever.
+
 Create **member** accounts under **Accounts**, then assign those accounts in the org chart. Employee restrictions require individual accounts. The shared office password grants administrator access, so do not give it to employees. After an owner has a working named admin account, disable shared-password access under Accounts. Existing owner access is not changed automatically.
 
 This policy governs managed Content Studio workers, its API, and its agent delegation tools. Current workers still run on the shared Mac with bypass permissions. These controls do not prevent a process from launching raw CLI agents or editing host files outside the app. Enforcing a computer-level restriction requires isolated worker users, containers, or VMs in the sandbox phase.

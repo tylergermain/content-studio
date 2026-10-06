@@ -3,6 +3,9 @@ import type { Me } from '../../shared/protocol.js';
 import type { Ctx, People } from './context.js';
 import type { Client } from './client.js';
 
+/** What about someone, when it changes, they're told again: whether they're an admin, and the floors they may work on. */
+export const meKey = (me: Me) => JSON.stringify([me.admin, me.floors ?? null]);
+
 /** WebSocket close code for a session that stopped counting: the account was revoked, or the shared password switched off. */
 const SIGNED_OUT = 4001;
 
@@ -11,7 +14,7 @@ export function people(ctx: Ctx): People {
   /** Who a connection is: its account's current name and role, or an admin guest on the shared password. */
   const meOf = (accountId: string | undefined): Me => {
     const a = ctx.accounts.get(accountId);
-    return a ? { account: { name: a.name, role: a.role }, admin: a.role === 'admin' } : { admin: !accountId };
+    return a ? { account: { name: a.name, role: a.role }, admin: a.role === 'admin', ...(a.role !== 'admin' && a.floors ? { floors: [...a.floors] } : {}) } : { admin: !accountId };
   };
   /** Still signed in: the account wasn't revoked, and the shared password wasn't switched off. */
   const stillIn = (c: Client) => (c.accountId ? !!ctx.accounts.get(c.accountId) : ctx.accounts.sharedPassword);
@@ -30,8 +33,9 @@ export function people(ctx: Ctx): People {
         continue;
       }
       const me = meOf(c.accountId);
-      if (me.admin !== c.admin) {
+      if (meKey(me) !== c.meKey) {
         c.admin = me.admin;
+        c.meKey = meKey(me);
         ctx.sendTo(c, { t: 'me', me });
       }
       if (me.admin) ctx.sendTo(c, { t: 'accounts', state: (state ??= ctx.accounts.state(onlineAccounts())) });

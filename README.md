@@ -340,12 +340,16 @@ A teammate with the `agent-office` command on their computer can run `agent-offi
 
 **2. Make them an account.** Open **☰ → 🔑 Accounts** and make an invite link. Name it (or let them pick) and make them a *Member* or an *Admin*. The link works once, for 7 days, and they choose their own password. Make one for yourself too, as an admin.
 
+**Which floors they work on.** A member works on every floor unless you say otherwise: tick the floors under the invite (*They'll work on*), or later under their name in **🔑 Accounts** (*Works on*). On the other floors they're read-only: they ride there, look round, and read its workers' chats, files and reviews, but can't hire, message or direct workers, approve, send reviews, commit, or change the floor, and the office refuses those whatever their page shows. The top bar says **👀 Read-only here** on those floors. Admins work on every floor. (What a member may do on the floors they work on is still the [org chart](docs/org-chart.md)'s to say.)
+
 The same works from a terminal on the office's machine, even while it runs:
 
 ```bash
 agent-office accounts                      # accounts and open invites
 agent-office accounts invite ada --admin   # prints a single-use /join#… link
 agent-office accounts role ada member
+agent-office accounts floors ada content-os,friday-studio   # works there, read-only elsewhere (or: all)
+agent-office accounts invite ada --floors content-os        # an invite that starts them on those floors
 agent-office accounts revoke ada           # signed out within seconds
 ```
 

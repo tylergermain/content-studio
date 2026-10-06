@@ -35,7 +35,7 @@ function office(t: { after(fn: () => void): void }) {
       },
     },
   };
-  const ctx = { cfg: { trustProxy: false }, floors: new Map([['f1', floor]]), toastFloor: (_f: unknown, text: string) => toasts.push(text) } as never;
+  const ctx = { cfg: { trustProxy: false }, floors: new Map([['f1', floor]]), toastFloor: (_f: unknown, text: string) => toasts.push(text), meOf: () => ({ admin: true }) } as never;
   const server = http.createServer((req, res) => {
     const url = new URL(req.url!, 'http://office');
     void tableReviewRoute.handle(ctx, { req, res, url, path: url.pathname, session: { account: { id: 'acct', name: 'Tyler' } } } as never);

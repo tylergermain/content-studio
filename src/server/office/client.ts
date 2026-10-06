@@ -12,8 +12,9 @@ export interface Client {
   peer: PeerInfo;
   /** Signed in with this account; none means the shared office password. */
   accountId?: string;
-  /** Whether this person was last told they're an admin (see `me`). */
+  /** Whether this person was last told they're an admin (see `me`), and all they were last told that matters (people.ts meKey). */
   admin: boolean;
+  meKey: string;
   /** Signed out while connected; whatever it still sends is dropped until the socket closes. */
   out?: boolean;
   attached: Set<string>;
@@ -30,12 +31,13 @@ export interface Client {
 }
 
 /** A client that just connected, with nothing going on yet. */
-export function newClient(id: string, ws: WebSocket, who: { accountId: string | undefined; admin: boolean }, peer: PeerInfo): Client {
+export function newClient(id: string, ws: WebSocket, who: { accountId: string | undefined; admin: boolean; meKey: string }, peer: PeerInfo): Client {
   return {
     id,
     ws,
     accountId: who.accountId,
     admin: who.admin,
+    meKey: who.meKey,
     attached: new Set(),
     stale: new Set(),
     lastMoveAt: 0,

@@ -8,7 +8,7 @@ import { fileTab, reviewText, WORKSPACE_TABS, type WorkspaceTab } from '../../sh
 import type { WorkerInfo } from '../../shared/protocol.js';
 import type { Floor } from '../floor.js';
 import type { Ctx } from '../office/context.js';
-import { employeeWorkerError } from '../org-chart/access.js';
+import { employeeWorkerError, floorAccessError } from '../org-chart/access.js';
 import { listArtifacts } from '../worker-chat/artifacts.js';
 import { chatHistory, mergeMessages } from '../worker-chat/history.js';
 import { defaultRoot, workerLinks } from '../worker-chat/links.js';
@@ -177,6 +177,9 @@ export class ReviewQueue {
     const item = this.store.get(id);
     if (!item) return 'That item is no longer in the queue';
     const floor = this.ctx.floors.get(item.floor);
+    // Deciding a floor's work is working there (shared/floor-access.ts).
+    const readOnly = floor && floorAccessError(this.ctx, floor, account);
+    if (readOnly) return readOnly;
     const here = floor?.workers.get(item.workerId);
     if ((state === 'approved' || state === 'notes') && floor && here) {
       const denied = employeeWorkerError(this.ctx, floor, account, item.workerId);

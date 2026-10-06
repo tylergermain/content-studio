@@ -3,6 +3,7 @@ import { existsSync, readFileSync, renameSync, statSync, writeFileSync } from 'n
 import path from 'node:path';
 import { officeHome } from './config.js';
 import type { AccountInvite, AccountRole, AccountsState } from '../shared/protocol.js';
+import { cleanFloors } from '../shared/floor-access.js';
 
 export const NAME_MAX = 24;
 export const PASSWORD_MIN = 8;
@@ -20,6 +21,8 @@ export interface Account {
   createdAt: number;
   createdBy: string;
   lastSeenAt?: number;
+  /** The floors a member may work on; read-only on the rest (shared/floor-access.ts). Missing: every floor. */
+  floors?: string[];
 }
 
 interface Saved {
@@ -110,7 +113,7 @@ export class Accounts {
     return a && timingSafeEqual(derived, Buffer.from(a.hash, 'hex')) ? a : undefined;
   }
 
-  invite(by: string, role: AccountRole, name?: string): AccountInvite | string {
+  invite(by: string, role: AccountRole, name?: string, floors?: string[]): AccountInvite | string {
     this.sync();
     this.dropExpired();
     const n = cleanName(name);
@@ -126,6 +129,7 @@ export class Accounts {
       token: randomBytes(24).toString('base64url'),
       ...(n ? { name: n } : {}),
       role: role === 'admin' ? 'admin' : 'member',
+      ...(role !== 'admin' && floors ? { floors } : {}),
       createdBy: by,
       createdAt: now,
       expiresAt: now + INVITE_TTL_MS,
@@ -177,6 +181,7 @@ export class Accounts {
       salt: salt.toString('hex'),
       createdAt: Date.now(),
       createdBy: invite.createdBy,
+      ...(invite.floors ? { floors: [...invite.floors] } : {}),
     };
     this.data.invites.splice(i, 1);
     this.data.accounts.push(account);
@@ -198,6 +203,16 @@ export class Accounts {
     const a = this.get(id);
     if (!a) return undefined;
     a.role = role === 'admin' ? 'admin' : 'member';
+    this.save();
+    return a;
+  }
+
+  /** The floors a member may work on, or every floor (`undefined`). */
+  setFloors(id: string, floors: string[] | undefined): Account | undefined {
+    const a = this.get(id);
+    if (!a) return undefined;
+    if (floors) a.floors = floors;
+    else delete a.floors;
     this.save();
     return a;
   }
@@ -287,10 +302,13 @@ const HELP = `agent-office accounts — who can sign in to the office
 
 Usage:
   agent-office accounts [list]                 Accounts, open invites, and the shared password
-  agent-office accounts invite [name] [--admin]
-                                               Make a single-use invite link (valid 7 days)
+  agent-office accounts invite [name] [--admin] [--floors <id,id>]
+                                               Make a single-use invite link (valid 7 days); a
+                                               member works on the floors given (default: all)
   agent-office accounts revoke <name>          Delete an account; it's signed out at once
   agent-office accounts role <name> admin|member
+  agent-office accounts floors <name> <id,id>|all
+                                               The floors a member works on; read-only on the rest
   agent-office accounts password on|off        Whether the shared office password still works
 
 Options:
@@ -309,6 +327,7 @@ export function accountsCommand(argv: string[]): number {
   // An office started in this project keeps its accounts here; one started anywhere else, in its home.
   let dir = existsSync(path.join(process.cwd(), '.agent-office', 'config.json')) ? process.cwd() : officeHome();
   let admin = false;
+  let floors: string[] | undefined;
   const args: string[] = [];
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -319,6 +338,10 @@ export function accountsCommand(argv: string[]): number {
       if (!argv[i + 1]) return usage('--dir needs a value');
       dir = path.resolve(argv[++i]);
     } else if (a === '--admin') admin = true;
+    else if (a === '--floors') {
+      if (!argv[i + 1]) return usage('--floors needs floor ids, comma-separated');
+      floors = cleanFloors(argv[++i].split(','));
+    }
     else if (a.startsWith('-')) return usage(`unknown option ${a}`);
     else args.push(a);
   }
@@ -338,7 +361,7 @@ export function accountsCommand(argv: string[]): number {
       console.log(`Shared office password: ${s.sharedPassword ? 'on' : 'off'}`);
       console.log(`\nAccounts (${s.accounts.length}):`);
       for (const a of s.accounts) {
-        console.log(`  ${a.name.padEnd(NAME_MAX)}  ${a.role.padEnd(6)}  since ${day(a.createdAt)}  ${a.lastSeenAt ? `last seen ${day(a.lastSeenAt)}` : 'never signed in'}`);
+        console.log(`  ${a.name.padEnd(NAME_MAX)}  ${a.role.padEnd(6)}  since ${day(a.createdAt)}  ${a.lastSeenAt ? `last seen ${day(a.lastSeenAt)}` : 'never signed in'}${a.role === 'member' ? `  works on ${a.floors ? a.floors.join(', ') || 'no floors' : 'every floor'}` : ''}`);
       }
       if (!s.accounts.length) console.log('  none yet: `agent-office accounts invite <name> --admin` makes you one');
       if (s.invites.length) {
@@ -348,7 +371,7 @@ export function accountsCommand(argv: string[]): number {
       return 0;
     }
     case 'invite': {
-      const v = accounts.invite('the terminal', admin ? 'admin' : 'member', arg);
+      const v = accounts.invite('the terminal', admin ? 'admin' : 'member', arg, floors);
       if (typeof v === 'string') return fail(v);
       console.log(`Invite ${v.name ? `for ${v.name} ` : ''}(${v.role}), single use, valid for 7 days:\n\n  /join#${v.token}\n`);
       console.log(`Open it on the office's own address, e.g. http://localhost:4600/join#${v.token}`);
@@ -367,6 +390,15 @@ export function accountsCommand(argv: string[]): number {
       if (arg2 !== 'admin' && arg2 !== 'member') return usage('role takes admin or member');
       accounts.setRole(a.id, arg2);
       console.log(`${a.name} is ${arg2 === 'admin' ? 'an admin' : 'a member'} now.`);
+      return 0;
+    }
+    case 'floors': {
+      if (!arg || !arg2) return usage('floors needs a name, then floor ids (comma-separated) or all');
+      const a = accounts.byName(arg);
+      if (!a) return fail(`there's no account called ${arg}`);
+      const set = arg2 === 'all' ? undefined : cleanFloors(arg2.split(','));
+      accounts.setFloors(a.id, set);
+      console.log(`${a.name} works on ${set ? set.join(', ') || 'no floors' : 'every floor'} now${a.role === 'admin' ? ' (an admin works on every floor anyway)' : ''}.`);
       return 0;
     }
     case 'password': {
