@@ -29,13 +29,58 @@ export interface ReviewPick {
   rect: { x: number; y: number; w: number; h: number };
 }
 
-/** A comment pinned to an element of a page, as it's sent. With no `selector` it's about the page as a whole. */
+/**
+ * An area of a page a comment is about, drawn round what's in it: a box dragged out, or a ring drawn by hand. Its
+ * bounds are in the page's CSS pixels from the top of the document (so it stays put as the page scrolls), a ring's
+ * points are relative to them (x, y, x, y\u2026 each 0 to 1), and `items` is what it takes in, so the worker finds it.
+ */
+export interface ReviewArea {
+  shape: 'rect' | 'lasso';
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  points?: number[];
+  items: { what: string; selector: string }[];
+}
+
+/** A comment pinned to an element of a page, or to an area of it, as it's sent. With neither it's about the page as a whole. */
 export interface SoftwareNote {
   text: string;
   /** The page it's on (its path and query on the worker's server, or a full address). */
   page: string;
   what: string;
   selector: string;
+  area?: ReviewArea;
+}
+
+export const MAX_AREA_ITEMS = 12;
+const MAX_POINTS = 64;
+
+/** An area from somewhere it can't be trusted: well formed, or nothing. */
+export function cleanArea(raw: unknown): ReviewArea | undefined {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const n = (v: unknown, max = 200_000) => (typeof v === 'number' && Number.isFinite(v) && Math.abs(v) <= max ? Math.round(v) : undefined);
+  const x = n(r.x), y = n(r.y), w = n(r.w), h = n(r.h);
+  if ((r.shape !== 'rect' && r.shape !== 'lasso') || x === undefined || y === undefined || !w || !h || w < 0 || h < 0) return undefined;
+  const items = (Array.isArray(r.items) ? r.items : []).slice(0, MAX_AREA_ITEMS).flatMap((i) => {
+    const o = (i && typeof i === 'object' ? i : {}) as Record<string, unknown>;
+    const what = typeof o.what === 'string' && o.what.length <= 300 && !/[\x00-\x1f]/.test(o.what) ? o.what.trim() : '';
+    const selector = typeof o.selector === 'string' && o.selector.length <= 600 && !/[\x00-\x1f]/.test(o.selector) ? o.selector.trim() : '';
+    return what && selector ? [{ what, selector }] : [];
+  });
+  const points = r.shape === 'lasso' && Array.isArray(r.points)
+    ? r.points.slice(0, MAX_POINTS * 2).filter((p): p is number => typeof p === 'number' && Number.isFinite(p)).map((p) => Math.round(Math.max(0, Math.min(1, p)) * 1000) / 1000)
+    : undefined;
+  return { shape: r.shape, x, y, w, h, ...(points && points.length >= 6 && points.length % 2 === 0 ? { points } : {}), items };
+}
+
+/** An area in a few words: what it takes in. */
+export function areaWhat(a: Pick<ReviewArea, 'shape' | 'items'>): string {
+  const shape = a.shape === 'rect' ? 'the box drawn' : 'the area circled';
+  if (!a.items.length) return shape;
+  const first = a.items.slice(0, 3).map((i) => i.what).join(', ');
+  return `${shape} round ${first}${a.items.length > 3 ? ` and ${a.items.length - 3} more` : ''}`;
 }
 
 /** What a comment about a whole page says it's on. */
@@ -101,8 +146,14 @@ export function cleanSoftwareNotes(raw: unknown): SoftwareNote[] | string {
     const page = field(r.page, MAX_FIELD);
     const what = field(r.what, MAX_FIELD);
     const selector = field(r.selector, MAX_FIELD);
+    const area = cleanArea(r.area);
     if (!text) return `Write each comment in up to ${MAX_TEXT.toLocaleString('en-US')} characters`;
     if (!page) return 'Say which page each comment is on';
+    // An area drawn on the page: what it takes in says what it is.
+    if (area) {
+      out.push({ text, page, what: what ?? areaWhat(area), selector: '', area });
+      continue;
+    }
     // No selector: a comment on the page as a whole.
     if (selector && !what) return 'Say what each comment is pinned to';
     out.push({ text, page, what: selector ? what! : WHOLE_PAGE, selector: selector ?? '' });
@@ -112,6 +163,13 @@ export function cleanSoftwareNotes(raw: unknown): SoftwareNote[] | string {
 
 const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
 
+/** An area as the worker reads it: where it is on the page, and what it takes in, each by its selector. */
+function areaLine(a: ReviewArea): string {
+  const where = `${a.shape === 'rect' ? 'the box' : 'the area circled'} ${a.w}x${a.h} at (${a.x}, ${a.y}) from the top left of the page`;
+  if (!a.items.length) return where;
+  return `${where}, taking in ${a.items.map((i) => `${oneLine(i.what)} (\`${i.selector}\`)`).join(', ')}`;
+}
+
 /**
  * The request a review sends the worker: the app (`app`, its address), the size it was seen at, and
  * each comment with the page, the element and the selector that finds it, by its number in the review (`n`) when it has
@@ -119,7 +177,7 @@ const oneLine = (s: string) => s.replace(/\s+/g, ' ').trim();
  */
 export function softwareReviewText(app: string, size: { w: number; h: number; label?: string }, notes: (SoftwareNote & { n?: number })[], text?: string, fresh = false): string {
   const seen = `${size.label ? `${size.label}, ` : ''}${size.w}x${size.h}`;
-  const lines = notes.map((n, i) => `${n.n ?? i + 1}. On ${oneLine(n.page)}, ${n.selector ? `${oneLine(n.what)} (\`${n.selector}\`)` : WHOLE_PAGE}: ${oneLine(n.text)}`);
+  const lines = notes.map((n, i) => `${n.n ?? i + 1}. On ${oneLine(n.page)}, ${n.area ? areaLine(n.area) : n.selector ? `${oneLine(n.what)} (\`${n.selector}\`)` : WHOLE_PAGE}: ${oneLine(n.text)}`);
   return [
     `Review comments on the running app at ${app} (seen at ${seen}):`,
     lines.join('\n'),

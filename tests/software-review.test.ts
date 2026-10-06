@@ -185,3 +185,37 @@ test('a note sent from the screening room is marked done by its message and plac
   assert.deepEqual(Object.keys(reviewMarks(dir, 'w1')), ['review-123-abc#2'], 'reopened');
   for (const bad of ['review-123', '../x#1', 'a#b', `${'x'.repeat(101)}#1`]) assert.ok(!MARK_KEY.test(bad), bad);
 });
+
+test('a comment drawn round an area keeps its box or ring and what it takes in, and tells the worker where it is', (t) => {
+  const items = Array.from({ length: 14 }, (_, i) => ({ what: `the picture “Shot ${i + 1}”`, selector: `main > img:nth-of-type(${i + 1})` }));
+  const notes = cleanSoftwareNotes([
+    { text: 'Make these three the same height', page: '/gallery', what: '', selector: '', area: { shape: 'rect', x: 40.4, y: 1200, w: 900, h: 300, items: items.slice(0, 3) } },
+    { text: 'Too busy here', page: '/gallery', what: 'the area circled', selector: '', area: { shape: 'lasso', x: 10, y: 20, w: 200, h: 100, points: [0, 0, 1.4, 0, 1, 1, -2, 1], items } },
+  ]);
+  assert.ok(Array.isArray(notes), String(notes));
+  const [box, ring] = notes as Exclude<typeof notes, string>;
+  assert.deepEqual(box.area, { shape: 'rect', x: 40, y: 1200, w: 900, h: 300, items: items.slice(0, 3) });
+  assert.equal(box.what, 'the box drawn round the picture “Shot 1”, the picture “Shot 2”, the picture “Shot 3”');
+  assert.equal(box.selector, '');
+  // A ring's points stay inside its bounds, and it takes in at most twelve things.
+  assert.deepEqual(ring.area!.points, [0, 0, 1, 0, 1, 1, 0, 1]);
+  assert.equal(ring.area!.items.length, 12);
+  // A shape that isn't one is a comment on the page.
+  const plain = cleanSoftwareNotes([{ text: 'Hm', page: '/', what: '', selector: '', area: { shape: 'star', x: 0, y: 0, w: 1, h: 1, items: [] } }]);
+  assert.deepEqual(plain, [{ text: 'Hm', page: '/', what: WHOLE_PAGE, selector: '' }]);
+  const text = softwareReviewText('http://localhost:3011', { w: 1440, h: 900 }, [{ ...box, n: 4 }]);
+  assert.ok(text.includes('4. On /gallery, the box 900x300 at (40, 1200) from the top left of the page, taking in the picture “Shot 1” (`main > img:nth-of-type(1)`)'), text);
+  assert.ok(!text.includes('—'));
+  // Kept with the round, and read back as it was.
+  const dir = mkdtempSync(path.join(tmpdir(), 'agent-office-review-area-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const kept = addRound(dir, 'w1', { at: 1, by: 'Tyler', app: 'http://localhost:3011', size: { w: 1440, h: 900 } }, [box]);
+  assert.deepEqual(kept.comments[0].area, box.area);
+  assert.deepEqual(cleanReview(JSON.parse(JSON.stringify(kept))).comments[0].area, box.area);
+});
+
+test('the review script draws boxes and rings, and says what is inside them', () => {
+  assert.ok(OVERLAY_JS.includes("post({ t: 'area'"));
+  assert.ok(OVERLAY_JS.includes('function within('));
+  new Function(OVERLAY_JS);
+});
