@@ -10,6 +10,7 @@ import { injectOverlay, OVERLAY_JS } from '../src/server/review/overlay.js';
 import { REVIEW_COOKIE, officeOriginOk, relayReviewed, reviewOffice, reviewRoute } from '../src/server/review/relay.js';
 import { REVIEW_SCRIPT, REVIEW_START, WHOLE_PAGE, cleanSoftwareNotes, reviewStatus, softwareReviewText } from '../src/shared/software-review.js';
 import { addRound, cleanReview, markDone, nextNumbers, reviewState, setApproved } from '../src/server/review/store.js';
+import { MARK_KEY, reviewMarks, setMark } from '../src/server/review/marks.js';
 import type { ServiceInfo } from '../src/shared/protocol.js';
 
 // Software review (shared/software-review.ts): a worker's running app framed in the office through
@@ -170,4 +171,17 @@ test('a review keeps each round, numbers its comments on from the last, and is a
   // What's read back is only what's well formed.
   assert.deepEqual(cleanReview({ rounds: [{ n: 'x' }], comments: [{ id: 'c1' }], approved: { by: 1 } }), { rounds: [], comments: [] });
   assert.deepEqual(reviewState(dir, 'w1'), s);
+});
+
+test('a note sent from the screening room is marked done by its message and place, and only such a key is kept', (t) => {
+  const dir = mkdtempSync(path.join(tmpdir(), 'review-marks-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  assert.deepEqual(reviewMarks(dir, 'w1'), {});
+  let marks = setMark(dir, 'w1', 'review-123-abc#0', true, 'Tyler');
+  assert.deepEqual(Object.keys(marks), ['review-123-abc#0']);
+  assert.equal(marks['review-123-abc#0'].by, 'Tyler');
+  marks = setMark(dir, 'w1', 'review-123-abc#2', true, 'Tyler');
+  marks = setMark(dir, 'w1', 'review-123-abc#0', false, 'Tyler');
+  assert.deepEqual(Object.keys(reviewMarks(dir, 'w1')), ['review-123-abc#2'], 'reopened');
+  for (const bad of ['review-123', '../x#1', 'a#b', `${'x'.repeat(101)}#1`]) assert.ok(!MARK_KEY.test(bad), bad);
 });

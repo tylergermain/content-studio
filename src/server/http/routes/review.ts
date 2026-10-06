@@ -1,6 +1,7 @@
 import type http from 'node:http';
 import { employeeWorkerError } from '../../org-chart/access.js';
 import { cleanSoftwareNotes, softwareReviewText } from '../../../shared/software-review.js';
+import { MARK_KEY, reviewMarks, setMark } from '../../review/marks.js';
 import { addRound, markDone, nextNumbers, reviewState, setApproved } from '../../review/store.js';
 import { sendable, sendToWorker } from '../../worker-chat/send.js';
 import { readBody, sameOrigin, send } from '../util.js';
@@ -12,6 +13,8 @@ import type { Route } from '../router.js';
 //   POST /api/review/notes     sends the comments pinned to the worker's running app as one request, and keeps them as a round
 //   POST /api/review/done      marks a comment done, or not done again
 //   POST /api/review/approve   approves the app as it is (telling the worker), or takes it back
+//   GET  /api/review/marks     which notes sent from the screening room are done (server/review/marks.ts)
+//   POST /api/review/marks     marks one done, or not done again
 // Whoever may direct the worker may review it.
 
 const CONTROL = /[\x00-\x08\x0b-\x1f\x7f]/;
@@ -32,21 +35,27 @@ export const reviewRoute = {
   auth: 'session',
   async handle(ctx, { req, res, url, path: p, session }) {
     const action = p.slice('/api/review/'.length);
-    if (!['state', 'notes', 'done', 'approve'].includes(action)) return send(res, 404, { error: 'Not found' });
-    if ((action === 'state') !== (req.method === 'GET') || (action !== 'state' && req.method !== 'POST')) return send(res, 405, { error: 'Method not allowed' });
-    if (action !== 'state' && !sameOrigin(req, ctx.cfg)) return send(res, 403, { error: 'Forbidden' });
+    if (!['state', 'notes', 'done', 'approve', 'marks'].includes(action)) return send(res, 404, { error: 'Not found' });
+    const reading = req.method === 'GET';
+    if (reading ? !['state', 'marks'].includes(action) : req.method !== 'POST' || action === 'state') return send(res, 405, { error: 'Method not allowed' });
+    if (!reading && !sameOrigin(req, ctx.cfg)) return send(res, 403, { error: 'Forbidden' });
     const floor = floorParam(ctx, url);
     const id = url.searchParams.get('worker') ?? '';
     if (!floor || !/^[a-zA-Z0-9_-]{1,80}$/.test(id) || !floor.workers.get(id)) return send(res, 404, { error: 'No such worker' });
     const denied = employeeWorkerError(ctx, floor, session.account?.id, id);
     if (denied) return send(res, 403, { error: denied });
     if (action === 'state') return send(res, 200, { state: reviewState(floor.dir, id) });
+    if (reading) return send(res, 200, { marks: reviewMarks(floor.dir, id) });
 
     const b = await body(req);
     if (!b) return send(res, 400, { error: 'Invalid request' });
     // On the shared password there's no account: the name they came in with, as the office shows it elsewhere.
     const by = session.account?.name ?? (line(b.by, 40) || 'Studio review');
 
+    if (action === 'marks') {
+      const key = typeof b.key === 'string' && MARK_KEY.test(b.key) ? b.key : '';
+      return key ? send(res, 200, { marks: setMark(floor.dir, id, key, b.done !== false, by) }) : send(res, 400, { error: 'Which note?' });
+    }
     if (action === 'done') {
       const commentId = line(b.id, 40);
       const state = commentId ? markDone(floor.dir, id, commentId, b.done !== false, by) : undefined;

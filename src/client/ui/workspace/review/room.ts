@@ -1,4 +1,4 @@
-import './room.css';
+import '../room.css';
 import { h, openModal } from '../../dom';
 import { store } from '../../../state';
 import { DEVICES, REVIEW_START, REVIEW_TAG, STATUS_LABEL, reviewStatus, type DeviceId, type ReviewPick, type SoftwareReviewState } from '../../../../shared/software-review';
