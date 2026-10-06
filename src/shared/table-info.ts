@@ -6,11 +6,28 @@ import type { GhPull } from './protocol.js';
 
 /** Something on a branch to look at: an agent's server, or (for the default branch) the table's app address. */
 export interface BranchApp {
-  /** What its picture is kept under, after the room's id (server/room-screens.ts): p<port>, or url. */
+  /** What its picture is kept under, after the room's id (server/room-screens.ts): live, b-<branch> for a preview, p<port>, or url. */
   key: string;
   label: string;
+  /** The live site, a branch's preview, or something running on the office's computer. */
+  kind: 'live' | 'preview' | 'local';
   port?: number;
   url?: string;
+}
+
+/** Where a branch is deployed (server/deploys.ts): the live site (the default branch's), or a branch's preview. */
+export interface Deploy {
+  env: 'production' | 'preview';
+  /** The branch it was built from, and the commit, when the host says. */
+  branch?: string;
+  sha?: string;
+  url: string;
+  state: 'ready' | 'building' | 'error' | 'canceled';
+  /** When it was made (ms). */
+  at: number;
+  /** Who hosts it, and its page there. */
+  from: 'vercel' | 'github';
+  inspect?: string;
 }
 
 export interface BranchAgent {
@@ -47,6 +64,8 @@ export interface TableBranch {
   pull?: number;
   /** What's running on it now. */
   apps: BranchApp[];
+  /** Where it's deployed: the live site on the default branch, its newest preview on any other. */
+  deploys: Deploy[];
 }
 
 export type TablePull = Pick<GhPull, 'number' | 'title' | 'state' | 'isDraft' | 'url' | 'author' | 'reviewDecision' | 'headRefName' | 'baseRefName' | 'updatedAt' | 'additions' | 'deletions' | 'checks'>;
@@ -84,6 +103,12 @@ export interface TableInfo {
   commits: TableCommit[];
   /** When the checkout last fetched from GitHub. */
   fetchedAt?: number;
+  /** The live site, if it has one: Vercel's production address, else the table's own app address when that's not on this computer. */
+  live?: string;
+  /** Previews of branches the repository hasn't (or that are another repository's): newest first. */
+  previews: Deploy[];
+  /** The office's Vercel sign-in: whether it has one and who as, the project this table's deploys come from, and (for admins) the projects to pick from. */
+  vercel: { connected: boolean; user?: string; project?: string; projects?: string[] };
   /** What couldn't be found out, in words: no checkout, git or gh failing. */
   problems: string[];
 }
@@ -109,6 +134,13 @@ export interface BranchDetail {
   /** What an agent on it has changed and not committed yet. */
   uncommitted: ChangedPath[];
 }
+
+const LOCAL = /^https?:\/\/(?:localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)(?::\d{1,5})?(?:\/|$)/i;
+/** Whether an address is on this computer (a dev server), rather than somewhere anyone can reach (a deployment). */
+export const isLocal = (url: string) => LOCAL.test(url);
+
+/** What a branch's preview's picture is kept under (server/room-screens.ts): `b-` and its name, as a file name can have it. */
+export const previewKey = (branch: string) => `b-${branch.replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 60)}`;
 
 /** A branch name as git allows it, to look one up by: no spaces, control characters or leading dash. */
 export const BRANCH_NAME = /^(?!-)(?!.*\.\.)[^\s\x00-\x1f\x7f~^:?*[\\]{1,200}$/;

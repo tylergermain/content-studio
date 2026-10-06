@@ -1,5 +1,5 @@
 import { h, timeAgo, clip, STATUS_LABEL } from '../dom';
-import type { TableBranch, TableCommit, TableIssue, TableInfo, TablePull } from '../../../shared/table-info';
+import type { BranchApp, Deploy, TableBranch, TableCommit, TableIssue, TableInfo, TablePull } from '../../../shared/table-info';
 import { github, shotUrl, type Shots } from './api';
 
 // The middle of a project table's panel (panel.ts): its branches as cards, each with a picture of what's running on
@@ -67,10 +67,21 @@ export function prState(p: TablePull): HTMLElement {
   return h('span.ti-pr-state', { 'data-state': s }, s === 'draft' ? 'Draft' : s === 'open' ? 'Open' : s === 'merged' ? 'Merged' : 'Closed');
 }
 
+/** What an app on a branch is, as its card says it. */
+export const KIND: Record<BranchApp['kind'], string> = { live: '● Live', preview: '● Preview', local: '● On this computer' };
+
+/** A branch's newest deploy, when it isn't ready: building, or failed. */
+export function deployNote(d: Deploy | undefined): string {
+  if (!d || d.state === 'ready') return '';
+  return d.state === 'building' ? '⏳ deploying' : d.state === 'error' ? '✕ deploy failed' : 'deploy cancelled';
+}
+
 export function branchCard(o: {
   b: TableBranch;
   info: TableInfo;
   picture?: HTMLImageElement;
+  /** Its picture's a preview behind Vercel's login. */
+  blocked?: boolean;
   selected: boolean;
   onTv: boolean;
   pick(): void;
@@ -78,9 +89,10 @@ export function branchCard(o: {
   const { b, info } = o;
   const pr = b.pull ? info.pulls.find((p) => p.number === b.pull) : undefined;
   const app = b.apps[0];
+  const note = deployNote(b.deploys[0]);
   const shot = h('div.ti-shot', {},
-    o.picture ?? h('span.ti-noshot', {}, app ? 'Taking a picture…' : b.base && !info.room.url ? 'No app running' : 'Not running'),
-    app ? h('span.ti-live', {}, '● Live') : '',
+    o.picture ?? h('span.ti-noshot', {}, o.blocked ? 'Behind Vercel’s login' : app ? 'Taking a picture…' : 'Not deployed or running'),
+    app ? h('span.ti-live', { 'data-kind': app.kind }, KIND[app.kind]) : '',
     o.onTv ? h('span.ti-ontv', { title: 'What the table’s screen shows' }, '\u{1f4fa}') : '',
     b.apps.length > 1 ? h('span.ti-apps', {}, `${b.apps.length} apps`) : '');
   const card = h('button.ti-card', { type: 'button', 'aria-pressed': String(o.selected), 'data-branch': b.name, title: b.name },
@@ -88,7 +100,7 @@ export function branchCard(o: {
     h('div.ti-card-body', {},
       h('div.ti-card-name', {}, h('span.ti-branch-icon', { 'aria-hidden': 'true' }, '⎇'), h('strong', {}, b.detached ? `${b.name} (no branch)` : b.name), b.base ? h('span.ti-tag', {}, 'default') : '', pr ? h('span.ti-tag.pr', { 'data-state': pr.state.toLowerCase() }, `#${pr.number}`) : ''),
       h('div.ti-card-sub', {}, clip(b.subject || '—', 90)),
-      h('div.ti-card-meta', {}, ...[ago(b.at), drift(b, info.base), b.dirty ? `✎ ${b.dirty} uncommitted` : '', pr && pr.checks !== 'none' ? h('span.ti-checks', { 'data-checks': pr.checks }, `${CHECKS[pr.checks].mark} checks`) : ''].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
+      h('div.ti-card-meta', {}, ...[ago(b.at), drift(b, info.base), b.dirty ? `✎ ${b.dirty} uncommitted` : '', note ? h('span.ti-deploy', { 'data-state': b.deploys[0]?.state }, note) : '', pr && pr.checks !== 'none' ? h('span.ti-checks', { 'data-checks': pr.checks }, `${CHECKS[pr.checks].mark} checks`) : ''].filter(Boolean).flatMap((x, i) => (i ? [' · ', x] : [x]))),
       b.agents.length ? h('div.ti-card-agents', {}, ...b.agents.slice(0, 3).map((a) => h('span.ti-agent', { 'data-status': a.status }, h('span.ti-dot'), a.name, h('span.ti-agent-status', {}, STATUS_LABEL[a.status] ?? a.status))), b.agents.length > 3 ? h('span.ti-more', {}, `+${b.agents.length - 3}`) : '') : ''));
   card.addEventListener('click', o.pick);
   return card;
@@ -122,4 +134,22 @@ export function commitRow(c: TableCommit, repo: string | undefined): HTMLElement
     repo ? h('a.ti-sha', { href: github.commit(repo, c.sha), target: '_blank', rel: 'noopener' }, sha) : h('span.ti-sha', {}, sha),
     h('span.ti-commit-subject', { title: c.subject }, c.subject),
     h('span.ti-commit-meta', {}, `${c.author} · ${timeAgo(c.at)}`));
+}
+
+/** A deploy: what it is, where it stands, when, and its links. */
+export function deployRow(d: Deploy): HTMLElement {
+  const state = d.state === 'ready' ? 'Ready' : d.state === 'building' ? 'Deploying…' : d.state === 'error' ? 'Failed' : 'Cancelled';
+  const host = (() => {
+    try {
+      return new URL(d.url).host;
+    } catch {
+      return d.url;
+    }
+  })();
+  return h('div.ti-row.ti-deploy-row', {},
+    h('span.ti-pr-state', { 'data-state': d.state === 'ready' ? 'open' : d.state === 'error' ? 'closed' : 'draft' }, state),
+    h('div.ti-row-main', {},
+      h('a.ti-row-title', { href: d.url, target: '_blank', rel: 'noopener' }, d.env === 'production' ? `Live · ${host}` : `${d.branch ?? 'Preview'} · ${host}`),
+      h('div.ti-row-meta', {}, [d.from === 'vercel' ? 'Vercel' : 'GitHub deployment', d.sha ? d.sha.slice(0, 7) : '', d.at ? timeAgo(d.at) : ''].filter(Boolean).join(' · '))),
+    h('div.ti-row-side', {}, d.inspect ? h('a.rr-ghost.ti-link', { href: d.inspect, target: '_blank', rel: 'noopener' }, 'Details ↗') : ''));
 }

@@ -5,8 +5,8 @@ import { openTableReview } from '../workspace/review/table';
 import { store } from '../../state';
 import { mayWork, readOnlyText } from '../../../shared/floor-access';
 import type { BranchDetail, TableBranch, TableInfo } from '../../../shared/table-info';
-import { github, loadBranch, loadInfo, loadShots, runBranch, type Shots } from './api';
-import { Pictures, active, branchCard, commitRow, issueRow, pullRow } from './cards';
+import { connectVercel, github, loadBranch, loadInfo, loadShots, pickVercelProject, runBranch, type Shots } from './api';
+import { Pictures, active, branchCard, commitRow, deployRow, issueRow, pullRow } from './cards';
 import { sideBody, sideHead, type SideDeps } from './side';
 
 // A project table's panel: what E at a table's screen in the Software Factory opens (and the Rooms panel's Branches),
@@ -56,10 +56,15 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
   shell.name.textContent = room.name;
   shell.sub.textContent = 'Reading the table…';
   const repoLink = h('a.rr-ghost.ti-link', { target: '_blank', rel: 'noopener', hidden: true }, 'Repository on GitHub ↗');
-  shell.right.append(repoLink);
-  const stage = h('div.ti-stage');
+  const liveLink = h('a.rr-ghost.ti-link.ti-live-link', { target: '_blank', rel: 'noopener', hidden: true, title: 'The live site, in a tab of its own' }, '● Live site ↗');
+  shell.right.append(liveLink, repoLink);
+  // The Vercel sign-in up top stays put while the rest repaints, so a token half typed in isn't lost.
+  const top = h('div.ti-top');
+  const body = h('div.ti-body');
+  const stage = h('div.ti-stage', {}, top, body);
   shell.stage.classList.add('ti-stage-wrap');
   shell.stage.append(stage);
+  let vercelStamp = '';
   const side = h('aside.rr-side.ti-side', { 'aria-label': 'The branch picked' });
   shell.side(side);
   const status = h('p.rr-status.rm-status', { 'aria-live': 'polite' });
@@ -77,10 +82,70 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
   const onTv = () => shots?.rooms[room.id]?.of;
   const showsOnTv = (b: TableBranch, tv = onTv()) => !!tv && b.apps.some((a) => (a.port ? tv === `http://127.0.0.1:${a.port}/` : tv === a.url));
 
-  /** The review room on `target`, else on what the branch picked has running, else on the first thing the table has. */
+  /** The review room on `target`, else on what the branch picked runs on this computer, else on the first thing the table has. */
   function review(target?: string) {
-    const app = current()?.apps[0];
+    const app = current()?.apps.find((a) => a.kind === 'local');
     openTableReview(room, target ?? (app?.port ? `port:${app.port}` : app?.url ? `url:${app.url}` : undefined));
+  }
+
+  /** Whether the picture of the app `key` is a preview behind Vercel's login. */
+  const blocked = (key: string | undefined) => !!key && !!shots?.apps[`${room.id}--${key}`]?.blocked;
+
+  /** Up top, for an admin: the office's Vercel sign-in (to show the live site and previews), and the project the table's deploys come from. */
+  function paintVercel() {
+    const v = info?.vercel;
+    const stamp = JSON.stringify([v, store.me.admin, !!info?.room.repo]);
+    if (stamp === vercelStamp) return;
+    vercelStamp = stamp;
+    if (!info || !v || !store.me.admin) return void top.replaceChildren();
+    const note = h('span.ti-connect-note', { 'aria-live': 'polite' });
+    if (!v.connected) {
+      const token = h('input.rr-address', { type: 'password', placeholder: 'Vercel token', autocomplete: 'off', spellcheck: 'false', 'aria-label': 'Vercel token' }) as HTMLInputElement;
+      const go = h('button.rr-send.ti-review-btn', { type: 'button' }, 'Connect');
+      const connect = async () => {
+        if (!token.value.trim()) return;
+        go.disabled = true;
+        note.textContent = 'Checking it with Vercel…';
+        try {
+          const who = await connectVercel(floor, room.id, token.value);
+          token.value = '';
+          note.textContent = `Signed in to Vercel as ${who ?? 'you'}.`;
+          vercelStamp = '';
+          void tick();
+        } catch (e) {
+          note.textContent = (e as Error).message;
+        } finally {
+          go.disabled = false;
+        }
+      };
+      go.addEventListener('click', () => void connect());
+      token.addEventListener('keydown', (e) => e.key === 'Enter' && void connect());
+      top.replaceChildren(h('div.ti-connect', {},
+        h('strong', {}, '▲ Show the live site and Vercel’s previews'),
+        h('p', {}, 'The screen and this panel show what’s deployed, a preview for each branch, rather than what runs on the office’s computer. Make a token at vercel.com/account/tokens and paste it here: the office keeps it on its own computer and only ever sends it to Vercel.'),
+        h('div.ti-connect-row', {}, token, go, note)));
+      return;
+    }
+    const pick = h('select.rr-pick', { 'aria-label': 'Vercel project' },
+      h('option', { value: '' }, 'Found by its repository'),
+      ...(v.projects ?? []).map((n) => h('option', { value: n, selected: n === v.project }, n))) as HTMLSelectElement;
+    if (!v.projects?.includes(v.project ?? '')) pick.value = '';
+    pick.addEventListener('change', () => {
+      note.textContent = 'Saving…';
+      pickVercelProject(floor, room.id, pick.value).then(() => {
+        note.textContent = pick.value ? `Deploys from ${pick.value}.` : 'Deploys from the project for its repository.';
+        vercelStamp = '';
+        void tick();
+      }, (e: Error) => (note.textContent = e.message));
+    });
+    const out = h('button.link-button', { type: 'button' }, 'Sign out');
+    out.addEventListener('click', () => {
+      void connectVercel(floor, room.id, '').then(() => {
+        vercelStamp = '';
+        void tick();
+      });
+    });
+    top.replaceChildren(h('div.ti-vercel', {}, h('span', {}, `▲ Vercel · ${v.user ?? 'signed in'} · project `), pick, h('span', {}, ' · '), out, note));
   }
 
   const sideDeps: SideDeps = {
@@ -90,6 +155,7 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
     running,
     cantHire,
     picture: (key) => pictures.copy(key, shots, sidePictures),
+    blocked: (key) => blocked(key),
   };
 
   async function run(b: TableBranch) {
@@ -154,7 +220,7 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
 
   function paintStage(tv: string | undefined) {
     if (!info) {
-      stage.replaceChildren(h('div.rm-empty', {}, h('strong', {}, error ? 'Couldn’t read this table' : 'Reading the table…'), error ? h('p', {}, error) : ''));
+      body.replaceChildren(h('div.rm-empty', {}, h('strong', {}, error ? 'Couldn’t read this table' : 'Reading the table…'), error ? h('p', {}, error) : ''));
       return;
     }
     const all = info.branches.length + (info.more ?? 0);
@@ -169,12 +235,15 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
     const shut = info.pulls.filter((p) => p.state !== 'OPEN');
     const names = new Set(info.branches.map((b) => b.name));
     const fetched = info.fetchedAt ? h('span.ti-fetched', {}, `from GitHub ${new Date(info.fetchedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`) : '';
-    stage.replaceChildren(
+    body.replaceChildren(
       ...info.problems.map((p) => h('p.ti-problem', {}, p)),
       h('section.ti-section', {},
         head('Branches', list.length === all ? String(all) : `${list.length} of ${all}`, fetched, list.length < all || showAll ? toggle : ''),
-        list.length ? h('div.ti-cards', {}, ...list.map((b) => branchCard({ b, info: info!, picture: b.apps[0] ? pictures.of(b.apps[0].key, shots) : undefined, selected: b.name === selected, onTv: showsOnTv(b, tv), pick: () => pick(b.name) }))) : h('p.rm-muted', {}, 'No branches yet.'),
+        list.length ? h('div.ti-cards', {}, ...list.map((b) => branchCard({ b, info: info!, picture: b.apps[0] ? pictures.of(b.apps[0].key, shots) : undefined, blocked: blocked(b.apps[0]?.key), selected: b.name === selected, onTv: showsOnTv(b, tv), pick: () => pick(b.name) }))) : h('p.rm-muted', {}, 'No branches yet.'),
         showAll && info.more ? h('p.rm-muted', {}, `and ${info.more} older, not shown`) : ''),
+      info.previews.length ? h('section.ti-section', {},
+        head('Other previews', `${info.previews.length}`, h('span.ti-fetched', {}, 'deployed from branches this repository doesn’t have')),
+        ...info.previews.map(deployRow)) : '',
       info.room.repo ? h('section.ti-section', {},
         head('Pull requests', open.length ? `${open.length} open` : 'none open'),
         ...open.map((p) => pullRow(p, pick, names.has(p.headRefName))),
@@ -228,6 +297,9 @@ export function openTablePanel(room: { id: string; name: string }, d: TablePanel
         repoLink.href = github.repo(info.room.repo);
         repoLink.hidden = false;
       }
+      liveLink.hidden = !info.live;
+      if (info.live) liveLink.href = info.live;
+      paintVercel();
     }
     paint();
     const b = current();

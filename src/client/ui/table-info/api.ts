@@ -7,6 +7,8 @@ import type { BranchDetail, TableInfo } from '../../../shared/table-info';
 export interface Shot {
   at: number;
   of: string;
+  /** A preview behind Vercel's login: there's no picture of it. */
+  blocked?: true;
 }
 
 export interface Shots {
@@ -48,3 +50,17 @@ export const github = {
   commit: (repo: string, sha: string) => `https://github.com/${repo}/commit/${sha}`,
   compare: (repo: string, base: string, branch: string) => `https://github.com/${repo}/compare/${encodeURIComponent(base)}...${branch.split('/').map(encodeURIComponent).join('/')}`,
 };
+
+/** Signs the office in to Vercel with `token` ('' signs it out): who as, or why not. Admins only. */
+export async function connectVercel(floor: string, room: string, token: string): Promise<string | undefined> {
+  const res = await fetch(`/api/table-info/vercel?${new URLSearchParams({ floor, room })}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token }) });
+  const out = (await res.json().catch(() => undefined)) as { vercel?: { user?: string }; error?: string } | undefined;
+  if (!res.ok) throw new Error(out?.error ?? 'The office didn\u2019t answer');
+  return out?.vercel?.user;
+}
+
+/** The Vercel project a table's deploys come from ('' for its repository's). Admins only. */
+export async function pickVercelProject(floor: string, room: string, project: string): Promise<void> {
+  const res = await fetch(`/api/table-info/vercel-project?${new URLSearchParams({ floor, room })}`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project }) });
+  if (!res.ok) throw new Error(((await res.json().catch(() => undefined)) as { error?: string } | undefined)?.error ?? 'The office didn\u2019t answer');
+}

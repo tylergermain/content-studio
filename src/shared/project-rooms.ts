@@ -19,7 +19,12 @@ export interface ProjectLink {
   git?: boolean;
   /** The GitHub repository the room is for, as owner/name: the office cloned it into `dir` (see server/factory-rooms.ts). */
   repo?: string;
+  /** Its Vercel project's name, when that isn't the repository's (see server/deploys.ts): where its live site and previews are. */
+  vercel?: string;
 }
+
+/** A Vercel project's name as Vercel allows it. */
+export const VERCEL_PROJECT = /^[a-z0-9][a-z0-9._-]{0,99}$/i;
 
 /** The project room a worker was hired into (see WorkerInfo.project): its piece's id, its name and its project. */
 export interface WorkerProject {
@@ -77,7 +82,8 @@ export function cleanProject(raw: unknown): ProjectLink | undefined {
   const dir = cleanProjectDir(r.dir);
   const url = cleanProjectUrl(r.url);
   const repo = typeof r.repo === 'string' && REPO_NAME.test(r.repo) && !r.repo.includes('..') ? r.repo : undefined;
-  const link: ProjectLink = { ...(dir ? { dir } : {}), ...(url ? { url } : {}), ...(r.keep === true ? { keep: true } : {}), ...(dir && r.git === true ? { git: true } : {}), ...(repo ? { repo } : {}) };
+  const vercel = typeof r.vercel === 'string' && VERCEL_PROJECT.test(r.vercel) ? r.vercel : undefined;
+  const link: ProjectLink = { ...(dir ? { dir } : {}), ...(url ? { url } : {}), ...(r.keep === true ? { keep: true } : {}), ...(dir && r.git === true ? { git: true } : {}), ...(repo ? { repo } : {}), ...(vercel ? { vercel } : {}) };
   return Object.keys(link).length ? link : undefined;
 }
 

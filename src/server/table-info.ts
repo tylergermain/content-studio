@@ -2,11 +2,12 @@ import { realpathSync } from 'node:fs';
 import path from 'node:path';
 import { layoutFurniture } from '../shared/office-builder.js';
 import type { WorkerInfo } from '../shared/protocol.js';
-import type { BranchAgent, BranchApp, BranchDetail, ChangedPath, TableBranch, TableCommit, TableInfo, TableIssue, TablePull } from '../shared/table-info.js';
+import { isLocal, previewKey, type BranchAgent, type BranchApp, type BranchDetail, type ChangedPath, type Deploy, type TableBranch, type TableCommit, type TableInfo, type TableIssue, type TablePull } from '../shared/table-info.js';
 import { roomsOf } from './factory-rooms.js';
 import { checksOf, gh } from './github.js';
 import { git } from './git-read.js';
 import { roomApps } from './room-screens.js';
+import { deploysOf, newestByBranch } from './deploys.js';
 import type { Floor } from './floor.js';
 import type { Ctx } from './office/context.js';
 
@@ -231,6 +232,8 @@ interface Table {
   repo?: string;
   dir?: string;
   url?: string;
+  /** Its Vercel project, when it was set to one by name. */
+  vercel?: string;
   git: boolean;
   seats: number;
   free?: string;
@@ -242,7 +245,7 @@ function tableOf(floor: Floor, room: string): Table | undefined {
   const view = roomsOf(floor).find((r) => r.id === room);
   if (!piece || !view) return undefined;
   const agents = view.agents.map((a) => floor.workers.get(a.id)).filter((w): w is WorkerInfo => !!w);
-  return { id: room, name: view.name, repo: view.repo, dir: view.dir, url: view.url, git: !!view.git, seats: view.seats, free: view.free, agents };
+  return { id: room, name: view.name, repo: view.repo, dir: view.dir, url: view.url, vercel: piece.project?.vercel, git: !!view.git, seats: view.seats, free: view.free, agents };
 }
 
 const agentOf = (w: WorkerInfo): BranchAgent => ({ id: w.id, name: w.name, status: w.status, ...(w.task?.name ? { task: w.task.name } : {}) });
@@ -270,9 +273,13 @@ async function workOut(ctx: Ctx, floor: Floor, t: Table): Promise<TableInfo> {
     pulls: [],
     issues: [],
     commits: [],
+    previews: [],
+    vercel: { connected: false },
     problems: [],
   };
   const hub = t.repo ? github(t.repo, t.dir ?? ctx.cfg.dataDir) : undefined;
+  const deploys = deploysOf(ctx.cfg.dataDir);
+  const deployed = deploys.of(t.repo, t.vercel, t.dir ?? ctx.cfg.dataDir).catch((e: Error) => ({ list: [] as Deploy[], error: e.message }) as Awaited<ReturnType<typeof deploys.of>>);
   if (t.dir && t.git) await branches(ctx, floor, t, info).catch((e: Error) => info.problems.push(`git couldn't read ${t.dir}: ${e.message}`));
   else info.problems.push(t.repo ? `${t.name} isn't checked out on the office's computer yet` : `${t.name} isn't set up for a repository yet: an admin sets it up in the Rooms panel`);
   if (hub) {
@@ -287,7 +294,35 @@ async function workOut(ctx: Ctx, floor: Floor, t: Table): Promise<TableInfo> {
     }
     info.branches = order(info.branches, h.pulls);
   }
+  deployedOn(info, t, await deployed, deploys.status());
   return info;
+}
+
+/**
+ * Where the table's project is deployed, onto its branches: the live site on the default branch, each
+ * branch's newest preview on it (and its newest that's ready, when the newest isn't yet), ahead of what
+ * runs on this computer; previews of branches the repository hasn't are listed on their own.
+ */
+export function deployedOn(info: TableInfo, t: { url?: string }, d: Awaited<ReturnType<ReturnType<typeof deploysOf>['of']>>, vercel: { connected: boolean; user?: string }) {
+  info.vercel = { ...vercel, ...(d.project ? { project: d.project } : {}) };
+  const live = d.live ?? (t.url && !isLocal(t.url) ? t.url : undefined);
+  if (live) info.live = live;
+  if (d.error) info.problems.push(`Deployments: ${d.error}`);
+  const newest = newestByBranch(d.list);
+  const ready = newestByBranch(d.list.filter((x) => x.state === 'ready'));
+  for (const b of info.branches) {
+    const mine: Deploy[] = b.base
+      ? d.list.filter((x) => x.env === 'production').sort((x, y) => y.at - x.at).slice(0, 1)
+      : [newest.get(b.name), ready.get(b.name)].filter((x, i, all): x is Deploy => !!x && all.indexOf(x) === i);
+    b.deploys = mine;
+    // Something to look at on it that's deployed comes before what runs here.
+    const shown: BranchApp | undefined = b.base
+      ? live ? { key: 'live', label: 'Live', kind: 'live', url: live } : undefined
+      : ready.get(b.name) ? { key: previewKey(b.name), label: 'Preview', kind: 'preview', url: ready.get(b.name)!.url } : undefined;
+    if (shown) b.apps = [shown, ...b.apps.filter((a) => a.key !== 'url')];
+  }
+  const known = new Set(info.branches.map((b) => b.name));
+  info.previews = [...newest.values()].filter((x) => !x.branch || !known.has(x.branch)).slice(0, 8);
 }
 
 async function branches(ctx: Ctx, floor: Floor, t: Table, info: TableInfo) {
@@ -302,7 +337,7 @@ async function branches(ctx: Ctx, floor: Floor, t: Table, info: TableInfo) {
   const list = new Map<string, TableBranch>();
   for (const r of refs.values()) {
     const tip = tipOf(r, r.name === base);
-    list.set(r.name, { name: r.name, ...(r.name === base ? { base: true as const } : {}), sha: tip.sha, subject: tip.subject, author: tip.author, at: tip.at, ...(r.local ? { local: true as const } : {}), ...(r.remote ? { remote: true as const } : {}), agents: [], apps: [] });
+    list.set(r.name, { name: r.name, ...(r.name === base ? { base: true as const } : {}), sha: tip.sha, subject: tip.subject, author: tip.author, at: tip.at, ...(r.local ? { local: true as const } : {}), ...(r.remote ? { remote: true as const } : {}), agents: [], apps: [], deploys: [] });
   }
   // The agents, on the branches their worktrees are on (one not on a branch, by the branch whose tip it's at), and what they've left uncommitted.
   const branchOf = new Map<string, string>();
@@ -313,7 +348,7 @@ async function branches(ctx: Ctx, floor: Floor, t: Table, info: TableInfo) {
     let name = tree.branch ?? [...list.values()].find((b) => b.sha === tree.sha)?.name;
     if (!name) {
       name = tree.sha.slice(0, 7);
-      list.set(name, { name, detached: true, sha: tree.sha, subject: '', author: '', at: 0, agents: [], apps: [] });
+      list.set(name, { name, detached: true, sha: tree.sha, subject: '', author: '', at: 0, agents: [], apps: [], deploys: [] });
     }
     const b = list.get(name);
     if (!b) return;
@@ -328,7 +363,7 @@ async function branches(ctx: Ctx, floor: Floor, t: Table, info: TableInfo) {
     const on = w ? branchOf.get(w.id) : base;
     const b = on ? list.get(on) : undefined;
     if (!b) continue;
-    const a: BranchApp = { key: app.key, label: w ? `${w.name} · port ${app.port}` : 'Its app address', ...(app.port ? { port: app.port } : {}), ...(app.key === 'url' ? { url: app.url } : {}) };
+    const a: BranchApp = { key: app.key, label: w ? `${w.name}\u2019s, on this computer \u00b7 port ${app.port}` : 'Its app address, on this computer', kind: 'local', ...(app.port ? { port: app.port } : {}), ...(app.key === 'url' ? { url: app.url } : {}) };
     b.apps.push(a);
   }
   // How far each is from the default branch, newest first, as many as are shown.

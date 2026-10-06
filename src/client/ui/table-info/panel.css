@@ -1,7 +1,17 @@
 /* A project table's panel (panel.ts), in the review rooms' frame and colors (../workspace/room.css). */
 .table-room .rr-body { grid-template-columns:minmax(0,1fr) 420px; }
 .rr-stage.ti-stage-wrap { padding:0; align-items:stretch; justify-content:flex-start; background:var(--rr-bg); }
-.ti-stage { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:28px; padding:20px 24px 40px; }
+.ti-stage { flex:1; min-height:0; overflow:auto; display:flex; flex-direction:column; gap:16px; padding:20px 24px 40px; }
+.ti-body { display:flex; flex-direction:column; gap:28px; }
+.ti-top:empty { display:none; }
+.ti-connect { display:flex; flex-direction:column; gap:8px; padding:14px 16px; border:1px solid rgba(124,92,255,.45); border-radius:12px; background:rgba(124,92,255,.08); }
+.ti-connect strong { font-size:14px; }
+.ti-connect p { margin:0; font-size:12.5px; line-height:1.5; color:var(--rr-muted); }
+.ti-connect-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.ti-connect-row .rr-address { flex:0 1 320px; }
+.ti-connect-note { font-size:12px; color:var(--rr-muted); }
+.ti-vercel { display:flex; align-items:center; gap:6px; flex-wrap:wrap; font-size:12.5px; color:var(--rr-muted); }
+.ti-live-link { border-color:rgba(48,209,88,.5); color:#7ee2a0; }
 .ti-section-head { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
 .ti-section-head h3 { margin:0; font-size:15px; }
 .ti-count { padding:2px 8px; border-radius:999px; background:var(--rr-raise); color:var(--rr-muted); font-size:12px; font-weight:600; }
@@ -25,6 +35,12 @@
 .ti-shot img, .ti-big-shot img { display:block; width:100%; height:100%; object-fit:cover; object-position:top; }
 .ti-noshot { color:var(--rr-muted); font-size:12px; }
 .ti-live { position:absolute; left:8px; top:8px; padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.66); color:#5be38a; font-size:11px; font-weight:700; }
+.ti-live[data-kind=preview], .ti-kind[data-kind=preview] { color:#c9b8ff; }
+.ti-live[data-kind=local], .ti-kind[data-kind=local] { color:#ffd38a; }
+.ti-kind { font-weight:700; color:#5be38a; }
+.ti-deploy[data-state=building] { color:var(--rr-warn); }
+.ti-deploy[data-state=error] { color:#ff6961; }
+a.ti-big-shot { text-decoration:none; color:inherit; }
 .ti-ontv { position:absolute; right:8px; top:6px; padding:1px 6px; border-radius:6px; background:rgba(0,0,0,.66); font-size:13px; }
 .ti-apps { position:absolute; right:8px; bottom:8px; padding:2px 8px; border-radius:999px; background:rgba(0,0,0,.66); color:#fff; font-size:11px; font-weight:600; }
 .ti-card-body { display:flex; flex-direction:column; gap:5px; min-width:0; padding:10px 12px 12px; }

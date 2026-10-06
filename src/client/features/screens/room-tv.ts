@@ -19,20 +19,35 @@ interface Shot {
   ready: boolean;
 }
 
-/** What the office says of a TV's picture: when it was taken, and whose server it is, its branch and how many more apps the room has running. */
+/** What the office says of a TV's picture (server/room-screens.ts): when it was taken, of what, and what that is. */
 interface Seen {
   at: number;
+  of?: string;
+  /** The live site, a branch's preview, or something running on the office's computer. */
+  kind?: 'live' | 'preview' | 'local';
   who?: string;
   branch?: string;
   also?: number;
 }
 
-/** The caption along the bottom of a TV's picture: the branch and whose server it is, or that it's the room's own app address. */
+const hostOf = (url?: string) => {
+  try {
+    return url ? new URL(url).host : '';
+  } catch {
+    return '';
+  }
+};
+
+/** The caption along the bottom of a TV's picture: the live site and where, a branch's preview, or what runs on the office's computer and whose. */
 function caption(g: CanvasRenderingContext2D, s: Seen) {
-  const text = [s.branch ? `\u2387 ${s.branch}` : '', s.who ?? (s.branch ? '' : 'Its app address'), s.also ? `+${s.also} more running` : ''].filter(Boolean).join('   \u00b7   ');
+  const what =
+    s.kind === 'live' ? `\u25cf Live \u00b7 ${hostOf(s.of)}`
+    : s.kind === 'preview' ? `\u2387 ${s.branch ?? 'a branch'} \u00b7 Preview`
+    : [s.branch ? `\u2387 ${s.branch}` : '', s.who ? `${s.who}\u2019s, on this computer` : 'On this computer'].filter(Boolean).join(' \u00b7 ');
+  const text = [what, s.also ? `+${s.also} more` : ''].filter(Boolean).join('   \u00b7   ');
   g.font = '600 28px system-ui, -apple-system, "Segoe UI", sans-serif';
   const w = Math.min(W - 48, g.measureText(text).width + 40);
-  g.fillStyle = 'rgba(14, 14, 20, 0.8)';
+  g.fillStyle = s.kind === 'live' ? 'rgba(20, 110, 60, 0.88)' : s.kind === 'preview' ? 'rgba(76, 52, 170, 0.88)' : 'rgba(14, 14, 20, 0.8)';
   g.beginPath();
   g.roundRect(24, H - 76, w, 52, 12);
   g.fill();

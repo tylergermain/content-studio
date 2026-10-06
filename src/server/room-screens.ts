@@ -2,16 +2,20 @@ import { copyFileSync, mkdirSync, renameSync, statSync, writeFileSync } from 'no
 import path from 'node:path';
 import type { Browser } from 'playwright-core';
 import { layoutFurniture } from '../shared/office-builder.js';
+import { isLocal, previewKey, type Deploy } from '../shared/table-info.js';
+import { deploysOf, newestByBranch } from './deploys.js';
 import type { Floor } from './floor.js';
 import { branchAt } from './git-read.js';
 import type { Ctx } from './office/context.js';
 
-// What each project room's TV shows (the wall screen in the room, media '@room'), and its panel's pictures of what's
-// running on each branch (server/table-info.ts): its apps, as they are now. Every EVERY_MS, on each floor somebody's
-// on, each of a room's apps is photographed in a headless Chromium (as the design canvas exports are, see
-// canvas/export.ts): each running web server of a worker in the room, newest first, then the room's own app address
-// (ProjectLink.url). The TV shows the first. The pictures are kept in <floor>/.agent-office/room-screens, the TV's as
-// <room>.jpg and each app's as <room>--<key>.jpg, and served only to whoever's signed in
+// What each project room's TV shows (the wall screen in the room, media '@room'), and its panel's pictures of each
+// branch (server/table-info.ts), as they are now. Every EVERY_MS, on each floor somebody's on, a room's apps are
+// photographed in a headless Chromium (as the design canvas exports are, see canvas/export.ts): first what's
+// deployed (server/deploys.ts), the live site and each branch's newest ready preview, which are photographed once a
+// minute; then what runs on this computer, an agent's web server on a branch with no preview, and the room's own app
+// address there only when there's nothing else. The TV goes round what's deployed a round at a time (or what runs
+// here, with nothing deployed), captioned. The pictures are kept in <floor>/.agent-office/room-screens, the TV's
+// as <room>.jpg and each app's as <room>--<key>.jpg, and served only to whoever's signed in
 // (http/routes/room-screens.ts). Nothing runs until a TV or a panel first asks.
 
 const EVERY_MS = 15_000;
@@ -22,16 +26,46 @@ const IDLE_MS = 90_000;
 /** The most apps of one room photographed a round. */
 const MAX_APPS = 6;
 const LOCAL = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::(\d{1,5}))?(?:\/.*)?$/i;
+/** How often a deployed site (which doesn't change till it's deployed again) is photographed again. */
+const DEPLOYED_MS = 60_000;
 
 export interface RoomShot {
   /** When it was taken. */
   at: number;
-  /** What it's of: a worker's server's port, or the room's app address. */
+  /** What it's of: an address. */
   of: string;
-  /** For the TV: whose server it is and the branch they're on (none for the room's app address), and how many more apps the room has running. */
+  /** For the TV: the live site, a branch's preview, or something running on this computer (whose, and on what branch); and how many more there are. */
+  kind?: 'live' | 'preview' | 'local';
   who?: string;
   branch?: string;
   also?: number;
+  /** A preview behind Vercel's login: the picture is of that, so there's none (see server/deploys.ts, headersFor). */
+  blocked?: true;
+}
+
+/** Something of a room's to photograph, and what it is. */
+export interface ScreenApp {
+  key: string;
+  url: string;
+  kind: 'live' | 'preview' | 'local';
+  branch?: string;
+  who?: string;
+}
+
+/**
+ * What a room's screen has to go round, in order: the live site, each branch's newest ready preview, then
+ * what runs on this computer on a branch with no preview, and the room's own address on this computer only
+ * when there's nothing else. `deployed` is how many at the front are deployed (the TV goes round those).
+ */
+export function screenOrder(o: { live?: string; previews: Deploy[]; here: ScreenApp[]; url?: string }): { apps: ScreenApp[]; deployed: number } {
+  const previews = [...newestByBranch(o.previews.filter((x) => x.state === 'ready')).values()].slice(0, 4);
+  const deployed: ScreenApp[] = [
+    ...(o.live ? [{ key: 'live', url: o.live, kind: 'live' as const }] : []),
+    ...previews.map((p) => ({ key: previewKey(p.branch!), url: p.url, kind: 'preview' as const, branch: p.branch })),
+  ];
+  const here = o.here.filter((a) => !a.branch || !previews.some((p) => p.branch === a.branch));
+  const apps = [...deployed, ...here, ...(!deployed.length && !here.length && o.url ? [{ key: 'url', url: o.url, kind: 'local' as const }] : [])];
+  return { apps: apps.slice(0, MAX_APPS), deployed: Math.min(deployed.length, MAX_APPS) };
 }
 
 /** Something running in a room to photograph: a worker's web server (key p<port>), or the room's app address (key url). */
@@ -73,6 +107,8 @@ export class RoomScreens {
   /** The TVs' pictures, by floor:room, and each app's, by floor:room--key. */
   private shots = new Map<string, RoomShot>();
   private apps = new Map<string, RoomShot>();
+  /** How many rounds each TV has been round its apps. */
+  private turns = new Map<string, number>();
   private timer: NodeJS.Timeout | undefined;
   private running = false;
   private browser: Browser | undefined;
@@ -136,32 +172,58 @@ export class RoomScreens {
     }
   }
 
+  /** What a room has to photograph: what's deployed first, then what runs here (see the top). */
+  private async screenApps(floor: Floor, room: string): Promise<{ apps: ScreenApp[]; deployed: number }> {
+    const project = layoutFurniture(floor.plan.state()).find((p) => p.id === room && p.kind === 'project-room')?.project;
+    const local = roomApps(this.ctx, floor, room);
+    const d = project?.repo || project?.vercel ? await deploysOf(this.ctx.cfg.dataDir).of(project.repo, project.vercel, project.dir ?? this.ctx.cfg.dataDir).catch(() => undefined) : undefined;
+    const live = d?.live ?? (project?.url && !isLocal(project.url) ? project.url : undefined);
+    const here: ScreenApp[] = [];
+    for (const a of local) {
+      if (a.key === 'url') continue;
+      const w = a.workerId ? floor.workers.get(a.workerId) : undefined;
+      // The branch its folder is really on, which needn't be the one the office cut for it.
+      const works = w?.worktree ? path.join(w.worktree.root ?? floor.dir, w.worktree.path) : w?.project?.dir;
+      const branch = works ? await branchAt(works) : undefined;
+      here.push({ key: a.key, url: a.url, kind: 'local', ...(branch ? { branch } : {}), ...(w ? { who: w.name } : {}) });
+    }
+    return screenOrder({ live, previews: d?.list ?? [], here, url: local.find((a) => a.key === 'url')?.url });
+  }
+
   private async shootRoom(floor: Floor, room: string) {
-    const apps = roomApps(this.ctx, floor, room).slice(0, MAX_APPS);
+    const { apps, deployed } = await this.screenApps(floor, room);
     const tv = `${floor.id}:${room}`;
     if (!apps.length) this.shots.delete(tv);
     const running = new Set(apps.map((a) => `${tv}--${a.key}`));
     for (const key of this.apps.keys()) if (key.startsWith(`${tv}--`) && !running.has(key)) this.apps.delete(key);
-    for (const [i, app] of apps.entries()) {
+    for (const app of apps) {
       const name = `${room}--${app.key}`;
-      if (!(await this.shoot(app.url, floor, name))) continue;
-      const at = Date.now();
-      this.apps.set(`${floor.id}:${name}`, { at, of: app.url });
-      if (i > 0) continue;
-      // The TV's is the first's.
-      const shots = this.dir(floor);
-      try {
-        copyFileSync(path.join(shots, `${name}.jpg`), path.join(shots, `${room}.jpg.tmp`));
-        renameSync(path.join(shots, `${room}.jpg.tmp`), path.join(shots, `${room}.jpg`));
-      } catch {
-        continue;
-      }
-      const worker = app.workerId ? floor.workers.get(app.workerId) : undefined;
-      // The branch its folder is really on, which needn't be the one the office cut for it.
-      const works = worker?.worktree ? path.join(worker.worktree.root ?? floor.dir, worker.worktree.path) : worker?.project?.dir;
-      const branch = works ? await branchAt(works) : undefined;
-      this.shots.set(tv, { at, of: app.url, ...(worker ? { who: worker.name } : {}), ...(branch ? { branch } : {}), ...(apps.length > 1 ? { also: apps.length - 1 } : {}) });
+      const had = this.apps.get(`${floor.id}:${name}`);
+      // A deployed site is the same till it's deployed again: once a minute is plenty.
+      if (app.kind !== 'local' && had?.of === app.url && Date.now() - had.at < DEPLOYED_MS) continue;
+      const shot = await this.shoot(app.url, floor, name);
+      if (shot === 'failed') continue;
+      this.apps.set(`${floor.id}:${name}`, { at: Date.now(), of: app.url, ...(shot === 'blocked' ? { blocked: true as const } : {}) });
     }
+    // The TV: round what's deployed a round at a time (with nothing deployed, round what runs here).
+    const turn = (this.turns.get(tv) ?? -1) + 1;
+    this.turns.set(tv, turn);
+    const ring = (deployed ? apps.slice(0, deployed) : apps).filter((a) => {
+      const shot = this.apps.get(`${floor.id}:${room}--${a.key}`);
+      return shot && !shot.blocked;
+    });
+    const on = ring[turn % Math.max(1, ring.length)];
+    if (!on) return;
+    const shots = this.dir(floor);
+    try {
+      copyFileSync(path.join(shots, `${room}--${on.key}.jpg`), path.join(shots, `${room}.jpg.tmp`));
+      renameSync(path.join(shots, `${room}.jpg.tmp`), path.join(shots, `${room}.jpg`));
+    } catch {
+      return;
+    }
+    const at = this.apps.get(`${floor.id}:${room}--${on.key}`)?.at ?? Date.now();
+    // A new picture for the TV every turn, even of a site it photographed a minute ago.
+    this.shots.set(tv, { at: Math.max(at, (this.shots.get(tv)?.at ?? 0) + 1), of: on.url, kind: on.kind, ...(on.who ? { who: on.who } : {}), ...(on.branch ? { branch: on.branch } : {}), ...(apps.length > 1 ? { also: apps.length - 1 } : {}) });
   }
 
   private async launch(): Promise<Browser | undefined> {
@@ -177,15 +239,19 @@ export class RoomScreens {
     }
   }
 
-  private async shoot(url: string, floor: Floor, name: string): Promise<boolean> {
+  /** A picture of `url` as `name`: taken, failed, or `blocked` (a preview behind Vercel's login, whose picture isn't kept). */
+  private async shoot(url: string, floor: Floor, name: string): Promise<'ok' | 'failed' | 'blocked'> {
     const browser = await this.launch();
-    if (!browser) return false;
+    if (!browser) return 'failed';
     this.usedAt = Date.now();
-    const context = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, acceptDownloads: false }).catch(() => undefined);
-    if (!context) return false;
+    const headers = deploysOf(this.ctx.cfg.dataDir).headersFor(url);
+    const context = await browser.newContext({ viewport: VIEW, deviceScaleFactor: 1, acceptDownloads: false, extraHTTPHeaders: headers }).catch(() => undefined);
+    if (!context) return 'failed';
     try {
       const page = await context.newPage();
       await page.goto(url, { waitUntil: 'load', timeout: LOAD_MS });
+      // Sent to Vercel's login: the preview's protected, and the office has no way past it.
+      if (/(^|\.)vercel\.com$/.test(new URL(page.url()).hostname)) return 'blocked';
       await page.waitForTimeout(800);
       const jpg = await page.screenshot({ type: 'jpeg', quality: 72 });
       const dir = this.dir(floor);
@@ -193,9 +259,9 @@ export class RoomScreens {
       const file = path.join(dir, `${name}.jpg`);
       writeFileSync(`${file}.tmp`, jpg, { mode: 0o600 });
       renameSync(`${file}.tmp`, file);
-      return true;
+      return 'ok';
     } catch {
-      return false;
+      return 'failed';
     } finally {
       await context.close().catch(() => {});
     }

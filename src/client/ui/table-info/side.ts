@@ -3,11 +3,12 @@ import { serviceUrl } from '../services';
 import { store } from '../../state';
 import type { BranchApp, BranchDetail, ChangedPath, TableBranch, TableInfo } from '../../../shared/table-info';
 import { github } from './api';
-import { CHECKS, REVIEW, commitRow, drift, prState } from './cards';
+import { CHECKS, KIND, REVIEW, commitRow, deployRow, drift, prState } from './cards';
 
-// The right of a project table's panel (panel.ts): the branch picked, close up. What's running on it (to review, or to
-// open in a tab of its own), or how to get it running; who's on it; its pull request; its commits, the files they
-// change, and what's changed and not committed yet.
+// The right of a project table's panel (panel.ts): the branch picked, close up. What's on it (its live site or its
+// preview, and what runs on the office's computer, to review or to open in a tab of its own), or how to get it
+// running; its deploys; who's on it; its pull request; its commits, the files they change, and what's changed and
+// not committed yet.
 
 export interface SideDeps {
   openWorker(id: string): void;
@@ -19,8 +20,9 @@ export interface SideDeps {
   running: ReadonlySet<string>;
   /** Why this person can't hire here, if they can't. */
   cantHire(): string | undefined;
-  /** The picture of the app `key`, for the side. */
+  /** The picture of the app `key`, for the side, and whether it's a preview behind Vercel's login. */
   picture(key: string): HTMLImageElement | undefined;
+  blocked(key: string): boolean;
 }
 
 const LOCAL = /^https?:\/\/(?:localhost|127\.0\.0\.1)(?::(\d{1,5}))?(?:\/.*)?$/i;
@@ -74,21 +76,27 @@ export function sideBody(b: TableBranch, detail: BranchDetail | string | undefin
   const out: HTMLElement[] = [];
   const pr = b.pull ? info.pulls.find((p) => p.number === b.pull) : undefined;
 
-  // ---- What's running on it ----
+  // ---- What's on it: deployed (the live site, its preview), then what runs on the office's computer ----
   if (b.apps.length) {
-    out.push(section(b.apps.length === 1 ? 'Running now' : `Running now · ${b.apps.length} apps`, ...b.apps.map((app) => {
-      const { target, open } = reach(app);
-      const review = h('button.rr-send.ti-review-btn', { type: 'button', disabled: !target, title: target ? 'Review it full screen: use it at any size and comment on it' : 'Only apps the office can reach are reviewed here' }, '\u{1f9ea} Review');
-      review.addEventListener('click', () => target && d.review(target));
+    out.push(section(b.apps.length === 1 ? 'What’s on it' : `What’s on it · ${b.apps.length}`, ...b.apps.map((app) => {
+      const deployed = app.kind !== 'local';
+      // A deployed site opens where it is; what runs here is reviewed through the office, with comments.
+      const { target, open } = deployed ? { target: undefined, open: app.url } : reach(app);
+      const review = deployed ? '' : h('button.rr-send.ti-review-btn', { type: 'button', disabled: !target, title: target ? 'Review it full screen: use it at any size and comment on it' : 'Only apps the office can reach are reviewed here' }, '\u{1f9ea} Review');
+      if (review) review.addEventListener('click', () => target && d.review(target));
       const picture = d.picture(app.key);
-      const shot = h('button.ti-big-shot', { type: 'button', disabled: !target, title: target ? 'Review it' : app.label }, picture ?? h('span.ti-noshot', {}, 'Taking a picture…'));
-      shot.addEventListener('click', () => target && d.review(target));
+      const blocked = d.blocked(app.key);
+      const shot = deployed && open
+        ? h('a.ti-big-shot', { href: open, target: '_blank', rel: 'noopener', title: `Open ${app.label.toLowerCase()} in a tab of its own` }, picture ?? h('span.ti-noshot', {}, blocked ? 'Behind Vercel’s login' : 'Taking a picture…'))
+        : h('button.ti-big-shot', { type: 'button', disabled: !target, title: target ? 'Review it' : app.label }, picture ?? h('span.ti-noshot', {}, 'Taking a picture…'));
+      if (!deployed) shot.addEventListener('click', () => target && d.review(target));
       return h('div.ti-app', {},
         shot,
         h('div.ti-app-row', {},
-          h('span.ti-app-label', {}, app.label, app.url ? h('span.ti-mono', {}, ` ${app.url}`) : ''),
+          h('span.ti-app-label', {}, h('span.ti-kind', { 'data-kind': app.kind }, KIND[app.kind]), ' ', app.kind === 'local' ? app.label : '', app.url ? h('span.ti-mono', {}, ` ${app.url.replace(/^https?:\/\//, '').replace(/\/$/, '')}`) : ''),
           open ? h('a.rr-ghost.ti-link', { href: open, target: '_blank', rel: 'noopener', title: 'Open it in a tab of its own' }, 'Open ↗') : '',
-          review));
+          review),
+        blocked ? h('p.ti-problem', {}, 'This preview is behind Vercel’s login, so the office sees the sign-in page. In the project on Vercel, Settings › Deployment Protection, turn on Protection Bypass for Automation, and the office gets past it.') : '');
     })));
   } else if (b.agents.length) {
     const ask = h('button.rr-ghost', { type: 'button' }, `Open ${b.agents[0].name}’s chat`);
@@ -101,6 +109,9 @@ export function sideBody(b: TableBranch, detail: BranchDetail | string | undefin
     run.addEventListener('click', () => d.run(b));
     out.push(section('Running now', h('p.rm-muted', {}, b.base ? `Nothing’s running on ${b.name}. A new agent at the table can get the app going in a worktree of its own.` : 'Nothing’s running on it. A new agent at the table can check it out in a worktree of its own and run the app, to see and review it.'), run));
   }
+
+  // ---- Its deploys ----
+  if (b.deploys.length) out.push(section(b.base ? 'Live site' : 'Deployed', ...b.deploys.map(deployRow)));
 
   // ---- Who's on it ----
   if (b.agents.length) {

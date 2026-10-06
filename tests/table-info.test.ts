@@ -107,10 +107,10 @@ test('a table shows its default branch first, then the ones its agents are on, t
   // The default branch as GitHub has it, and the table's own app address on it.
   assert.equal(main.subject, 'Fix on main');
   assert.equal(main.base, true);
-  assert.deepEqual(main.apps, [{ key: 'url', label: 'Its app address', url: 'http://localhost:3999/' }]);
+  assert.deepEqual(main.apps, [{ key: 'url', label: 'Its app address, on this computer', kind: 'local', url: 'http://localhost:3999/' }]);
   // Ada's: her, her server, what she hasn't committed, a commit ahead and one behind.
   assert.deepEqual(ada.agents, [{ id: 'w1', name: 'Ada', status: 'working', task: 'Fix the header' }]);
-  assert.deepEqual(ada.apps, [{ key: 'p5174', label: 'Ada · port 5174', port: 5174 }]);
+  assert.deepEqual(ada.apps, [{ key: 'p5174', label: 'Ada’s, on this computer · port 5174', kind: 'local', port: 5174 }]);
   assert.equal(ada.dirty, 1);
   assert.deepEqual([ada.ahead, ada.behind], [1, 1]);
   assert.deepEqual([feature.ahead, feature.behind, feature.remote, feature.local], [2, 1, true, undefined]);
