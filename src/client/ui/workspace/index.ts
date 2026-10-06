@@ -6,10 +6,13 @@ import { WORKSPACES, WORKSPACE_TABS, fileTab, type WorkspaceKind, type Workspace
 import { appOn } from '../../../shared/apps';
 import { store } from '../../state';
 import { designBoard } from './board';
+import { openBoardRoom } from './board/room';
+import { withRoom } from './room-attach';
 import { designCanvas } from './canvas';
 import { reviewTargets, softwareReview } from './review/index';
 import { filesPanel } from './files';
 import { reportReader } from './reader';
+import { openReaderRoom } from './reader/room';
 import { screeningRoom } from './screening';
 import type { Panel, Workspace, WorkspaceHost } from './types';
 
@@ -21,8 +24,8 @@ export const PANELS: Record<WorkspaceTab, (host: WorkspaceHost) => Panel> = {
   canvas: designCanvas,
   review: softwareReview,
   watch: screeningRoom,
-  board: designBoard,
-  read: reportReader,
+  board: (host) => withRoom(designBoard(host), (o) => openBoardRoom(host, o)),
+  read: (host) => withRoom(reportReader(host), (o) => openReaderRoom(host, o)),
   files: filesPanel,
 };
 

@@ -7,6 +7,9 @@
   position:fixed; inset:0; display:flex; flex-direction:column; background:var(--rr-bg); color:var(--rr-ink); font-size:13px; outline:none; color-scheme:dark;
 }
 .review-room .hidden { display:none !important; }
+.review-room.theater .rr-body { grid-template-columns:minmax(0,1fr); }
+.review-room.theater .rr-side { display:none; }
+.review-room [hidden] { display:none !important; }
 .review-room button { font:inherit; color:inherit; }
 .review-room button:focus-visible, .review-room a:focus-visible, .review-room select:focus-visible { outline:2px solid var(--rr-accent); outline-offset:2px; }
 
@@ -38,6 +41,28 @@
 .rr-approve:hover:not(:disabled) { background:var(--rr-accent-2); }
 .rr-approve.on { background:rgba(48,209,88,.16); color:var(--rr-ok); }
 .rr-approve:disabled { opacity:.4; cursor:default; }
+
+/* What more than one room's top bar has: a version, a line about the file, a button beside Approve */
+.rr-badge { flex:none; padding:1px 6px; border-radius:5px; background:var(--rr-accent); color:#fff; font:700 11px ui-monospace, SFMono-Regular, Menlo, monospace; }
+.rr-badge:empty { display:none; }
+.rr-title-line { display:flex; align-items:center; gap:8px; min-width:0; }
+.rr-title-line strong { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.rr-nav.rr-mid { justify-content:center; }
+.rr-meta { min-width:0; color:var(--rr-muted); font-size:12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rr-ghost { padding:7px 12px; border:1px solid var(--rr-line-2); border-radius:8px; background:var(--rr-raise); color:var(--rr-ink); font-weight:600; cursor:pointer; white-space:nowrap; }
+.rr-ghost:hover:not(:disabled) { border-color:var(--rr-accent); }
+.rr-ghost:disabled { opacity:.4; cursor:default; }
+.rr-sheet { position:absolute; top:14px; right:14px; z-index:5; width:min(360px, calc(100% - 28px)); display:flex; flex-direction:column; gap:8px; padding:14px; border-radius:12px; background:var(--rr-panel); border:1px solid var(--rr-line-2); box-shadow:0 18px 50px rgba(0,0,0,.5); }
+.rr-sheet label { font-weight:600; }
+.rr-sheet-row { display:flex; gap:8px; align-items:center; }
+
+/* The notes on an image, a document or a design (notes-side.ts) */
+.ns-where { min-width:0; font-size:12px; color:var(--rr-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.rr-text.ns-text { margin:6px 0 0 30px; }
+.ns-modes { align-self:flex-start; margin-left:0 !important; }
+.rr-card.near, .rr-card.focus { background:rgba(124,92,255,.1); }
+.rr-card.flash { animation:rr-flash .9s ease; }
+@keyframes rr-flash { 0%, 40% { background:rgba(124,92,255,.28); } 100% { background:transparent; } }
 
 /* The stage */
 .rr-body { flex:1; min-height:0; display:grid; grid-template-columns:minmax(0,1fr) 360px; }

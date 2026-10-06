@@ -133,3 +133,12 @@ test('a note about the whole cut keeps saying so, kept and read back', () => {
   saveDraft(key, notes, store);
   assert.deepEqual(loadDraft(key, store), notes);
 });
+
+test('a comment on an image or a passage keeps where it is and its pin, and a pin keeps only short values', () => {
+  const store = memory();
+  const key = draftKey('w1', { path: 'art/thumb-v01.png' });
+  const notes = addNote([], 0, 'bigger title', 'the point 30% across and 40% down', { x: 30, y: 40 });
+  assert.deepEqual(notes, [{ at: 0, text: 'bigger title', where: 'the point 30% across and 40% down', pin: { x: 30, y: 40 } }]);
+  saveDraft(key, [...notes, { at: 0, text: 'odd pin', where: 'the passage “x”', pin: { q: 'x', bad: { deep: 1 } as unknown as string } }], store);
+  assert.deepEqual(loadDraft(key, store), [...notes, { at: 0, text: 'odd pin', where: 'the passage “x”', pin: { q: 'x' } }]);
+});

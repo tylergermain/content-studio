@@ -13,7 +13,7 @@ import type { Panel, WorkspaceHost } from './types';
 // renames or publishes a file.
 
 const MOST = 4;
-const LETTERS = ['A', 'B', 'C', 'D'];
+export const LETTERS = ['A', 'B', 'C', 'D'];
 const ref = (f: ChatArtifact) => (f.root ? { root: f.root, path: f.path } : { path: f.path });
 /** What was typed, as the server takes it: a pasted control character (a soft return from a doc) becomes a space. */
 const plain = (s: string) => s.replace(/[\x00-\x08\x0b-\x1f\x7f]/g, ' ').trim();
@@ -22,9 +22,25 @@ const pill = (label: string) => h(`span.ws-pill${label === 'Latest' ? '.latest' 
 
 const SHAPES: [string, number][] = [['16:9', 16 / 9], ['9:16', 9 / 16], ['4:5', 4 / 5], ['1:1', 1], ['4:3', 4 / 3], ['3:4', 3 / 4], ['3:2', 3 / 2], ['2:3', 2 / 3], ['1.91:1', 1.91], ['21:9', 21 / 9]];
 /** An image's shape as designers name it: '16:9' for a thumbnail, '4:5' for a feed post, else the ratio to one. */
-function shape(w: number, hgt: number): string {
+export function shape(w: number, hgt: number): string {
   const r = w / hgt;
   return SHAPES.find(([, k]) => Math.abs(r - k) / k < 0.01)?.[0] ?? `${r.toFixed(2)}:1`;
+}
+
+// YouTube shows a thumbnail at 360 × 202 on its home page and 168 × 94 beside the video playing, with the
+// video's length over the bottom right corner, on a white page or a near-black one.
+export function youTubeView(list: ChatArtifact[], url: (f: ChatArtifact) => string): HTMLElement {
+  // yt-thumb-home and yt-thumb-side, never a bare .side: the HUD's .side panel (styles/hud.css) is positioned absolutely.
+  const thumb = (f: ChatArtifact, size: 'home' | 'side') => h(`div.yt-thumb.yt-thumb-${size}`, {}, h('img', { src: url(f), alt: '', decoding: 'async' }), h('span.yt-time', {}, '12:34'));
+  const lines = () => h('div.yt-lines', {}, h('span.yt-line'), h('span.yt-line.short'), h('span.yt-line.meta'));
+  const page = (theme: 'light' | 'dark', f: ChatArtifact) => h(`div.yt-page.${theme}`, { 'aria-label': `${f.name} on YouTube’s ${theme} page` },
+    h('div.yt-home', {}, thumb(f, 'home'), h('div.yt-info', {}, h('span.yt-avatar'), lines())),
+    h('div.yt-side', {}, thumb(f, 'side'), lines()));
+  return h('div.board-yt', {},
+    h('p.board-yt-note', {}, 'The size viewers meet it: 360 × 202 on the home page and 168 × 94 beside a video, on YouTube’s light and dark pages. The video’s length covers the bottom right corner.'),
+    ...list.map((f, i) => h('section.yt-row', {},
+      h('h5', {}, list.length > 1 ? h('span.board-letter', {}, LETTERS[i]) : null, f.name),
+      h('div.yt-pages', {}, page('light', f), page('dark', f)))));
 }
 
 export function designBoard(host: WorkspaceHost): Panel {
@@ -169,7 +185,7 @@ export function designBoard(host: WorkspaceHost): Panel {
         : `No images yet. When ${host.workerName} links a thumbnail or a graphic in the chat, it shows up here to compare, check at YouTube size and pick.`));
       return;
     }
-    stage.replaceChildren(youtube ? youTubeView(list) : list.length === 1 ? oneView(list[0]) : compareView(list));
+    stage.replaceChildren(youtube ? youTubeView(list, host.url) : list.length === 1 ? oneView(list[0]) : compareView(list));
     paintPills();
   }
 
@@ -207,22 +223,6 @@ export function designBoard(host: WorkspaceHost): Panel {
         h('figcaption', {}, h('span.board-letter', {}, LETTERS[i]), h('span.board-name', { title: fileTitle(f) }, f.name),
           h('span.board-pills', { 'data-pills': artifactKey(f) }), drop));
     }));
-  }
-
-  // YouTube shows a thumbnail at 360 × 202 on its home page and 168 × 94 beside the video playing, with the
-  // video's length over the bottom right corner, on a white page or a near-black one.
-  function youTubeView(list: ChatArtifact[]): HTMLElement {
-    // yt-thumb-home and yt-thumb-side, never a bare .side: the HUD's .side panel (styles/hud.css) is positioned absolutely.
-    const thumb = (f: ChatArtifact, size: 'home' | 'side') => h(`div.yt-thumb.yt-thumb-${size}`, {}, h('img', { src: host.url(f), alt: '', decoding: 'async' }), h('span.yt-time', {}, '12:34'));
-    const lines = () => h('div.yt-lines', {}, h('span.yt-line'), h('span.yt-line.short'), h('span.yt-line.meta'));
-    const page = (theme: 'light' | 'dark', f: ChatArtifact) => h(`div.yt-page.${theme}`, { 'aria-label': `${f.name} on YouTube’s ${theme} page` },
-      h('div.yt-home', {}, thumb(f, 'home'), h('div.yt-info', {}, h('span.yt-avatar'), lines())),
-      h('div.yt-side', {}, thumb(f, 'side'), lines()));
-    return h('div.board-yt', {},
-      h('p.board-yt-note', {}, 'The size viewers meet it: 360 × 202 on the home page and 168 × 94 beside a video, on YouTube’s light and dark pages. The video’s length covers the bottom right corner.'),
-      ...list.map((f, i) => h('section.yt-row', {},
-        h('h5', {}, list.length > 1 ? h('span.board-letter', {}, LETTERS[i]) : null, f.name),
-        h('div.yt-pages', {}, page('light', f), page('dark', f)))));
   }
 
   // ---- Picks and variations ----

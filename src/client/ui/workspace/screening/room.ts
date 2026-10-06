@@ -1,14 +1,14 @@
 import '../room.css';
 import './room.css';
 import { h, openModal } from '../../dom';
-import { store } from '../../../state';
 import { STATUS_LABEL, type ReviewStatus } from '../../../../shared/software-review';
 import { artifactKey, type ChatArtifact, type ChatSnapshot, type ReviewNote, type ReviewRequest } from '../../../../shared/worker-chat';
 import { parseChapters, versionLabel } from '../../../../shared/workspace';
 import { fileFolder, fileSize, fileTime, fileTitle, latestLinked, reviewsOf, sections } from '../files';
 import { draftKey, sentNotes, seriesKey } from '../notes';
 import type { WorkspaceHost } from '../types';
-import { screeningComments, type Chapter, type Marks } from './comments';
+import { marks as marksCall, myName, type Marks } from '../marks';
+import { screeningComments, type Chapter } from './comments';
 import { screeningPlayer } from './player';
 
 // The screening room full screen, the way Frame.io reviews a cut: the cut on a dark stage with a timeline of the
@@ -39,13 +39,6 @@ export interface ScreeningRoom {
   close(): void;
 }
 
-async function marksCall(workerId: string, body?: { key: string; done: boolean; by: string }): Promise<Marks> {
-  const params = new URLSearchParams({ floor: store.floor ?? '', worker: workerId });
-  const res = await fetch(`/api/review/marks?${params}`, body ? { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : { credentials: 'same-origin' });
-  const out = await res.json().catch(() => undefined);
-  if (!res.ok || !out?.marks) throw new Error(out?.error ?? 'That didn’t save');
-  return out.marks;
-}
 
 export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[]; data: ChatSnapshot; file?: ChatArtifact; onClose(): void }): ScreeningRoom {
   open?.close();
@@ -109,7 +102,7 @@ export function openScreeningRoom(host: WorkspaceHost, o: { files: ChatArtifact[
       await review({ kind: 'notes', files: [ref(selected)], notes });
     },
     async mark(key, done) {
-      marks = await marksCall(host.workerId, { key, done, by: store.me.account?.name ?? store.profile.name ?? 'You' });
+      marks = await marksCall(host.workerId, { key, done });
       comments.setMarks(marks);
       player.setMarks(comments.timeline());
       paintTop();

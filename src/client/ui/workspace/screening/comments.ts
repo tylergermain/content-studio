@@ -3,6 +3,7 @@ import { artifactKey, type ReviewNote } from '../../../../shared/worker-chat';
 import { clock } from '../../../../shared/workspace';
 import { fileTime } from '../files';
 import { MAX_NOTES, WHOLE_CUT, addNote, loadDraft, saveDraft, seekBefore, withoutNotes, type SentNotes } from '../notes';
+import type { Marks } from '../marks';
 import type { TimelineMark } from './player';
 
 // The screening room's sidebar (room.ts), as Frame.io's: the notes on this cut not sent yet, then what was sent on it
@@ -11,7 +12,6 @@ import type { TimelineMark } from './player';
 // started (the cut waits while you write) or about the whole cut.
 
 export type Chapter = { at: number; title: string };
-export type Marks = Record<string, { by: string; at: number }>;
 type Filter = 'open' | 'done' | 'all';
 type FileRef = { root?: string; path: string };
 

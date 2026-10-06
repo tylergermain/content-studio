@@ -16,6 +16,20 @@ const PREFIX = 'agent-office.screening-notes:';
 /** Where a note about the cut as a whole says it's on (its `at` is 0). */
 export const WHOLE_CUT = 'the whole cut';
 
+/** A note being written: on an image, a document or a design it says where (`where`), with what the room needs to pin it again (`pin`). */
+export type DraftNote = ReviewNote & { pin?: Record<string, string | number> };
+
+/** A note's pin as kept: a few short values, nothing else. */
+function cleanPin(v: unknown): Record<string, string | number> | undefined {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return undefined;
+  const out: Record<string, string | number> = {};
+  for (const [k, x] of Object.entries(v).slice(0, 8)) {
+    if (typeof x === 'number' && Number.isFinite(x)) out[k] = x;
+    else if (typeof x === 'string' && x.length <= 600) out[k] = x;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** Where the notes you're writing on one file are kept: one draft per worker and file (a share's file is its own). */
 export function draftKey(workerId: string, file: FileRef): string {
   return `${PREFIX}${workerId}:${artifactKey(file)}`;
@@ -37,10 +51,12 @@ export function sortNotes(notes: readonly ReviewNote[]): ReviewNote[] {
  * The notes with one more at `at` seconds (or about the whole cut, with `whole`), in order; the same
  * notes when it says nothing or there's no room.
  */
-export function addNote(notes: readonly ReviewNote[], at: number, text: string, whole = false): ReviewNote[] {
+export function addNote(notes: readonly DraftNote[], at: number, text: string, whole: boolean | string = false, pin?: DraftNote['pin']): DraftNote[] {
   const clean = cleanNote(text);
   if (!clean || !validAt(at) || notes.length >= MAX_NOTES) return [...notes];
-  return sortNotes([...notes, whole ? { at: 0, text: clean, where: WHOLE_CUT } : { at: Math.round(at * 100) / 100, text: clean }]);
+  // `whole` as words: where the note is on (an element, a point, a quote), at 0.
+  const where = whole === true ? WHOLE_CUT : typeof whole === 'string' ? cleanNote(whole).slice(0, 600) : '';
+  return sortNotes([...notes, where ? { at: 0, text: clean, where, ...(pin ? { pin } : {}) } : { at: Math.round(at * 100) / 100, text: clean }]);
 }
 
 /** Where clicking a note takes the player: two seconds before it, so you see what leads into it. */
@@ -56,11 +72,16 @@ function local(): Store | undefined {
 }
 
 /** The notes kept for a file, in order. Anything unreadable is left out, and a store that throws keeps nothing. */
-export function loadDraft(key: string, store: Store | undefined = local()): ReviewNote[] {
+export function loadDraft(key: string, store: Store | undefined = local()): DraftNote[] {
   try {
     const list: unknown = JSON.parse(store?.getItem(key) ?? '[]');
     if (!Array.isArray(list)) return [];
-    const notes = list.flatMap((n: Partial<ReviewNote> | null) => (n && validAt(n.at) && typeof n.text === 'string' && cleanNote(n.text) ? [{ at: n.at, text: cleanNote(n.text), ...(n.where === WHOLE_CUT ? { where: WHOLE_CUT } : {}) }] : []));
+    const notes = list.flatMap((n: Partial<DraftNote> | null) => {
+      if (!n || !validAt(n.at) || typeof n.text !== 'string' || !cleanNote(n.text)) return [];
+      const where = typeof n.where === 'string' ? cleanNote(n.where).slice(0, 600) : '';
+      const pin = where ? cleanPin(n.pin) : undefined;
+      return [{ at: n.at, text: cleanNote(n.text), ...(where ? { where } : {}), ...(pin ? { pin } : {}) }];
+    });
     return sortNotes(notes).slice(0, MAX_NOTES);
   } catch {
     return [];

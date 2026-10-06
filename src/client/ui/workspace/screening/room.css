@@ -1,7 +1,5 @@
 /* What's only the screening room's (room.ts, player.ts, comments.ts); the rest of its look is ../room.css. */
 .rr-stage.sr-stage { padding:0; align-items:stretch; justify-content:stretch; }
-.screening-room.theater .rr-body { grid-template-columns:minmax(0,1fr); }
-.screening-room.theater .rr-side { display:none; }
 
 /* The top bar */
 .sr-title-line { display:flex; align-items:center; gap:8px; min-width:0; }

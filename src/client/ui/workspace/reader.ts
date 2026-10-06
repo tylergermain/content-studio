@@ -46,7 +46,8 @@ async function copyText(text: string): Promise<boolean> {
   }
 }
 
-export function reportReader(host: WorkspaceHost): Panel {
+/** `onOpen` hears each document as it opens, for a room built around the reader (reader/room.ts). */
+export function reportReader(host: WorkspaceHost, o: { onOpen?(f: ChatArtifact): void } = {}): Panel {
   let data: ChatSnapshot | undefined;
   /** This tab's documents, the worker's first (`mine`: what it linked and what sits beside that) and then the floor's. */
   let files: ChatArtifact[] = [];
@@ -177,16 +178,17 @@ export function reportReader(host: WorkspaceHost): Panel {
   }
 
   /** Opens a document; `keep` re-reads the open one in place (it changed on disk) without losing the reader's spot. */
-  async function open(f: ChatArtifact, o: { hash?: string; keep?: boolean } = {}) {
+  async function open(f: ChatArtifact, opts: { hash?: string; keep?: boolean } = {}) {
     abort?.abort();
     const ctrl = (abort = new AbortController());
-    const scroll = o.keep ? page.scrollTop : 0;
+    const scroll = opts.keep ? page.scrollTop : 0;
     current = f;
-    if (!o.keep) { closeSheet(); words = undefined; }
+    o.onOpen?.(f);
+    if (!opts.keep) { closeSheet(); words = undefined; }
     paintList();
     paintHead(f);
     page.classList.toggle('framed', framed(f));
-    if (!o.keep) {
+    if (!opts.keep) {
       page.replaceChildren(h('p.reader-empty', {}, 'Opening…'));
       paintRail([], []);
     }
@@ -229,7 +231,7 @@ export function reportReader(host: WorkspaceHost): Panel {
       if (n) a.after(h('sup.reader-cite', { title: `Source ${n}` }, String(n)));
     }
     page.scrollTop = scroll;
-    if (o.hash) jump(o.hash);
+    if (opts.hash) jump(opts.hash);
   }
 
   /** Text that isn't Markdown, as written (JSON laid out), with its web addresses made links so the rail can list them. */

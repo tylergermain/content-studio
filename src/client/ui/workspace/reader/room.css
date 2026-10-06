@@ -1,0 +1,22 @@
+/* Reports' room (room.ts): the reader (../reader.css) on the dark stage, its page a sheet of paper; the rest is ../room.css. */
+.rr-stage.rd-stage { padding:0; align-items:stretch; justify-content:stretch; }
+.reports-room .ws-reader { flex:1; height:auto; color:var(--ink); background:transparent;
+  --ink:#f1f1f4; --muted:#9b9ba6; --hairline:rgba(255,255,255,.08); --hairline-2:rgba(255,255,255,.14); --wash:rgba(255,255,255,.06); --control:#1e1e22; --surface:#151518; --accent-text:#b5a6ff; --content:transparent; }
+.reports-room .reader-docs, .reports-room .reader-tools, .reports-room .reader-readonly, .reports-room .reader-sheet, .reports-room .reader-status, .reports-room .reader-crumbs, .reports-room .reader-pills { display:none !important; }
+.reports-room .reader-head { padding:8px 24px 0; border:0; }
+.reports-room .reader-head:not(:has(.reader-back:not(.hidden))) .reader-title { display:none; }
+.reports-room .reader-meta { display:none; }
+.reports-room .reader-page { padding:28px 24px 72px; }
+.reports-room .reader-page > .md, .reports-room .reader-page > .reader-text { max-width:760px; margin:0 auto; padding:56px 64px 72px; border-radius:6px; background:#fff; color:#1d1d1f; box-shadow:0 0 0 1px rgba(255,255,255,.06), 0 24px 70px rgba(0,0,0,.55);
+  --ink:#1d1d1f; --muted:#6e6e73; --hairline:rgba(0,0,0,.1); --hairline-2:rgba(0,0,0,.16); --wash:rgba(0,0,0,.05); --accent-text:#4b2fe0; }
+.reports-room .reader-page.framed { padding:20px 24px; }
+.reports-room .reader-page iframe { background:#fff; border-radius:6px; }
+.reports-room .reader-empty, .reports-room .reader-notice { color:var(--rr-muted); }
+.reports-room .reader-rail { background:var(--rr-panel); border-left:1px solid var(--rr-line); }
+.reports-room .reader-rail .btn.small { background:var(--rr-raise); color:var(--rr-ink); border-color:var(--rr-line-2); }
+.rd-quote { position:absolute; z-index:6; padding:7px 12px; border:0; border-radius:9px; background:var(--rr-accent); color:#fff; font-weight:600; font-size:12.5px; cursor:pointer; box-shadow:0 8px 24px rgba(0,0,0,.4); white-space:nowrap; }
+.rd-quote.hidden { display:none; }
+::highlight(rr-notes) { background-color:rgba(124,92,255,.22); }
+::highlight(rr-focus) { background-color:rgba(124,92,255,.5); }
+::highlight(rr-pick) { background-color:rgba(255,214,10,.5); }
+@media (max-width: 960px) { .reports-room .reader-page > .md, .reports-room .reader-page > .reader-text { padding:28px 22px 40px; } }
