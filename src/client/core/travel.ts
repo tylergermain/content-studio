@@ -49,7 +49,8 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
     const count = index < 0 ? 1 : floors.length;
     const wings = floorWings(floors);
     setStoreys(floorStoreys(floors));
-    player.street = streetBelow(index);
+    // Up on the roof the street is the whole tower's height down (see roofDrop): that's where you'd land.
+    player.street = store.floor === ROOF ? -roofDrop(parts.rooftop.roofFloors()) : streetBelow(index);
     const s = office.stack.state;
     const same = s.index === Math.max(0, index) && s.count === count && s.up === up && s.down === down;
     const outside = wings.join() + storeysKey();
@@ -195,6 +196,21 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
     setTimeout(() => net.send({ t: 'floor.go', floor: floorId, at }), 170);
   }
 
+  /**
+   * Down from the roof by parachute, onto the street: you're on the bottom floor's street now, at the
+   * same spot (every floor's x and z are the street's), with the garage elevator to take you back up.
+   */
+  function landFromRoof(x: number, z: number, rotY: number) {
+    const floorId = builtFloors()[0]?.id;
+    if (!core.upTop || core.trip || !floorId) return;
+    stopForTrip();
+    core.trip = { floor: floorId, how: 'switch', timer: window.setTimeout(tripFailed, 10_000) };
+    player.enabled = false;
+    player.clearKeys();
+    fade(true, true);
+    setTimeout(() => net.send({ t: 'floor.go', floor: floorId, at: { x, y: streetBelow(0), z, rotY } }), 170);
+  }
+
   /** The floor never came (it's gone, or the office is unreachable): back where you were. */
   function tripFailed() {
     const t = core.trip;
@@ -281,5 +297,5 @@ export function installTravel(ctx: Ctx, core: CoreState, parts: TravelParts) {
     doorsOpen();
   }
 
-  return { syncStack, takenAway, showElevator, lift, ride, switchFloor, travel, setPlace, arrive };
+  return { syncStack, takenAway, showElevator, lift, ride, switchFloor, travel, landFromRoof, setPlace, arrive };
 }

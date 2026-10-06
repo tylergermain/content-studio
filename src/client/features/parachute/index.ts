@@ -8,11 +8,12 @@
 import * as THREE from 'three';
 import type { Ctx } from '../../core/context';
 import type { Parts } from '../../core/parts';
+import { STOREY } from '../../../shared/layout';
 import { groundAt } from '../../player';
 import { store } from '../../state';
 import { toast } from '../../ui/dom';
 import { CANOPIES, disposeParachute, parachute } from '../../world/parachute';
-import { POP, SINK, STRAP, airborne, crumpleAt, popScale, shouldOpen } from './logic';
+import { POP, STRAP, airborne, crumpleAt, popScale, shouldOpen, sinkAt } from './logic';
 
 /** A chute over someone, and how far along it is: opening, open, or crumpling once they're down. */
 interface Chute {
@@ -28,7 +29,7 @@ interface Chute {
 /** A chute is a touch bigger over a person than over a worker. */
 const SIZE = 1.15;
 
-export function installParachute(ctx: Ctx, parts: Pick<Parts, 'peers' | 'cars' | 'heli'>) {
+export function installParachute(ctx: Ctx, parts: Pick<Parts, 'peers' | 'cars' | 'heli' | 'travel'>) {
   const { player, scene } = ctx;
   let mine: Chute | null = null;
   const theirs = new Map<string, Chute>();
@@ -87,10 +88,13 @@ export function installParachute(ctx: Ctx, parts: Pick<Parts, 'peers' | 'cars' |
         mine.down = 0;
         player.maxFall = Infinity;
         if (free) ctx.sound.chute('land');
+        // Off the roof, down on the street: that's the bottom floor's street now (see landFromRoof).
+        if (free && ctx.upTop() && player.pos.y < -STOREY) parts.travel.landFromRoof(player.pos.x, player.pos.z, player.facing);
       } else {
-        // It catches you over the time it takes to open, not all at once.
+        // It catches you over the time it takes to open, not all at once, and lets you down quicker while you're high up.
         const k = Math.min(1, mine.t / POP);
-        player.maxFall = SINK + Math.max(0, mine.from - SINK) * (1 - k);
+        const sink = sinkAt(heightAt(player.pos.x, player.pos.y, player.pos.z));
+        player.maxFall = sink + Math.max(0, mine.from - sink) * (1 - k);
       }
     }
     // In first person the cords would run right past your eyes: only the canopy shows, overhead.

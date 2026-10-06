@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { AXE_LANE } from '../../../shared/bargames';
-import { DANCE_FLOOR, DJ_BOOTH, ELEVATOR, ELEVATOR_FRONT, FIRE_PIT, FLOOR, ROOF_BAR, ROOF_TABLES, SEATING_BY_ID, STAGE, WALL_HEIGHT, WALL_T } from '../../../shared/layout';
+import { DANCE_FLOOR, DJ_BOOTH, ELEVATOR, ELEVATOR_FRONT, FIRE_PIT, FLOOR, ROOF_BAR, ROOF_RAIL, ROOF_TABLES, SEATING_BY_ID, STAGE, WALL_HEIGHT, WALL_T } from '../../../shared/layout';
 import type { DjFrame } from '../../dnb';
 import { buildBarGames, type BarGamesView } from '../bargames/world';
 import { Worker } from '../../world/character';
@@ -288,7 +288,7 @@ export function buildRooftop(night: NightParts, floors: number): Rooftop {
       const pz = alongX ? ez : z0 + a;
       statics.add(mesh(new THREE.BoxGeometry(0.06, 0.75, 0.06), steel, px, 0.8, pz, false));
     }
-    colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: 99 });
+    colliders.push({ minX: x0, maxX: x1, minZ: z0, maxZ: z1, top: ROOF_RAIL }); // As high as the rail: over it by parachute (see features/parachute).
   }
 
   // The elevator, in its housing: a back wall and a roof over the shaft (as tall as a floor), and the light on top of its mast (mast.ts).

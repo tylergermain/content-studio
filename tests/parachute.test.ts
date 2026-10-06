@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { BALCONY_RAIL, PARACHUTE } from '../src/shared/layout.js';
+import { BALCONY_RAIL, PARACHUTE, ROOF_RAIL, roofDrop } from '../src/shared/layout.js';
 import { JUMP_HEIGHT } from '../src/client/player/motion.js';
 import { MANTLE, STEP } from '../src/client/player/collide.js';
-import { AIRBORNE, CRUMPLE, OPEN, POP, SINK, airborne, crumpleAt, popScale, shouldOpen } from '../src/client/features/parachute/logic.js';
+import { AIRBORNE, CRUMPLE, OPEN, POP, SINK, SINK_HIGH, airborne, crumpleAt, popScale, shouldOpen, sinkAt } from '../src/client/features/parachute/logic.js';
 
 // Parachuting off the balcony (features/parachute): over the railing, a chute that opens by itself,
 // and everyone else's worked out from where they are.
@@ -16,6 +16,8 @@ test('the balcony railing keeps you in when you walk, and lets you over when you
   const worst = JUMP_HEIGHT - (6.4 * 0.05) / 2;
   assert.ok(BALCONY_RAIL - worst < MANTLE, `rail ${BALCONY_RAIL}, slowest jump ${worst.toFixed(2)}`);
   assert.ok(BALCONY_RAIL > MANTLE + STEP, 'too high to climb without jumping');
+  // The roof's railing too.
+  assert.ok(ROOF_RAIL - worst < MANTLE && ROOF_RAIL > MANTLE + STEP, `roof rail ${ROOF_RAIL}`);
   // The workers stand up on the same rail to jump.
   assert.ok(Math.abs(PARACHUTE.railTop - BALCONY_RAIL) < 0.05);
 });
@@ -46,4 +48,17 @@ test("someone else's chute shows while they hang up off the ground, and doesn't 
   assert.ok(airborne(AIRBORNE.up + 0.1, false));
   assert.ok(airborne(1, true), 'still under it near the ground');
   assert.ok(!airborne(AIRBORNE.down - 0.1, true));
+});
+
+test('off the roof it lets you down quicker while you are high up, and gently at the end', () => {
+  assert.equal(sinkAt(2), SINK);
+  assert.equal(sinkAt(1000), SINK_HIGH.max);
+  assert.ok(sinkAt(20) > SINK && sinkAt(20) < SINK_HIGH.max);
+  // From the top of a 15-storey tower, a float of well under half a minute.
+  let h = roofDrop(15), t = 0;
+  while (h > 0 && t < 120) {
+    h -= sinkAt(h) * 0.05;
+    t += 0.05;
+  }
+  assert.ok(t > 8 && t < 20, `${t.toFixed(1)} s down from ${roofDrop(15).toFixed(0)} m`);
 });
