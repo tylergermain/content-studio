@@ -1,15 +1,18 @@
 import { h, timeAgo } from '../../dom';
-import { WHOLE_PAGE, type ReviewPick, type SentComment, type SoftwareReviewState } from '../../../../shared/software-review';
+import { WHOLE_PAGE, type ReviewArea, type ReviewPick, type SentComment, type SoftwareReviewState } from '../../../../shared/software-review';
 import { loadDrafts, saveDrafts, type Draft } from './api';
 
 // The review room's sidebar (room.ts), as in Frame.io: every comment, the ones not sent yet first and
 // then each round sent, newest first, with Open / Done / All; a check marks one done. The box at the
-// bottom writes the next one, pinned to what was last clicked in comment mode or else about the page.
+// bottom writes the next one, pinned to what was last clicked in comment mode, or to the area last drawn
+// round with the box or circle, or else about the page.
 
 export type PinState = 'draft' | 'open' | 'done';
 export interface Pin { n: number; selector: string; state: PinState }
+/** A comment's area, as the page draws it: numbered like a pin. */
+export type Shape = ReviewArea & { n: number; state: PinState };
 /** Where a comment is: what the room needs to show it, highlight it or go to it. */
-export interface Spot { app: string; page: string; selector: string }
+export interface Spot { app: string; page: string; selector: string; area?: ReviewArea }
 type Filter = 'open' | 'done' | 'all';
 
 export interface CommentsDeps {
@@ -30,13 +33,16 @@ export interface CommentsDeps {
 
 export interface Comments {
   element: HTMLElement;
-  pick(p: { pick: ReviewPick; page: string }): void;
+  /** What the next comment is pinned to: an element clicked, or an area drawn (`area`). */
+  pick(p: { pick: ReviewPick; page: string; area?: ReviewArea }): void;
   clearPick(): void;
   hasPick(): boolean;
   /** Something written in the box, or a pick waiting for it. */
   busy(): boolean;
   setState(s: SoftwareReviewState): void;
   pins(app: string, page: string): Pin[];
+  /** The areas of the comments on that page, to draw. */
+  shapes(app: string, page: string): Shape[];
   drafts(): Draft[];
   focusBox(): void;
   paint(): void;
@@ -48,7 +54,7 @@ export function reviewComments(d: CommentsDeps): Comments {
   let state: SoftwareReviewState = { rounds: [], comments: [] };
   let drafts = loadDrafts(d.workerId);
   let filter: Filter = 'open';
-  let picked: { pick: ReviewPick; page: string } | undefined;
+  let picked: { pick: ReviewPick; page: string; area?: ReviewArea } | undefined;
   let error = '';
 
   const count = h('span.rr-count');
@@ -88,7 +94,7 @@ export function reviewComments(d: CommentsDeps): Comments {
     const w = d.where();
     if (!text || !w) return input.focus();
     const page = picked?.page ?? w.page;
-    drafts.push({ id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, app: w.app, at: Date.now(), text, page, what: picked ? picked.pick.what : WHOLE_PAGE, selector: picked?.pick.selector ?? '' });
+    drafts.push({ id: `d${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`, app: w.app, at: Date.now(), text, page, what: picked ? picked.pick.what : WHOLE_PAGE, selector: picked?.area ? '' : (picked?.pick.selector ?? ''), ...(picked?.area ? { area: picked.area } : {}) });
     keep();
     input.value = '';
     picked = undefined;
@@ -153,7 +159,7 @@ export function reviewComments(d: CommentsDeps): Comments {
       actions.push(check);
     }
     const w = d.where();
-    const spot: Spot = { app: c.app, page: c.page, selector: c.selector };
+    const spot: Spot = { app: c.app, page: c.page, selector: c.selector, ...(c.area ? { area: c.area } : {}) };
     const whereText = `${w && c.app !== w.app ? `${shortApp(c.app)} \u00b7 ` : ''}${c.page} \u00b7 ${c.what}`;
     const el = h('div.rr-card', { 'data-state': st, tabindex: '0', role: 'button', title: 'Show it in the app' },
       h('div.rr-card-head', {},
@@ -192,7 +198,7 @@ export function reviewComments(d: CommentsDeps): Comments {
     if (!groups.length) {
       groups.push(h('div.rr-none', {},
         h('strong', {}, filter === 'done' ? 'Nothing done yet' : 'No open comments'),
-        h('p', {}, filter === 'done' ? `Check a comment once ${d.workerName} has fixed it.` : 'Press C, then click anything in the app to pin a comment to it. Or write one below about the whole page.')));
+        h('p', {}, filter === 'done' ? `Check a comment once ${d.workerName} has fixed it.` : 'Press C, then click anything in the app to pin a comment to it, or B (box) or O (circle) and draw round an area. Or write one below about the whole page.')));
     }
     list.replaceChildren(...groups);
 
@@ -208,7 +214,7 @@ export function reviewComments(d: CommentsDeps): Comments {
         d.changed();
       });
       on.replaceChildren(h('span.rr-pin.draft', {}, String(nextN() + drafts.length + 1)), h('span.rr-on-text', {}, h('strong', {}, picked.pick.what), ` on ${picked.page}`), unpin);
-    } else on.replaceChildren(h('span.rr-on-text', {}, w ? `About ${w.page} as a whole \u00b7 press C and click to pin it to something` : 'Open an app to comment on it'));
+    } else on.replaceChildren(h('span.rr-on-text', {}, w ? `About ${w.page} as a whole \u00b7 press C and click to pin it to something, or B or O to draw round an area` : 'Open an app to comment on it'));
     const n = here().length;
     send.textContent = n ? `Send ${n === 1 ? '1 comment' : `${n} comments`} to ${d.workerName}` : `Send to ${d.workerName}`;
     send.disabled = !n || !d.canSend();
@@ -237,6 +243,14 @@ export function reviewComments(d: CommentsDeps): Comments {
       for (const c of state.comments) {
         const st: PinState = c.done ? 'done' : 'open';
         if (c.app === app && c.page === page && c.selector && shows(st)) out.push({ n: c.n, selector: c.selector, state: st });
+      }
+      return out;
+    },
+    shapes(app, page) {
+      const out: Shape[] = numbered().filter((x) => x.app === app && x.page === page && x.area).map((x) => ({ ...x.area!, n: x.n, state: 'draft' }));
+      for (const c of state.comments) {
+        const st: PinState = c.done ? 'done' : 'open';
+        if (c.app === app && c.page === page && c.area && shows(st)) out.push({ ...c.area, n: c.n, state: st });
       }
       return out;
     },

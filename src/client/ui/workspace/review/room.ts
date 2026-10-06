@@ -1,7 +1,7 @@
 import '../room.css';
 import { h, openModal } from '../../dom';
 import { store } from '../../../state';
-import { DEVICES, REVIEW_START, REVIEW_TAG, STATUS_LABEL, reviewStatus, type DeviceId, type ReviewPick, type SoftwareReviewState } from '../../../../shared/software-review';
+import { DEVICES, REVIEW_START, REVIEW_TAG, STATUS_LABEL, areaWhat, cleanArea, reviewStatus, type DeviceId, type ReviewPick, type SoftwareReviewState } from '../../../../shared/software-review';
 import type { WorkspaceHost } from '../types';
 import { approve, loadReview, markDone, myName, sendRound, isTable, startTableApp } from './api';
 import { reviewComments, type Spot } from './comments';
@@ -64,7 +64,10 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   const device = h('div.rr-device', {}, frame);
   const useBtn = h('button', { type: 'button', 'aria-pressed': 'true', title: 'Use the app as it is' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u2196'), 'Use app');
   const commentBtn = h('button', { type: 'button', 'aria-pressed': 'false', title: 'Click anything in the app to comment on it (C)' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u{1f4ac}'), 'Comment', h('kbd', {}, 'C'));
-  const modes = h('div.rr-modes', { role: 'group', 'aria-label': 'Mode' }, useBtn, commentBtn);
+  // Drawing round an area to comment on all of it: a box dragged out, or a ring drawn by hand.
+  const boxBtn = h('button', { type: 'button', 'aria-pressed': 'false', title: 'Drag a box round an area of the app to comment on everything in it (B)' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u25ad'), 'Box', h('kbd', {}, 'B'));
+  const ringBtn = h('button', { type: 'button', 'aria-pressed': 'false', title: 'Draw a ring round an area of the app to comment on everything in it (O)' }, h('span.rr-mode-icon', { 'aria-hidden': 'true' }, '\u25ef'), 'Circle', h('kbd', {}, 'O'));
+  const modes = h('div.rr-modes', { role: 'group', 'aria-label': 'Mode' }, useBtn, commentBtn, boxBtn, ringBtn);
   const notice = h('div.rr-notice.hidden');
   const banner = h('p.rr-banner.hidden');
   const stage = h('div.rr-stage', {}, banner, device, notice, modes);
@@ -77,7 +80,10 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     me: myName,
     canSend: () => host.canSend(),
     where: () => (target ? { app: appAddress(target), page } : undefined),
-    focus: (s) => tell({ t: 'focus', selector: s && target && s.app === appAddress(target) && s.page === page ? s.selector : '' }),
+    focus: (s) => {
+      const here = !!s && !!target && s.app === appAddress(target) && s.page === page;
+      tell({ t: 'focus', selector: here ? s!.selector : '', area: here ? s!.area : undefined });
+    },
     reveal,
     changed: () => {
       // A comment just added (or a pick let go of) takes the selection off its element.
@@ -88,7 +94,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       if (!target) return;
       const d = DEVICES.find((x) => x.id === size);
       const seen = d ? { w: d.w, h: d.h, label: d.label } : { w: frame.offsetWidth, h: frame.offsetHeight };
-      setState(await sendRound(host.workerId, appAddress(target), seen, drafts.map(({ text, page: p, what, selector }) => ({ text, page: p, what, selector }))));
+      setState(await sendRound(host.workerId, appAddress(target), seen, drafts.map(({ text, page: p, what, selector, area }) => ({ text, page: p, what, selector, ...(area ? { area } : {}) }))));
       void host.refresh();
     },
     async done(id, done) {
@@ -115,7 +121,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       /* not loaded yet */
     }
   };
-  const pins = (keep = true) => target && tell({ t: 'pins', pins: comments.pins(appAddress(target), page), keep });
+  const pins = (keep = true) => target && tell({ t: 'pins', pins: comments.pins(appAddress(target), page), shapes: comments.shapes(appAddress(target), page), keep });
 
   function onMessage(e: MessageEvent) {
     const m = e.data;
@@ -137,7 +143,14 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     } else if (m.t === 'picked' && m.pick && commenting) {
       comments.pick({ pick: m.pick as ReviewPick, page: typeof m.page === 'string' ? m.page : page });
       pins();
-    } else if (m.t === 'key' && (m.key === 'Escape' || m.key === 'c')) {
+    } else if (m.t === 'area' && commenting) {
+      // An area drawn round what's in it: the next comment's about all of that.
+      const area = cleanArea(m.area);
+      if (!area) return;
+      comments.pick({ pick: { selector: '', what: areaWhat(area), rect: { x: area.x, y: area.y, w: area.w, h: area.h } }, page: typeof m.page === 'string' ? m.page : page, area });
+      comments.focusBox();
+      pins();
+    } else if (m.t === 'key' && (m.key === 'Escape' || m.key === 'c' || m.key === 'b' || m.key === 'o')) {
       onKey(new KeyboardEvent('keydown', { key: m.key }));
     }
   }
@@ -176,8 +189,8 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       revealAfterLoad = s;
       return ready && commentable ? tell({ t: 'go', path: s.page }) : open(target, s.page);
     }
-    tell({ t: 'reveal', selector: s.selector });
-    tell({ t: 'focus', selector: s.selector });
+    tell({ t: 'reveal', selector: s.selector, area: s.area });
+    tell({ t: 'focus', selector: s.selector, area: s.area });
   }
 
   // ---- Sizes ----
@@ -209,17 +222,26 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
   resize.observe(stage);
 
   // ---- Modes ----
-  function setCommenting(on: boolean) {
+  /** Comment mode, and its tool: clicking an element ('pick'), or drawing a box ('rect') or a ring ('lasso') round an area. */
+  let tool: 'pick' | 'rect' | 'lasso' = 'pick';
+  function setCommenting(on: boolean, using: 'pick' | 'rect' | 'lasso' = 'pick') {
     commenting = on && commentable && host.canSend() && !!target;
-    commentBtn.setAttribute('aria-pressed', String(commenting));
+    tool = commenting ? using : 'pick';
+    commentBtn.setAttribute('aria-pressed', String(commenting && tool === 'pick'));
+    boxBtn.setAttribute('aria-pressed', String(commenting && tool === 'rect'));
+    ringBtn.setAttribute('aria-pressed', String(commenting && tool === 'lasso'));
     useBtn.setAttribute('aria-pressed', String(!commenting));
-    commentBtn.disabled = !commentable || !host.canSend();
+    commentBtn.disabled = boxBtn.disabled = ringBtn.disabled = !commentable || !host.canSend();
     root.classList.toggle('commenting', commenting);
-    tell({ t: 'comment', on: commenting });
+    tell({ t: 'comment', on: commenting, tool });
     if (!commenting && comments.hasPick()) comments.clearPick(), pins(false);
   }
+  /** A tool's key or button again turns comment mode off; another tool switches to it. */
+  const toggleTool = (using: 'pick' | 'rect' | 'lasso') => setCommenting(!(commenting && tool === using), using);
   useBtn.addEventListener('click', () => setCommenting(false));
   commentBtn.addEventListener('click', () => setCommenting(true));
+  boxBtn.addEventListener('click', () => toggleTool('rect'));
+  ringBtn.addEventListener('click', () => toggleTool('lasso'));
 
   // ---- Where the review stands ----
   function setState(s: SoftwareReviewState) {
@@ -326,9 +348,10 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
     }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
     if (dock?.key(e)) return e.preventDefault();
-    if (e.key === 'c' || e.key === 'C') {
+    const k = e.key.toLowerCase();
+    if (k === 'c' || k === 'b' || k === 'o') {
       e.preventDefault?.();
-      setCommenting(!commenting);
+      toggleTool(k === 'c' ? 'pick' : k === 'b' ? 'rect' : 'lasso');
       if (commenting) frame.focus();
       return;
     }

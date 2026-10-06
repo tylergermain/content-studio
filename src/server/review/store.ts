@@ -1,6 +1,6 @@
 import { mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import { EMPTY_REVIEW, type ReviewRound, type SentComment, type SoftwareNote, type SoftwareReviewState } from '../../shared/software-review.js';
+import { cleanArea, EMPTY_REVIEW, type ReviewRound, type SentComment, type SoftwareNote, type SoftwareReviewState } from '../../shared/software-review.js';
 
 // A worker's software review as the office keeps it (shared/software-review.ts): every round of
 // comments sent, each comment with whether it's done, and whether the app is approved. One file per
@@ -34,7 +34,8 @@ export function cleanReview(raw: unknown): SoftwareReviewState {
     const text = str(o.text, 1000), page = str(o.page, 600), what = str(o.what, 600), selector = str(o.selector, 600);
     if (!id || !n || !round || !at || by === undefined || !app || !text || !page || !what || selector === undefined) return [];
     const done = who(o.done);
-    return [{ id, n, round, at, by, app, text, page, what, selector, ...(done ? { done } : {}) }];
+    const area = cleanArea(o.area);
+    return [{ id, n, round, at, by, app, text, page, what, selector, ...(area ? { area } : {}), ...(done ? { done } : {}) }];
   });
   const approved = who(r.approved);
   const approvedApp = str((r.approved as Record<string, unknown> | undefined)?.app, 300);
