@@ -6,6 +6,7 @@ import type { WorkspaceHost } from '../types';
 import { approve, loadReview, markDone, myName, sendRound } from './api';
 import { reviewComments, type Spot } from './comments';
 import { appAddress, plainUrl, relayBase, reviewTargets, type ReviewTarget } from './targets';
+import { roomDock } from '../room-dock';
 
 // The review room: Software review full screen, the way Frame.io reviews a cut. The app sits on a dark
 // stage at a device's size, with Use app / Comment (C) under it; the comments are down the right
@@ -18,6 +19,11 @@ const SIZE_KEY = 'agent-office:review-size';
 const POLL_MS = 10_000;
 
 let current: { close(): void } | undefined;
+
+/** Closes the review room, if it's open (the review queue moving on to its next item). */
+export function closeReviewRoom() {
+  current?.close();
+}
 
 /** Opens the review room for `host`'s worker, on `target` (a ReviewTarget key) or its first app. */
 export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onClose?: () => void } = {}): void {
@@ -94,6 +100,9 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       h('div.rr-nav', {}, back, reload, address),
       h('div.rr-right', {}, sizes, pill, approveBtn, openOut)),
     h('div.rr-body', {}, stage, comments.element));
+  // Opened from the review queue: its strip over the top bar, and its keys.
+  const dock = roomDock();
+  if (dock) root.prepend(dock.bar());
 
   // ---- Talking to the page ----
   const tell = (m: Record<string, unknown>) => {
@@ -294,6 +303,7 @@ export function openReviewRoom(host: WorkspaceHost, opts: { target?: string; onC
       return modal.close();
     }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (dock?.key(e)) return e.preventDefault();
     if (e.key === 'c' || e.key === 'C') {
       e.preventDefault?.();
       setCommenting(!commenting);

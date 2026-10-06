@@ -73,6 +73,7 @@ import { installStudio } from './features/studio';
 import { installApps } from './features/apps';
 import { installAgentsPanel } from './features/agents';
 import { installRooms } from './features/rooms';
+import { installReviewQueue } from './features/review-queue';
 import { installWorkstation } from './features/workstation';
 import { installWhiteboard } from './features/whiteboard';
 import { installWhisky } from './features/whisky';
@@ -198,6 +199,7 @@ parts.studio = installStudio(ctx, { redress: () => parts.boards.dressBoards(ctx.
 installApps(ctx);
 installAgentsPanel(ctx, { openWorker: (id) => parts.waiting.openWorkerTerminal(id), switchFloor: (id) => parts.travel.switchFloor(id), firstFreeSeat: () => parts.actions.firstFreeSeat(), hireAtDesk: (id) => parts.actions.hireAtDesk(id) });
 installRooms(ctx, { hireAtDesk: (id) => parts.actions.hireAtDesk(id), openWorker: (id) => parts.waiting.openWorkerTerminal(id) });
+installReviewQueue(ctx, { openWorker: (id) => parts.waiting.openWorkerTerminal(id), switchFloor: (id) => parts.travel.switchFloor(id) });
 installGong(ctx, { burstOver: parts.views.burstOver, workerViews: parts.views.workerViews, idleAgents: () => parts.worlds.idleAgents() });
 parts.goat = installGoat(ctx);
 installWhisky(ctx, { remotes: parts.peers.remotes, target: () => parts.pointer.target() });

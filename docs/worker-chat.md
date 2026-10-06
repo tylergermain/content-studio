@@ -28,6 +28,21 @@ A review is sent the way a typed message is: it wakes an asleep worker, goes onc
 
 Who may message, interrupt, wake or send an agent home is the same as in its chat: admins, and the agent's owner within their org-chart roles. Anyone else sees it all read-only.
 
+## The review queue
+
+When an agent finishes a task (it was working, and now it's done), the task joins the office's **review queue**, a few seconds after it settles: **☰ › 📥 Review queue**, or **📥 Review** on the 2D and phone view, each with how many are waiting. It's every floor's, oldest waiting first. Board agents, the meeting table and an agent only acknowledging an approval aren't queued, and an agent that finishes again while its item is still waiting brings that item up to date instead of adding another.
+
+Each item has what the agent was asked that turn, what it said when it finished, the files it named or made since it was asked, and the app it's best looked at in:
+
+- **Jev picks the app.** Jev is TypeSafe AI's decision model. It's asked one question, with the task, what the agent said and its files: which of the floor's apps that have something to show (a cut for the Screening room, images for the Image board, a document for Reports, a design for the Design canvas, the agent's running app for Software review, or Files for a mix) suits it. The card says *Jev 94%*. When there's only one place to look, or Jev can't be asked, the newest file's own app is used.
+- **Open it** (Enter, or double-click) and it opens full screen in that app's room, on its file, as the agent's own window would. Under **Open in** you can pick another app instead. One on another floor takes you to that floor first, then opens it there.
+- **In the room,** a strip over the top bar shows where you are in the queue: **✓ Approve** (Shift+A), **‹ Previous** ( [ ) and **Next ›** ( ] ), and **Queue** to go back. Approving there closes the room and opens the next one waiting.
+- **In the queue,** **A** approves (press it twice), **N** writes notes and ⌘/Ctrl Enter sends them, **D** dismisses, **S** skips to the next one, **C** opens the agent's chat, and J/K or the arrows move.
+
+Approving tells the agent its files are final, as a room's **Approve** does (the files show *Approved*). Notes go to the agent as a message; when it's revised the work, the revision comes back as a new item. Dismissing tells it nothing. Approving or sending notes from the room's own controls decides the item too. **Done** lists what was decided, by whom, and **Put it back in the queue** undoes one.
+
+The queue is kept in the office's `.agent-office/review-queue.json`. Jev needs a TypeSafe API key: `TYPESAFE_API_KEY` in the office's environment, or `{"apiKey": "..."}` in `.agent-office/typesafe.json` (only the office reads it; browsers never see it). Without one, every item opens in its files' app.
+
 ## The executive assistant
 
 An admin's Agents panel opens on their **🧑‍💼 Assistant** (also **☰ › 🧑‍💼 Assistant**): an agent with no desk and no body that keeps the others organized. The right side has it and the agent you choose, a tab each.

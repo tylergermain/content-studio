@@ -1,0 +1,13 @@
+/* The review queue's strip over a review room's top bar (room-dock.ts, filled by ui/review-queue/dock.ts). */
+.rr-dock { flex-shrink:0; display:flex; align-items:center; gap:8px; min-height:38px; padding:4px 14px; background:#1a1530; border-bottom:1px solid rgba(124,92,255,.35); font-size:12.5px; color:var(--rr-ink); overflow-x:auto; }
+.rr-dock-label { display:flex; align-items:center; gap:6px; font-weight:600; white-space:nowrap; }
+.rr-dock-label span { font-weight:400; color:var(--rr-muted); }
+.rr-dock-task { flex:1; min-width:60px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; color:var(--rr-muted); }
+.rr-dock button { flex:none; display:inline-flex; align-items:center; gap:6px; height:28px; padding:0 10px; border:1px solid var(--rr-line-2); border-radius:8px; background:var(--rr-raise); color:var(--rr-ink); font:inherit; cursor:pointer; white-space:nowrap; }
+.rr-dock button:hover:not(:disabled) { border-color:rgba(255,255,255,.3); }
+.rr-dock button:disabled { opacity:.45; cursor:default; }
+.rr-dock button.ok { border-color:rgba(48,209,88,.5); color:#7ee29a; }
+.rr-dock button.ok.confirm { background:var(--rr-ok); border-color:var(--rr-ok); color:#0b2d14; }
+.rr-dock kbd { padding:0 5px; border-radius:4px; background:rgba(255,255,255,.1); font:11px ui-monospace, SFMono-Regular, Menlo, monospace; color:var(--rr-muted); }
+.rr-dock-note { color:var(--rr-muted); white-space:nowrap; }
+@media (max-width: 700px) { .rr-dock-task, .rr-dock kbd { display:none; } }

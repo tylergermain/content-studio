@@ -11,6 +11,8 @@ import { randomLook } from '../shared/avatar';
 import { cloneLabel } from '../shared/floors';
 import { openAgentsPanel, whenReady } from './ui/agents/panel';
 import { openRoomsPanel } from './ui/rooms/panel';
+import { openReviewQueue } from './ui/review-queue/panel';
+import type { ReviewItem } from '../shared/review-queue';
 import { ROOF } from '../shared/rooftop';
 import { DESK_BY_ID, nextFreeSeat } from '../shared/layout';
 import { layoutFurniture } from '../shared/office-builder';
@@ -346,12 +348,38 @@ $('btn-agents').addEventListener('click', () => openAgentsPanel({
 // The floor's project rooms (ui/rooms/panel.ts): a new task in one is a new worker at its table.
 $('btn-rooms').addEventListener('click', () => openRoomsPanel({ hireAt: (seat) => sendToWorker('✨ New task', {}, undefined, seat), openWorker }));
 
+// Every agent's finished work (ui/review-queue/panel.ts): one on another floor is opened once you've gone there.
+function reviewThere(i: ReviewItem, then: () => void) {
+  if (i.floor === store.floor) return then();
+  net.send({ t: 'floor.go', floor: i.floor });
+  whenReady(() => store.floor === i.floor && store.workers.has(i.workerId), then);
+}
+function showReviewQueue(o: { start?: string; open?: boolean } = {}) {
+  if (document.querySelector('.queue-room')) return;
+  openReviewQueue({ openWorker: (i) => reviewThere(i, () => openWorker(i.workerId)), goTo: (i, open) => reviewThere(i, () => showReviewQueue({ start: i.id, open })) }, o);
+}
+$('btn-review').addEventListener('click', () => showReviewQueue());
+let reviewWaiting = 0;
+async function countReview() {
+  if (document.visibilityState !== 'visible') return;
+  try {
+    const res = await fetch('/api/review-queue?count', { credentials: 'same-origin', cache: 'no-store' });
+    if (res.ok) reviewWaiting = Number((await res.json()).waiting) || 0;
+    renderNav();
+  } catch {
+    // the next time
+  }
+}
+window.setInterval(() => void countReview(), 20_000);
+void countReview();
+
 function renderNav() {
   const count = (id: string, n: number) => ($(id).querySelector('.n')!.textContent = n ? String(n) : '');
   count('btn-issues', store.issues.items.filter((i) => i.state === 'OPEN').length);
   count('btn-pulls', store.pulls.items.filter((p) => p.state === 'OPEN').length);
   count('btn-queue', store.queue.tasks.filter((t) => t.status !== 'done').length);
   count('btn-agents', store.floors.reduce((n, f) => n + (f.waiting ?? 0), 0));
+  count('btn-review', reviewWaiting);
   $('btn-rooms').hidden = !layoutFurniture(store.floorPlan).some((p) => p.kind === 'project-room');
 }
 store.on('issues', renderNav);

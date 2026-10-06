@@ -1,5 +1,6 @@
 import './room.css';
 import { h, openModal } from '../dom';
+import { roomDock } from './room-dock';
 
 // The frame every full-screen review room is built in (see room.css), the way Frame.io frames an asset: a top bar
 // with \u2715, the file's name and the worker's, a middle and a right of the room's own; the stage; and the notes down the
@@ -42,6 +43,9 @@ export function openRoomShell(o: {
   const stage = h('div.rr-stage');
   const body = h('div.rr-body', {}, stage);
   const root = h(`div.review-room.${o.className}`, { role: 'dialog', 'aria-label': o.label, tabindex: '-1' }, h('header.rr-top', {}, left, middle, right), body);
+  // Opened from the review queue: its strip over the top bar, and its keys.
+  const dock = roomDock();
+  if (dock) root.prepend(dock.bar());
 
   function onKey(e: KeyboardEvent) {
     if (document.getElementById('modal-root')?.lastElementChild !== modal.backdrop) return;
@@ -53,6 +57,7 @@ export function openRoomShell(o: {
       return modal.close();
     }
     if (typing(e.target) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (dock?.key(e)) return e.preventDefault();
     if (e.key === 'f' || e.key === 'F') {
       e.preventDefault();
       return theater();
