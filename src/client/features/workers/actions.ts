@@ -30,6 +30,7 @@ import { openPull } from '../../ui/pull';
 import { openRepoPulls, workerRepos } from '../../ui/repos';
 import { openTerminal } from '../../ui/terminal';
 import { hiringPaused, usageLabel, usageTitle } from '../../ui/usage';
+import { mayWork, readOnlyText } from '../../../shared/floor-access';
 
 // The kinds of thing you can use that this defines (see InteractKinds in world/types.ts).
 declare module '../../world/types' {
@@ -132,9 +133,16 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
   }
 
   /** Direct hire from an empty desk, with an optional first prompt and provider choice. */
+  /** Someone read-only on this floor (shared/floor-access.ts) is told so rather than shown a form the office refuses. */
+  function readOnlyHere(): boolean {
+    if (mayWork(store.me, store.floor)) return false;
+    toast(`\u{1f440} ${readOnlyText(store.currentFloor()?.name ?? 'this floor')}`, 'warn');
+    return true;
+  }
+
   function hireAtDesk(deskId: string) {
     const desk = plan().byId.get(deskId)!;
-    if (officeIsFull()) return;
+    if (readOnlyHere() || officeIsFull()) return;
     openPrompt({
       title: `✨ Hire a worker at ${desk.label}`,
       subtitle: hireNote(deskId, 'You can start with an empty prompt and send work later.'),
@@ -450,6 +458,7 @@ export function installWorkerActions(ctx: Ctx, core: CoreState, parts: WorkerAct
 
   /** A prompt from the boards goes to a new worker at a free desk, or to one already at a desk. With `issue`, that worker takes the issue. */
   function sendToWorker(title: string, text: { context?: string; initial?: string }, issue?: number) {
+    if (readOnlyHere()) return;
     const desk = freeDesk();
     const awake = [...store.workers.values()].filter((w) => w.kind === 'agent' && !isAsleep(w.status));
     if (!desk && !awake.length) {

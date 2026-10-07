@@ -7,7 +7,7 @@ import type { PlanClientMsg } from '../../../shared/protocol.js';
 import type { Client } from '../../office/client.js';
 import type { Ctx } from '../../office/context.js';
 import { str } from '../../office/input.js';
-import { here } from './common.js';
+import { here, workHere } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
 export const planView: ViewPieces['plan'] = (_ctx, floor) => floor?.plan.state() ?? EMPTY_PLAN;
@@ -28,7 +28,7 @@ const mayBuild = (ctx: Ctx, c: Client): boolean => {
 export const planHandlers = {
   'desk.label'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     if (!floor) return;
     const deskId = str(msg.deskId, 32);
     const r = floor.plan.label(deskId, msg.text, msg.color, who);

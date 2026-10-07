@@ -1,5 +1,5 @@
 import type http from 'node:http';
-import { employeeWorkerError } from '../../org-chart/access.js';
+import { employeeWorkerError, workerRulesError } from '../../org-chart/access.js';
 import { cleanSoftwareNotes, softwareReviewText } from '../../../shared/software-review.js';
 import { MARK_KEY, reviewMarks, setMark } from '../../review/marks.js';
 import { addRound, markDone, nextNumbers, reviewState, setApproved } from '../../review/store.js';
@@ -42,7 +42,8 @@ export const reviewRoute = {
     const floor = floorParam(ctx, url);
     const id = url.searchParams.get('worker') ?? '';
     if (!floor || !/^[a-zA-Z0-9_-]{1,80}$/.test(id) || !floor.workers.get(id)) return send(res, 404, { error: 'No such worker' });
-    const denied = employeeWorkerError(ctx, floor, session.account?.id, id);
+    // Reading a review is the org chart's to say; sending one, approving and marking take work on the floor too.
+    const denied = reading ? workerRulesError(ctx, floor, session.account?.id, id) : employeeWorkerError(ctx, floor, session.account?.id, id);
     if (denied) return send(res, 403, { error: denied });
     if (action === 'state') return send(res, 200, { state: reviewState(floor.dir, id) });
     if (reading) return send(res, 200, { marks: reviewMarks(floor.dir, id) });

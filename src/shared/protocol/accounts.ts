@@ -8,6 +8,8 @@ export interface Me {
   account?: { name: string; role: AccountRole };
   /** May invite, list and revoke accounts. */
   admin: boolean;
+  /** The floors a member may work on (see shared/floor-access.ts): on the rest they look round and read. Missing: every floor. */
+  floors?: string[];
 }
 
 /** What someone signs in to for their own workers: Claude Code, and the GitHub CLI. */
@@ -44,6 +46,8 @@ export interface AccountInfo {
   createdAt: number;
   createdBy: string;
   lastSeenAt?: number;
+  /** The floors a member may work on; missing, every floor. */
+  floors?: string[];
   /** In the office right now. */
   online: boolean;
 }
@@ -55,6 +59,8 @@ export interface AccountInvite {
   /** The name the account gets; when missing, whoever opens the link picks one. */
   name?: string;
   role: AccountRole;
+  /** The floors the member it makes may work on; missing, every floor. */
+  floors?: string[];
   createdBy: string;
   createdAt: number;
   expiresAt: number;
@@ -100,7 +106,9 @@ export type TeamClientMsg =
 export type AccountsClientMsg =
   /** The rest of the accounts messages are for admins only. */
   | { t: 'accounts.get' }
-  | { t: 'accounts.invite'; name?: string; role: AccountRole }
+  | { t: 'accounts.invite'; name?: string; role: AccountRole; floors?: string[] }
+  /** The floors a member may work on; `floors` missing (or 'all'), every floor. */
+  | { t: 'accounts.floors'; accountId: string; floors?: string[] | 'all' }
   | { t: 'accounts.cancel'; inviteId: string }
   | { t: 'accounts.revoke'; accountId: string }
   | { t: 'accounts.role'; accountId: string; role: AccountRole }

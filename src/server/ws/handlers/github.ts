@@ -3,7 +3,7 @@
 import type { GitHubClientMsg } from '../../../shared/protocol.js';
 import { GH_COMMENT_MAX, GH_LABEL_MAX } from '../../../shared/protocol.js';
 import { num, str } from '../../office/input.js';
-import { here } from './common.js';
+import { here, workHere } from './common.js';
 import type { HandlerMap, ViewPieces } from './types.js';
 
 export const issuesView: ViewPieces['issues'] = (_ctx, floor) => floor?.github.issues ?? { items: [], fetchedAt: 0, loading: false };
@@ -15,7 +15,7 @@ export const githubHandlers = {
   },
   'gh.merge'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     const n = num(msg.number);
     const method = (['squash', 'merge', 'rebase'] as const).find((m) => m === msg.method);
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !method) return;
@@ -34,7 +34,7 @@ export const githubHandlers = {
   },
   'gh.comment'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     const n = num(msg.number);
     const kind = msg.kind === 'pull' ? 'pull' : 'issue';
     if (!floor || !Number.isSafeInteger(n) || n <= 0) return;
@@ -57,7 +57,7 @@ export const githubHandlers = {
   },
   'gh.close'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     const n = num(msg.number);
     const kind = msg.kind === 'issue' || msg.kind === 'pull' ? msg.kind : undefined;
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !kind) return;
@@ -78,7 +78,7 @@ export const githubHandlers = {
   },
   'gh.labels'(ctx, c, msg) {
     const who = c.peer.name;
-    const floor = here(ctx, c);
+    const floor = workHere(ctx, c);
     const n = num(msg.number);
     const kind = msg.kind === 'issue' || msg.kind === 'pull' ? msg.kind : undefined;
     if (!floor || !Number.isSafeInteger(n) || n <= 0 || !kind) return;

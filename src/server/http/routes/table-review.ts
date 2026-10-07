@@ -7,6 +7,7 @@ import { sendable } from '../../worker-chat/send.js';
 import { readBody, sameOrigin, send } from '../util.js';
 import { floorParam } from './files.js';
 import type { Route } from '../router.js';
+import { floorAccessError } from '../../org-chart/access.js';
 
 // Software review of a project table's app (shared/software-review.ts), each ?floor&room (the project room's id):
 //   GET  /api/table-review/state   the review as kept (server/review/store.ts, under tableKey)
@@ -43,6 +44,8 @@ export const tableReviewRoute = {
     const key = tableKey(room);
     if (action === 'state') return send(res, 200, { state: reviewState(floor.dir, key) });
 
+    const readOnly = floorAccessError(ctx, floor, session.account?.id);
+    if (readOnly) return send(res, 403, { error: readOnly });
     const b = await body(req);
     if (!b) return send(res, 400, { error: 'Invalid request' });
     const by = session.account?.name ?? (line(b.by, 40) || 'Studio review');

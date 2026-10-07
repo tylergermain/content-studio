@@ -3,6 +3,7 @@ import type { AccountsClientMsg } from '../../../shared/protocol.js';
 import type { Ctx } from '../../office/context.js';
 import type { Client } from '../../office/client.js';
 import { str } from '../../office/input.js';
+import { cleanFloors } from '../../../shared/floor-access.js';
 import type { HandlerMap } from './types.js';
 
 /** Whether `c` may manage accounts; if not, they're told so. */
@@ -20,7 +21,7 @@ export const accountsHandlers = {
   'accounts.invite'(ctx, c, msg) {
     const who = c.peer.name;
     if (!admin(ctx, c)) return;
-    const r = ctx.accounts.invite(who, msg.role === 'admin' ? 'admin' : 'member', typeof msg.name === 'string' ? msg.name : undefined);
+    const r = ctx.accounts.invite(who, msg.role === 'admin' ? 'admin' : 'member', typeof msg.name === 'string' ? msg.name : undefined, cleanFloors(msg.floors));
     if (typeof r === 'string') return ctx.sendTo(c, { t: 'accounts.invited', error: r });
     ctx.sendTo(c, { t: 'accounts.invited', invite: r });
     ctx.accountsChanged();
@@ -54,6 +55,17 @@ export const accountsHandlers = {
     ctx.accountsChanged();
     // Only admins may use the office's own sign-ins: a demoted one is back on their own.
     void ctx.signins.look(a.id, true);
+  },
+  'accounts.floors'(ctx, c, msg) {
+    const who = c.peer.name;
+    if (!admin(ctx, c)) return;
+    const floors = cleanFloors(msg.floors);
+    const a = ctx.accounts.setFloors(str(msg.accountId, 32), floors);
+    if (!a) return;
+    const names = (floors ?? []).map((id) => ctx.floors.get(id)?.def.name ?? id);
+    console.log(`  ${who} gave ${a.name} ${floors ? (names.join(', ') || 'no floors') : 'every floor'} to work on`);
+    ctx.toastAll(floors ? `${who} gave ${a.name} ${names.length ? names.join(', ') : 'no floors'} to work on (read-only on the rest)` : `${who} gave ${a.name} every floor to work on`);
+    ctx.accountsChanged();
   },
   'accounts.shared'(ctx, c, msg) {
     const who = c.peer.name;
