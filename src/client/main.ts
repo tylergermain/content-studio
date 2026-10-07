@@ -85,6 +85,7 @@ import { installWorkerViews } from './features/workers/views';
 import { installLiveGreeting } from './features/workers/live-greeting';
 import { installHeadLook } from './features/head-look';
 import { installVr } from './features/vr';
+import { installPerf } from './features/perf';
 
 // The loading screen stays up until there's an office to see (see boot and whoami at the end).
 const loading = loadingScreen(onModelsProgress);
@@ -223,6 +224,7 @@ fitWindow(ctx);
 const frame = frameLoop(ctx, loading);
 // A VR headset borrows the loop while you're in it (see features/vr).
 installVr(ctx, parts, { loop: frame });
+installPerf(ctx, parts);
 installHeadLook(ctx, parts);
 
 // ---- Boot ------------------------------------------------------------------------------------------

@@ -6,16 +6,16 @@ import type { Route, RouteRequest } from '../router.js';
 import type { Ctx } from '../../office/context.js';
 
 /** One of the bundle's own pages, never cached, so a new version is picked up at once. */
-const page = (name: string) => (ctx: Ctx, { res }: RouteRequest) => serveFile(res, path.join(ctx.publicDir, name), false);
+const page = (name: string) => (ctx: Ctx, { req, res }: RouteRequest) => serveFile(res, path.join(ctx.publicDir, name), false, String(req.headers['accept-encoding'] ?? ''));
 
 export const pageRoutes = {
   health: { path: '/api/health', auth: 'public', handle: (_ctx, { res }) => send(res, 200, { ok: true }) },
   assets: {
     prefix: '/assets/',
     auth: 'public',
-    handle(ctx, { res, path: p }) {
+    handle(ctx, { req, res, path: p }) {
       const file = publicFile(ctx.publicDir, p);
-      if (file) return serveFile(res, file, true);
+      if (file) return serveFile(res, file, true, String(req.headers['accept-encoding'] ?? ''));
       res.writeHead(404).end();
     },
   },
@@ -30,9 +30,9 @@ export const pageRoutes = {
   bundle: {
     prefix: '/',
     auth: 'session',
-    handle(ctx, { res, path: p }) {
+    handle(ctx, { req, res, path: p }) {
       const file = publicFile(ctx.publicDir, p);
-      if (file) return serveFile(res, file, false);
+      if (file) return serveFile(res, file, false, String(req.headers['accept-encoding'] ?? ''));
       res.writeHead(404, { 'content-type': 'text/plain' }).end('Not found');
     },
   },

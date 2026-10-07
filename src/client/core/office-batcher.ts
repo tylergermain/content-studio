@@ -1,14 +1,14 @@
 /**
- * The office's batcher (world/batch), for a headset's quality profile to turn on (see quality.ts): one
- * for the page, made the first time it's asked for. It batches the office floor's group, and the
+ * The office's batcher (world/batch): one for the page, made the first time it's asked for. The desktop
+ * turns it on from the start (features/perf), and a headset's quality profile while it's on (features/vr/quality.ts). It batches the office floor's group, and the
  * roof's once there is one; it starts over whenever you're on another floor or up on the roof, or the
  * floor's furniture or its room change; and it holds off while the office builder is open, where
  * everything is dragged about. The batches' own shaders are compiled before they're first drawn.
  */
-import type { Ctx } from '../../core/context';
-import type { Parts } from '../../core/parts';
-import { store } from '../../state';
-import { Batcher } from '../../world/batch/batcher';
+import type { Ctx } from './context';
+import type { Parts } from './parts';
+import { store } from '../state';
+import { Batcher } from '../world/batch/batcher';
 
 const made = new WeakMap<Ctx, Batcher>();
 

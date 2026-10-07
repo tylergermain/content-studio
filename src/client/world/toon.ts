@@ -27,8 +27,48 @@ export function toon(color: THREE.ColorRepresentation, opts: { emissive?: THREE.
     m.transparent = true;
     m.opacity = opts.opacity ?? 1;
   }
+  // Shared by everything of its color: see ownSet.
+  m.userData.shared = true;
   cache.set(key, m);
   return m;
+}
+
+/** The copies of the shared toon materials for each set of meshes drawn another way than the office's. */
+const sets = new Map<string, WeakMap<THREE.Material, THREE.Material>>();
+
+/**
+ * One of the shared toon materials (see toon), as a set of meshes that's drawn another way than the office's
+ * has it: a copy of its own. Three works a material's shader program out again every time it's drawn another
+ * way than it last was (on a skinned mesh, then not; in the office's foggy scene, then the hands' own), which
+ * is slow, so a skinned mesh (the dog's) and the hands each have their own. It looks the same. Anything that
+ * isn't one of the shared ones is its own already.
+ */
+/**
+ * Everything under `root` given its own copies of the shared materials it has (see ownSet): what's in your
+ * hands (a mug, a paper, a dram) is built from the office's shared ones, and the hands' scene is lit its own
+ * way with no fog, so before it's drawn its meshes get theirs. Quick for a small scene.
+ */
+export function ownSetIn(root: THREE.Object3D, set: 'skinned' | 'hands') {
+  root.traverse((o) => {
+    const m = o as THREE.Mesh;
+    if (!m.isMesh) return;
+    if (Array.isArray(m.material)) {
+      if (m.material.some((x) => x.userData.shared)) m.material = m.material.map((x) => ownSet(x, set));
+    } else if (m.material?.userData.shared) m.material = ownSet(m.material, set);
+  });
+}
+
+export function ownSet<T extends THREE.Material>(m: T, set: 'skinned' | 'hands'): T {
+  if (!m.userData.shared) return m;
+  let copies = sets.get(set);
+  if (!copies) sets.set(set, (copies = new WeakMap()));
+  let copy = copies.get(m) as T | undefined;
+  if (!copy) {
+    copy = m.clone() as T;
+    copy.userData = { ...m.userData, shared: false };
+    copies.set(m, copy);
+  }
+  return copy;
 }
 
 /** A fresh (uncached) toon material, for things whose color animates. */

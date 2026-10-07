@@ -4,6 +4,7 @@
  * the mouse points at, and clicking the world to use what's there.
  */
 import * as THREE from 'three';
+import { buildTrees, wantTree } from '../core/ray-trees';
 import { SLAB } from '../../shared/layout';
 import type { GhIssue } from '../../shared/protocol';
 import type { Ctx } from '../core/context';
@@ -98,6 +99,40 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   let longest = 0;
 
   /**
+   * What the crosshair could land on: everything shown within reach of your eye (and of the camera, behind
+   * you in third person), gathered every few frames, or as soon as you've moved, rather than the ray going
+   * through the whole floor every frame. Things move a little between gatherings, which the slack allows.
+   */
+  const near: THREE.Object3D[] = [];
+  const gathered = { x: Infinity, y: Infinity, z: Infinity, frame: -Infinity, roots: [] as THREE.Object3D[] };
+  const NEAR_SLACK = 3;
+  const GATHER_EVERY = 8;
+  let frameNo = 0;
+  const sphere = new THREE.Sphere();
+  function nearby(roots: THREE.Object3D[], from: THREE.Vector3, reach: number): THREE.Object3D[] {
+    const moved = Math.hypot(from.x - gathered.x, from.y - gathered.y, from.z - gathered.z);
+    const same = roots.length === gathered.roots.length && roots.every((r, i) => r === gathered.roots[i]);
+    if (same && moved < 1 && frameNo - gathered.frame < GATHER_EVERY) return near;
+    near.length = 0;
+    for (const root of roots) {
+      root.traverseVisible((o) => {
+        const m = o as THREE.Mesh;
+        if (!(m.isMesh || (o as THREE.Sprite).isSprite || (o as THREE.Points).isPoints || (o as THREE.Line).isLine) || !m.geometry) return;
+        const g = m.geometry;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        if (!g.boundingSphere) return;
+        sphere.copy(g.boundingSphere).applyMatrix4(m.matrixWorld);
+        if (sphere.center.distanceTo(from) - sphere.radius > reach) return;
+        near.push(o);
+        // A big one gets a tree, so the ray finds its triangles quickly (core/ray-trees.ts).
+        wantTree(o);
+      });
+    }
+    Object.assign(gathered, { x: from.x, y: from.y, z: from.z, frame: frameNo, roots: [...roots] });
+    return near;
+  }
+
+  /**
    * What the ray through `ndc` lands on first (or the one `aim` gives, measuring reach from its eye),
    * whether it is within reach (plus `slack` meters), and where it hit. `near` alone (what's aimed at
    * each frame) looks no further along the ray than anything could be in reach from the eye: whatever's
@@ -117,7 +152,10 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
     longest ||= Math.max(0, ...ctx.interactions.kinds().map((k) => ctx.interactions.reach(k)));
     raycaster.far = near ? longest + slack + raycaster.ray.origin.distanceTo(eye) + 0.01 : Infinity;
     const roof = parts.rooftop.roof();
-    for (const hit of raycaster.intersectObjects(core.upTop && roof ? roof.pickables : [office.group, ...ctx.usables.pickables()], true)) {
+    const roots = core.upTop && roof ? roof.pickables : [office.group, ...ctx.usables.pickables()];
+    // Each frame's aim tries only what's near (nearby); a click goes through everything.
+    const hits = near ? raycaster.intersectObjects(nearby(roots, eye, raycaster.far + NEAR_SLACK), false) : raycaster.intersectObjects(roots, true);
+    for (const hit of hits) {
       let it: Interactable | undefined;
       let shown = true;
       for (let o: THREE.Object3D | null = hit.object; o; o = o.parent) {
@@ -146,6 +184,8 @@ export function installPointer(ctx: Ctx, core: CoreState, parts: PointerParts) {
   canvas.addEventListener('pointerleave', () => (pointer = null));
   // What you're pointing at (first person) or standing at (third), and what the hint bar says about it.
   ctx.ticks.add('aim', () => {
+    frameNo++;
+    buildTrees();
     const { seating, hoops } = parts;
     const firstPerson = player.view === 'first';
     aimedNote = null;

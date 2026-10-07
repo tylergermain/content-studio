@@ -31,7 +31,7 @@ import { startInteract } from './interact';
 import { startPresence } from './presence';
 import { profileFor } from './quality-profile';
 import { qualityBefore, startQuality } from './quality';
-import { officeBatcher } from './batching';
+import { officeBatcher } from '../../core/office-batcher';
 import { startFade } from './fade';
 
 /** Where your eyes are over the floor in a 'local' room, whose origin is your head where it started. */

@@ -3,6 +3,7 @@
  * office where you are, the building, the sky and drawing it all. They're registered before anything
  * else's (see installLoop), so within a phase they come first.
  */
+import { ownSetIn } from '../world/toon';
 import * as THREE from 'three';
 import { SlowFrames } from '../framerate';
 import { EYE_HEIGHT } from '../player';
@@ -188,6 +189,7 @@ export function installLoop(ctx: Ctx, core: CoreState, parts: Pick<Parts, 'stage
       // Hands go on top of everything, so they never clip into a desk you walk up to. They have
       // lights of their own, turned down to match wherever you're standing.
       renderer.clearDepth();
+      ownSetIn(hands.scene, 'hands');
       hands.setLight(sky.lightAt(camera.position));
       sky.shading(false);
       effect.render(hands.scene, hands.camera);

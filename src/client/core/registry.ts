@@ -187,19 +187,68 @@ export interface Frame {
 
 interface TickEntry {
   fn: (f: Frame) => void;
+  /** Which source file added it, for the profile (only worked out while profiling). */
+  where?: string;
 }
 
-/** What runs each frame, phase by phase (see TICK_PHASES). */
+/** How long the ticks added from each file took, altogether, and over how many frames. */
+export type TickProfile = Record<string, { ms: number; frames: number }>;
+
+/** Whether this page measures its ticks: ?profile in its address (the headless checks, or someone finding what's slow). */
+const PROFILING = typeof location !== 'undefined' && /[?&]profile\b/.test(location.search);
+
+/** The office's source file a registration came from, from its stack: the first that isn't this one (the dev server's file, or the bundle's). */
+function caller(stack: string | undefined): string {
+  for (const line of (stack ?? '').split('\n').slice(1)) {
+    const m = /https?:\/\/[^/]+\/(?:src\/client\/)?([^?:)\s]+\.(?:ts|js))/.exec(line);
+    if (m && !m[1].includes('core/registry')) return m[1];
+  }
+  return '?';
+}
+
+/**
+ * What runs each frame, phase by phase (see TICK_PHASES). With ?profile in the page's address, it also
+ * keeps how long the ticks from each file take (`profile`), which the headless checks read off
+ * window.__officeTicks; otherwise it just runs them.
+ */
 export class Ticks {
   private readonly phases = new Map<TickPhase, List<TickEntry>>();
+  private measured: TickProfile = {};
+  private frames = 0;
+
+  constructor() {
+    if (PROFILING) (globalThis as { __officeTicks?: Ticks }).__officeTicks = this;
+  }
 
   add(phase: TickPhase, fn: (f: Frame) => void): Off {
     if (!TICK_PHASES.includes(phase)) throw new Error(`No such frame phase: ${phase}`);
-    return listAt(this.phases, phase).add({ fn });
+    return listAt(this.phases, phase).add({ fn, ...(PROFILING ? { where: `${phase} ${caller(new Error().stack)}` } : {}) });
   }
 
   run(f: Frame): void {
-    for (const phase of TICK_PHASES) for (const e of this.phases.get(phase)?.items ?? []) e.fn(f);
+    if (!PROFILING) {
+      for (const phase of TICK_PHASES) for (const e of this.phases.get(phase)?.items ?? []) e.fn(f);
+      return;
+    }
+    this.frames++;
+    for (const phase of TICK_PHASES) {
+      for (const e of this.phases.get(phase)?.items ?? []) {
+        const t0 = performance.now();
+        e.fn(f);
+        const k = e.where ?? phase;
+        const m = (this.measured[k] ??= { ms: 0, frames: 0 });
+        m.ms += performance.now() - t0;
+        m.frames = this.frames;
+      }
+    }
+  }
+
+  /** What the ticks took since it last said, by where they were added from, and how many frames that was; and starts over. */
+  profile(): { frames: number; ticks: TickProfile } {
+    const out = { frames: this.frames, ticks: this.measured };
+    this.measured = {};
+    this.frames = 0;
+    return out;
   }
 }
 
