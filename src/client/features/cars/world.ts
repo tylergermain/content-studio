@@ -233,6 +233,8 @@ export class Fleet {
   ) {
     this.cars = CARS.map((def, index) => {
       const model = supercar(def.kind, def.color);
+      // Never batched with the still office (world/batch): a parked car drives off, and a race moves several at once.
+      model.root.traverse((o) => (o.userData.noBatch = true));
       const interactable: Interactable = { kind: 'car', x: def.x, z: def.z, y: this.street, radius: 3.2, car: index };
       model.root.userData.interact = interactable;
       this.group.add(model.root);
