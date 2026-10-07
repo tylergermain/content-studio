@@ -14,6 +14,7 @@ import { roomsRoute } from './rooms.js';
 import { reviewQueueRoute } from './review-queue.js';
 import { roomScreensRoute } from './room-screens.js';
 import { tableReviewRoute } from './table-review.js';
+import { tableInfoRoute } from './table-info.js';
 import { sharesRoute } from './shares.js';
 import type { Route } from '../router.js';
 import { agentRoutes } from './agents.js';
@@ -53,6 +54,7 @@ export const routes: readonly Route[] = [
   reviewQueueRoute,
   roomScreensRoute,
   tableReviewRoute,
+  tableInfoRoute,
   sharesRoute,
   specialistRoute,
   skillLibraryRoute,

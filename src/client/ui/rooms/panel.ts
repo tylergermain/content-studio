@@ -2,6 +2,7 @@ import './panel.css';
 import { h, timeAgo, STATUS_LABEL } from '../dom';
 import { openRoomShell } from '../workspace/room-shell';
 import { openTableReview } from '../workspace/review/table';
+import { openTablePanel } from '../table-info/panel';
 import { store } from '../../state';
 import type { RoomView } from '../../../shared/factory';
 import type { RepoChoice } from '../../../shared/protocol';
@@ -106,6 +107,9 @@ export function openRoomsPanel(d: RoomsDeps): { close(): void } {
     // Its app in Software review: what's sent from there goes to a new agent at the table.
     const review = h('button.rr-ghost', { type: 'button', title: 'Review its app at any size and comment on it: a new agent here does what you send' }, '\u{1f9ea} Review the app');
     review.addEventListener('click', () => openTableReview({ id: r.id, name: r.name }));
+    // Its branches, who's on each and what's running there, its pull requests and issues: what E at its screen opens.
+    const branches = h('button.rr-ghost', { type: 'button', title: 'Every branch, who\u2019s on it and its app as it is now; its pull requests and issues' }, '\u2387 Branches');
+    branches.addEventListener('click', () => openTablePanel({ id: r.id, name: r.name }, { hireAt: d.hireAt, openWorker: d.openWorker }));
     const setUp = h('button.rr-ghost', { type: 'button', disabled: !admin || !!r.cloning }, r.repo ? 'Change repository\u2026' : 'Set up for a repository\u2026');
     setUp.addEventListener('click', () => {
       picking = true;
@@ -123,7 +127,7 @@ export function openRoomsPanel(d: RoomsDeps): { close(): void } {
           return b;
         })) : h('p.rm-muted', {}, r.repo ? 'Nobody yet. A new task here gets a worktree of its own of the repository.' : 'Nobody yet.'),
         h('div.rm-actions', {}, setUp, clear)),
-      h('div.rm-side-foot', {}, h('div.rm-row', {}, task, review), status));
+      h('div.rm-side-foot', {}, h('div.rm-row', {}, task, review, branches), status));
   }
 
   function paintPicker(r: RoomView) {

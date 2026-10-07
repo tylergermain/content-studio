@@ -3,11 +3,11 @@ import type { WorkspaceHost } from '../types';
 import { TABLE } from './api';
 import { openReviewRoom } from './room';
 
-// Software review of a project table's app (its screen's E, the Rooms panel's Review): the servers the agents at the
-// table run, or its app's address. What's sent from it goes to a new agent hired at the table to do it
+// Software review of a project table's app (from its panel, ui/table-info/, and the Rooms panel's Review): the servers
+// the agents at the table run, or its app's address, opened on `target` (one of them, as review/targets.ts keys it). What's sent from it goes to a new agent hired at the table to do it
 // (server/http/routes/table-review.ts); with no app running, it offers to hire one to start it.
 
-export function openTableReview(room: { id: string; name: string }) {
+export function openTableReview(room: { id: string; name: string }, target?: string) {
   const host: WorkspaceHost = {
     workerId: `${TABLE}${room.id}`,
     workerName: room.name,
@@ -21,5 +21,5 @@ export function openTableReview(room: { id: string; name: string }) {
     refresh: async () => {},
     draft: () => {},
   };
-  openReviewRoom(host);
+  openReviewRoom(host, { target });
 }

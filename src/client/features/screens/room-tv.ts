@@ -6,8 +6,8 @@ import { store } from '../../state';
 import { roomCard } from './card';
 
 // The TVs in project rooms (a screen whose media is ROOM_MEDIA): each shows its room's app as the office last
-// photographed it (server/room-screens.ts), which it asks after every POLL_MS while one's on the floor, or a card
-// saying there's no app running there yet.
+// photographed it (server/room-screens.ts), which it asks after every POLL_MS while one's on the floor, with a caption
+// along the bottom saying whose it is and which branch, or a card saying there's no app running there yet.
 
 const POLL_MS = 8000;
 const W = 1280;
@@ -17,6 +17,43 @@ interface Shot {
   at: number;
   texture: THREE.CanvasTexture;
   ready: boolean;
+}
+
+/** What the office says of a TV's picture (server/room-screens.ts): when it was taken, of what, and what that is. */
+interface Seen {
+  at: number;
+  of?: string;
+  /** The live site, a branch's preview, or something running on the office's computer. */
+  kind?: 'live' | 'preview' | 'local';
+  who?: string;
+  branch?: string;
+  also?: number;
+}
+
+const hostOf = (url?: string) => {
+  try {
+    return url ? new URL(url).host : '';
+  } catch {
+    return '';
+  }
+};
+
+/** The caption along the bottom of a TV's picture: the live site and where, a branch's preview, or what runs on the office's computer and whose. */
+function caption(g: CanvasRenderingContext2D, s: Seen) {
+  const what =
+    s.kind === 'live' ? `\u25cf Live \u00b7 ${hostOf(s.of)}`
+    : s.kind === 'preview' ? `\u2387 ${s.branch ?? 'a branch'} \u00b7 Preview`
+    : [s.branch ? `\u2387 ${s.branch}` : '', s.who ? `${s.who}\u2019s, on this computer` : 'On this computer'].filter(Boolean).join(' \u00b7 ');
+  const text = [what, s.also ? `+${s.also} more` : ''].filter(Boolean).join('   \u00b7   ');
+  g.font = '600 28px system-ui, -apple-system, "Segoe UI", sans-serif';
+  const w = Math.min(W - 48, g.measureText(text).width + 40);
+  g.fillStyle = s.kind === 'live' ? 'rgba(20, 110, 60, 0.88)' : s.kind === 'preview' ? 'rgba(76, 52, 170, 0.88)' : 'rgba(14, 14, 20, 0.8)';
+  g.beginPath();
+  g.roundRect(24, H - 76, w, 52, 12);
+  g.fill();
+  g.fillStyle = '#ffffff';
+  g.textBaseline = 'middle';
+  g.fillText(text, 44, H - 50, w - 40);
 }
 
 export class RoomTvs {
@@ -76,11 +113,11 @@ export class RoomTvs {
     try {
       const res = await fetch(`/api/room-screens?${new URLSearchParams({ floor })}`, { credentials: 'same-origin', cache: 'no-store' });
       if (!res.ok || floor !== this.floor) return;
-      const { rooms } = (await res.json()) as { rooms: Record<string, { at: number }> };
+      const { rooms } = (await res.json()) as { rooms: Record<string, Seen> };
       for (const [room, shot] of Object.entries(rooms)) {
         const had = this.shots.get(room);
         if (had?.at === shot.at) continue;
-        this.load(floor, room, shot.at, had);
+        this.load(floor, room, shot, had);
       }
       for (const [room, s] of this.shots) if (!rooms[room]) (s.texture.dispose(), this.shots.delete(room));
     } catch {
@@ -90,8 +127,9 @@ export class RoomTvs {
     }
   }
 
-  /** The picture taken `at` of `room`, drawn onto its TV's canvas once it's in (the last one stays up till then). */
-  private load(floor: string, room: string, at: number, had: Shot | undefined) {
+  /** The picture `seen` of `room`, drawn onto its TV's canvas with its caption once it's in (the last one stays up till then). */
+  private load(floor: string, room: string, seen: Seen, had: Shot | undefined) {
+    const at = seen.at;
     let shot = had;
     if (!shot) {
       const canvas = document.createElement('canvas');
@@ -107,7 +145,9 @@ export class RoomTvs {
     img.addEventListener('load', () => {
       if (floor !== this.floor || this.shots.get(room) !== shot) return;
       const canvas = shot!.texture.image as HTMLCanvasElement;
-      canvas.getContext('2d')!.drawImage(img, 0, 0, W, H);
+      const g = canvas.getContext('2d')!;
+      g.drawImage(img, 0, 0, W, H);
+      caption(g, seen);
       shot!.texture.needsUpdate = true;
       shot!.ready = true;
     });

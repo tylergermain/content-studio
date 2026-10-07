@@ -32,7 +32,7 @@ function labels(raw: any[]): GhLabel[] {
   return (raw ?? []).map((l) => ({ name: String(l.name), color: `#${l.color ?? '888888'}` }));
 }
 
-function checksOf(rollup: any[]): GhPull['checks'] {
+export function checksOf(rollup: any[]): GhPull['checks'] {
   if (!rollup?.length) return 'none';
   let pending = false;
   for (const c of rollup) {
