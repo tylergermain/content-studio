@@ -9,7 +9,7 @@
  */
 import type { Ctx } from '../../core/context';
 import type { Parts } from '../../core/parts';
-import { officeBatcher } from './batching';
+import { officeBatcher } from '../../core/office-batcher';
 import { flatProfileFor } from './quality-profile';
 import { applyQuality, type OnQuality } from './quality';
 import type { FlatQuality } from './types';

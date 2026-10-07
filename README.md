@@ -415,6 +415,8 @@ npm test
 
 Server edits restart the server, not the workers. After changing `ptyhost.ts`, bump `PTY_PROTOCOL` in `ptys.ts` so the next server replaces the PTY host.
 
+`npm run build` also makes a brotli and a gzip copy of each file of the client (`scripts/compress.mjs`), which the office sends to any browser that takes them: a first visit downloads about a quarter as much. To see what a frame costs, open the office with `?profile` in the address (from `npm run dev`, so each file's own name shows) and read `window.__officeTicks.profile()` in the console: how long each file's per-frame work took. `?batch=0` draws the office without batching, to compare (see Drawing fast in [docs/code-layout.md](docs/code-layout.md)).
+
 [docs/code-layout.md](docs/code-layout.md) says where the code lives, and where a new feature's pieces go.
 
 The rules for coding agents working on this repository are in [`AGENTS.md`](AGENTS.md), which Codex, OpenCode and most other agent CLIs read. `CLAUDE.md` only imports it for Claude Code, so new rules go in `AGENTS.md`.

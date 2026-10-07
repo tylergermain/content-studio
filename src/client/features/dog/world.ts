@@ -4,7 +4,7 @@ import type { Theme } from '../../../shared/protocol';
 import { dogAntlers, dogRedNose, dogScarf } from '../../world/costumes';
 import { loadModel, type Model } from '../../world/models';
 import type { Interactable } from '../../world/types';
-import { disposeSprite, textSprite, toon, toonUnique } from '../../world/toon';
+import { disposeSprite, ownSet, textSprite, toon, toonUnique } from '../../world/toon';
 
 export interface DogSounds {
   bark(x: number, z: number, times: number): void;
@@ -354,7 +354,7 @@ export class Dog {
         if (box) collar = (box.max.x - box.min.x) / 2;
       }
       const paint = PAINT[name] ?? 0;
-      m.material = typeof paint === 'number' ? this.coatMats[paint] : toon(paint);
+      m.material = typeof paint === 'number' ? this.coatMats[paint] : ownSet(toon(paint), 'skinned'); // its own copy of a shared color: it's skinned (ownSet)
       m.castShadow = typeof paint === 'number';
       m.receiveShadow = true;
       // Culled by bounds worked out standing, it would vanish lying down at the edge of the screen.

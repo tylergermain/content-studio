@@ -3,7 +3,9 @@
  * camera, the office building, the sky and the holiday decorations.
  */
 import * as THREE from 'three';
-import { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
+import { FastOutlineEffect } from './outline-effect';
+// Matrices worked out again only for what's moved (see still-matrices.ts).
+import './still-matrices';
 import { store } from '../state';
 import { Holiday } from '../world/holiday';
 import { buildOffice } from '../world/office';
@@ -23,7 +25,7 @@ export interface Stage {
   readonly canvas: HTMLCanvasElement;
   readonly renderer: THREE.WebGLRenderer;
   /** Draws the scene with the toon outline (see drawFrame in core/loop.ts). */
-  readonly effect: OutlineEffect;
+  readonly effect: FastOutlineEffect;
   readonly scene: THREE.Scene;
   readonly camera: THREE.PerspectiveCamera;
   readonly hemi: THREE.HemisphereLight;
@@ -57,7 +59,7 @@ export function createScene(canvas: HTMLCanvasElement, renderer: THREE.WebGLRend
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  const effect = new OutlineEffect(renderer, { defaultThickness: 0.0032, defaultColor: [0.17, 0.18, 0.26] });
+  const effect = new FastOutlineEffect(renderer, { defaultThickness: 0.0032, defaultColor: [0.17, 0.18, 0.26] });
 
   const scene = new THREE.Scene();
   // The sky's color and the fog change with the time of day and the weather (world/sky.ts).

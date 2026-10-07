@@ -28,16 +28,24 @@ export function findPublicDir(): string {
   throw new Error(`Client bundle not found (looked in ${candidates.join(', ')}). Run \`npm run build\`.`);
 }
 
-export function serveFile(res: http.ServerResponse, file: string, cache: boolean) {
+/**
+ * Sends `file`, compressed when the build made a brotli or gzip copy of it (scripts/compress.mjs) and the
+ * browser takes that (`accept`, its Accept-Encoding): a quarter of the bytes for the bundle's scripts.
+ */
+export function serveFile(res: http.ServerResponse, file: string, cache: boolean, accept = '') {
   const ext = path.extname(file);
+  const encoding = /\bbr\b/.test(accept) && existsSync(`${file}.br`) ? 'br' : /\bgzip\b/.test(accept) && existsSync(`${file}.gz`) ? 'gzip' : undefined;
   res.writeHead(200, {
     'content-type': MIME[ext] ?? 'application/octet-stream',
     'cache-control': cache ? 'public, max-age=31536000, immutable' : 'no-store',
+    ...(encoding ? { 'content-encoding': encoding } : {}),
+    // Whether it came compressed depends on what the browser said it takes.
+    vary: 'accept-encoding',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
     'referrer-policy': 'no-referrer',
   });
-  createReadStream(file).pipe(res);
+  createReadStream(encoding === 'br' ? `${file}.br` : encoding === 'gzip' ? `${file}.gz` : file).pipe(res);
 }
 
 /** A file of the client bundle, or undefined when it's missing, a folder, or outside the bundle. */

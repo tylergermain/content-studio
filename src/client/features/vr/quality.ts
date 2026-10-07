@@ -28,7 +28,7 @@
  * - panelScale (VR): read by the panels when they paint (panels/).
  */
 import * as THREE from 'three';
-import type { OutlineEffect } from 'three/examples/jsm/effects/OutlineEffect.js';
+import type { FastOutlineEffect } from '../../core/outline-effect';
 import type { Ctx } from '../../core/context';
 import type { Parts } from '../../core/parts';
 import type { Frame, TickPhase } from '../../core/registry';
@@ -73,13 +73,13 @@ interface Entry {
 /** The profiles on in an office, the top one applied (see the stacking above). */
 class Profiles {
   private readonly entries: Entry[] = [];
-  /** The renderer's shadows as they were before any profile was on. */
-  private was = { autoUpdate: true, enabled: true, size: 2048 };
+  /** The renderer's shadows as they were before any profile was on, and the batching (the desktop has it on from the start: features/perf). */
+  private was = { autoUpdate: true, enabled: true, size: 2048, batching: false };
   private readonly hot = new HotTextures();
   private halos: THREE.Points[] = [];
   private shadowAt = -Infinity;
   /** The outline effect's own outline pass, while a profile stands in front of it. */
-  private outline: OutlineEffect['renderOutline'] | null = null;
+  private outline: FastOutlineEffect['renderOutline'] | null = null;
 
   constructor(
     private readonly ctx: Ctx,
@@ -94,7 +94,7 @@ class Profiles {
     const { renderer } = this.ctx;
     const { effect } = this.parts.stage;
     if (!this.entries.length) {
-      this.was = { autoUpdate: renderer.shadowMap.autoUpdate, enabled: renderer.shadowMap.enabled, size: this.parts.stage.sun.shadow.mapSize.x };
+      this.was = { autoUpdate: renderer.shadowMap.autoUpdate, enabled: renderer.shadowMap.enabled, size: this.parts.stage.sun.shadow.mapSize.x, batching: !!deps.batcher?.enabled };
       // The outline's pass, drawn only while the top profile has it.
       if (effect) {
         const draw = (this.outline = effect.renderOutline);
@@ -135,7 +135,7 @@ class Profiles {
     renderer.shadowMap.autoUpdate = this.was.autoUpdate;
     resizeShadow(sun, this.was.size);
     renderer.shadowMap.needsUpdate = true;
-    entry.batcher?.enable(false);
+    entry.batcher?.enable(this.was.batching);
     capPictures(0);
     if (this.outline && this.parts.stage.effect) this.parts.stage.effect.renderOutline = this.outline;
     this.outline = null;
